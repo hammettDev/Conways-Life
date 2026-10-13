@@ -383,19 +383,11 @@ export default function App() {
                 {phase === 'locked' && (
                   <>
                     <p><b>{selected && selected.name}</b> vs <b className="red">{botName}</b></p>
-                    <div className="row">
-                      <button className="go small" onClick={snap}>Snap</button>
-                      <button className="ghost small" onClick={callAudible} disabled={audibleUsed || !canAfford(save, audiblePrice)} title="Switch your formation after seeing the bot's">
-                        Audible {tutorial ? 'free' : money(AUDIBLE_PRICE)}
-                      </button>
-                      <button className="ghost small" onClick={cancelMatch}>Cancel</button>
-                    </div>
                   </>
                 )}
                 {phase === 'audible' && (
                   <>
                     <p>Pick your new formation in the sidebar.</p>
-                    <div className="row"><button className="ghost small" onClick={cancelAudible}>Back</button></div>
                   </>
                 )}
                 {phase === 'playing' && (
@@ -443,6 +435,9 @@ export default function App() {
           audibleChoiceId={audibleChoice} canAudible={canAudible}
           audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${tutorial ? 'free' : money(AUDIBLE_PRICE)}` : 'Pick a formation'}
           onAudibleConfirm={confirmAudible}
+          onSnap={snap} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
+          audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
+          audibleFee={tutorial ? 'free' : money(AUDIBLE_PRICE)}
         />
       </div>
 
