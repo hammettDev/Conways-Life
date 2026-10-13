@@ -36,7 +36,7 @@ export function createEngine({
     threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 3,
     hotValue: 5, restValue: 1, unit: 5, fence: true, maxBlocks: Infinity,
     overtime: 0,                      // ticks to play on after settling while flashers are still stacking, until the first topple
-    spread: false, spacing: 6,        // drop pieces far apart, only into clear space
+    spread: false, spacing: 6, slide: 30,        // drop pieces far apart, only into clear space
     cold: false, coldAfter: 4,        // still cells stop adding chips after this many quiet ticks
     flicker: false,                   // a flasher stays lit: a tile whose cell just went dark still adds a chip that tick
     resetTowers: false,               // a crash clears the stack only, not the scoring tower
@@ -77,6 +77,7 @@ export function createEngine({
   const fortuneScore = { blue: 0, red: 0 };
   const crashes = { total: 0, blue: 0, red: 0 }; // by the stack's majority colour
   let lastCrash = -Infinity;
+  let fencePieces = []; // [x, y] of each fence piece placed by the last topple
   let lastCrashInfo = null; // for the renderer: where the last topple happened and how much spilled
   let overtimeUntil = null; // set when the board has settled but flashers are still stacking
   let crashesAtSettle = 0;
@@ -163,33 +164,46 @@ export function createEngine({
       for (let yy = y0; yy <= y0 + 1; yy++) {
         for (let xx = a; xx <= a + 1; xx++) teams[yy * COLS + xx] = color;
       }
+      fencePieces.push([a, y0]);
       placed++;
     }
     return placed * F.chipsPerBlock;
   }
 
-  // The spread version: each chip gets its own slot every `spacing` tiles and
-  // lands only if the ground around it is clear (a piece already sitting there,
-  // static or not, wins). Chips that cannot land, or run past the edge, spill
-  // to Board 2. Returns the chips left over.
+  // The spread version: each piece lands in clear ground (nothing alive within
+  // two tiles, so it never touches anything) in the direction the tower falls. A
+  // piece that finds its slot blocked slides outward along the fall direction to the
+  // first clear spot (up to `slide` tiles) instead of being skipped. Chips that
+  // never land, or run past the edge, spill to Board 2. Returns the chips left over.
+  function clearAround(a, y0) {
+    for (let yy = Math.max(0, y0 - 2); yy <= Math.min(ROWS - 1, y0 + 3); yy++) {
+      for (let xx = Math.max(0, a - 2); xx <= Math.min(COLS - 1, a + 3); xx++) {
+        if (teams[yy * COLS + xx] !== DEAD) return false;
+      }
+    }
+    return true;
+  }
+
   function layFenceSpread(x0, y, dir, chipTeams) {
     const y0 = y + 1 < ROWS ? y : y - 1;
-    const left = [];
+    let from = 3; // distance of the next piece's nominal slot from the tower
     for (let n = 0; n < chipTeams.length; n++) {
-      if (n >= F.maxBlocks) return left.concat(chipTeams.slice(n));
-      const bx = x0 + dir * (3 + F.spacing * n);
-      const a = dir > 0 ? bx : bx - 1;
-      if (a < 0 || a + 1 >= COLS || y0 < 0) return left.concat(chipTeams.slice(n));
-      let clear = true;
-      for (let yy = Math.max(0, y0 - 2); yy <= Math.min(ROWS - 1, y0 + 3) && clear; yy++) {
-        for (let xx = Math.max(0, a - 2); xx <= Math.min(COLS - 1, a + 3); xx++) {
-          if (teams[yy * COLS + xx] !== DEAD) { clear = false; break; }
-        }
+      if (n >= F.maxBlocks) return chipTeams.slice(n);
+      let landedAt = -1;
+      for (let off = from; off <= from + F.slide; off++) {
+        const bx = x0 + dir * off;
+        const a = dir > 0 ? bx : bx - 1;
+        if (a < 0 || a + 1 >= COLS || y0 < 0) break;
+        if (!clearAround(a, y0)) continue;
+        for (let yy = y0; yy <= y0 + 1; yy++) for (let xx = a; xx <= a + 1; xx++) teams[yy * COLS + xx] = chipTeams[n];
+        fencePieces.push([a, y0]);
+        landedAt = off;
+        break;
       }
-      if (!clear) { left.push(chipTeams[n]); continue; }
-      for (let yy = y0; yy <= y0 + 1; yy++) for (let xx = a; xx <= a + 1; xx++) teams[yy * COLS + xx] = chipTeams[n];
+      if (landedAt < 0) return chipTeams.slice(n); // nowhere clear left: the rest spills
+      from = landedAt + F.spacing;
     }
-    return left;
+    return [];
   }
 
   // Board 2 landing order for a spill entering at (ex, ey): tiles fanning out
@@ -289,13 +303,14 @@ export function createEngine({
     const x0 = i % COLS;
     const y = (i / COLS) | 0;
     let leftover = chipTeams;
+    fencePieces = [];
     if (F.fence) {
       leftover = F.spread
         ? layFenceSpread(x0, y, dir, chipTeams)
         : chipTeams.slice(layFence(x0, y, dir, chipTeams));
     }
     const landings = F.pit ? splatter(leftover) : (spill(leftover, y, dir), []);
-    lastCrashInfo = { id: crashes.total, tick: tickCount, owner, dir, x: x0, y, spilled: leftover.length, landings };
+    lastCrashInfo = { id: crashes.total, tick: tickCount, owner, dir, x: x0, y, spilled: leftover.length, landings, fence: fencePieces };
   }
 
   function detectStability() {

@@ -412,14 +412,45 @@ describe('fortune layer (stacks, coloured fences, Board 2 spill)', () => {
       expect([25, 26, 27, 31, 32, 33].every((x) => e.teams[at(x, 30)] === DEAD)).toBe(true);
     });
 
-    it('a piece already sitting on the spot wins; the chip spills to Board 2 instead', () => {
+    it('a piece already sitting on the spot wins; the blocked piece slides outward to clear ground', () => {
       const e = make(SPREAD);
       e.loadTeams([{ x: 29, y: 30, team: RED }, { x: 30, y: 30, team: RED }, { x: 29, y: 31, team: RED }, { x: 30, y: 31, team: RED }]);
       e.setStack(20, 30, [[BLUE, 5]]);
       e.tick();
       expect(e.teams[at(29, 30)]).toBe(RED);           // the original piece stays
-      expect([23, 35, 41, 47].map((x) => e.teams[at(x, 30)])).toEqual([BLUE, BLUE, BLUE, BLUE]);
-      expect(total(e, BLUE)).toBe(1);                   // the blocked chip went to Board 2
+      // pieces at 23, then 33 (its slot at 29 was taken, so it slid out past the red block), 39, 45, 51
+      expect([23, 33, 39, 45, 51].map((x) => e.teams[at(x, 30)])).toEqual([BLUE, BLUE, BLUE, BLUE, BLUE]);
+      expect(total(e, BLUE)).toBe(0);                   // nothing was left over for Board 2
+      expect(e.lastCrash.fence).toHaveLength(5);
+    });
+
+    it('pieces always fall in the fall direction and never touch a live cell', () => {
+      const e = make({ ...SPREAD, maxBlocks: 2 });
+      const wall = [];
+      for (let y = 26; y <= 34; y++) wall.push({ x: 31, y, team: RED }); // a wall across the way
+      e.loadTeams(wall);
+      e.setStack(20, 30, [[BLUE, 5]]);
+      e.tick();
+      expect(e.lastCrash.fence.length).toBeGreaterThan(0);
+      for (const [px] of e.lastCrash.fence) expect(px).toBeGreaterThan(20); // toward the enemy side
+      for (const [px, py] of e.lastCrash.fence) {
+        for (let dx = -2; dx <= 3; dx++) for (let dy = -2; dy <= 3; dy++) {
+          const t = e.teams[at(px + dx, py + dy)];
+          const inPiece = dx >= 0 && dx <= 1 && dy >= 0 && dy <= 1;
+          if (!inPiece) expect([DEAD, BLUE].includes(t) && !(t === RED)).toBe(true);
+        }
+      }
+    });
+
+    it('with no clear ground in reach, the chips spill to Board 2 instead', () => {
+      const e = make({ ...SPREAD, slide: 2 });
+      const wall = [];
+      for (let y = 24; y <= 36; y++) for (let x = 24; x <= 40; x++) wall.push({ x, y, team: RED }); // a solid field of cells
+      e.loadTeams(wall);
+      e.setStack(20, 30, [[BLUE, 5]]);
+      e.tick();
+      expect(e.lastCrash.fence).toHaveLength(0);
+      expect(total(e, BLUE)).toBeGreaterThan(0);
     });
 
     it('pieces landing in clear space leave the rest of the board untouched', () => {
