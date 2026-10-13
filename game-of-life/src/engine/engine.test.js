@@ -235,3 +235,78 @@ describe('underworld seeding', () => {
     expect(live(empty)).toBeGreaterThan(0);
   });
 });
+
+describe('avalanche mode (tower crashes)', () => {
+  const block = (team, x, y) => [[x, y, team], [x + 1, y, team], [x, y + 1, team], [x + 1, y + 1, team]];
+  // `heatAt`: tiles that are Hot Zones, so that team's towers grow +2 a tick.
+  const make = (cells, av, heatAt = []) => {
+    const e = createEngine({ seed: 1, freezeUnderworld: true, avalanche: av });
+    e.hot.fill(0);
+    for (const [x, y] of heatAt) e.hot[at(x, y)] = 1;
+    e.loadTeams(cells.map(([x, y, team]) => ({ x, y, team })));
+    return e;
+  };
+  const AV = { threshold: 2, target: 99, maxTicks: 60, cooldown: 5 };
+  const BLOCK_HEAT = [[20, 30], [21, 30], [20, 31], [21, 31]];
+
+  it('does not end on a still life; the tower climbs until it crashes', () => {
+    const e = make(block(BLUE, 20, 30), { ...AV, threshold: 5 });
+    for (let i = 0; i < 4; i++) e.tick();
+    expect(e.status).toBe('running');
+    expect(e.banked.blue).toBe(0);
+    e.tick();
+    expect(e.banked.blue).toBe(1); // only the single tallest tower crashes
+    expect(e.blueTower.reduce((a, v) => a + (v === 0 ? 1 : 0), 0)).toBeGreaterThan(SIZE - 4);
+  });
+
+  it('a crash topples a fence toward the enemy, to the board edge', () => {
+    const e = make(block(BLUE, 20, 30), AV, BLOCK_HEAT);
+    e.tick(); // hot towers reach 2 in one tick
+    expect(e.banked.blue).toBe(1);
+    let reachesEdge = false;
+    for (let y = 30; y <= 31; y++) for (let x = COLS - 5; x < COLS; x++) if (e.teams[at(x, y)] === BLUE) reachesEdge = true;
+    expect(reachesEdge).toBe(true);
+    const crashed = [[20, 30], [21, 30], [20, 31], [21, 31]].findIndex(([x, y]) => e.blueTower[at(x, y)] === 0);
+    expect(crashed).toBeGreaterThanOrEqual(0);
+  });
+
+  it('a Red crash topples the other way', () => {
+    const e = make(block(RED, 50, 30), AV, [[50, 30], [51, 30], [50, 31], [51, 31]]);
+    e.tick();
+    expect(e.banked.red).toBe(1);
+    let reachesEdge = false;
+    for (let y = 30; y <= 31; y++) for (let x = 0; x < 5; x++) if (e.teams[at(x, y)] === RED) reachesEdge = true;
+    expect(reachesEdge).toBe(true);
+  });
+
+  it('the fence crushes enemy cells but never the team\'s own', () => {
+    const cells = [...block(BLUE, 20, 30), ...block(RED, 40, 30), ...block(BLUE, 30, 30)];
+    const e = make(cells, AV, BLOCK_HEAT);
+    e.tick();
+    // The fence covers both rows of every other 2-wide slot; (40..41) is one.
+    const crushed = [at(39, 30), at(40, 30), at(41, 30), at(42, 30), at(43, 30)].some((i) => e.teams[i] === BLUE);
+    expect(crushed).toBe(true);
+    expect(e.teams[at(30, 30)]).toBe(BLUE); // own block untouched
+  });
+
+  it('cooldown spaces out a team\'s crashes', () => {
+    const e = make(block(BLUE, 20, 30), { ...AV, cooldown: 10 }, BLOCK_HEAT);
+    for (let i = 0; i < 9; i++) e.tick();
+    expect(e.banked.blue).toBe(1);
+    e.tick();
+    expect(e.banked.blue).toBeGreaterThanOrEqual(1);
+  });
+
+  it('ends when a team banks its target, and the bank race decides the winner', () => {
+    const e = make(block(BLUE, 20, 30), { ...AV, target: 3, cooldown: 2 }, BLOCK_HEAT);
+    const r = e.runToEnd();
+    expect(r.status).toBe('target');
+    expect(r.outcome).toBe('win');
+    expect(r.banked.blue).toBeGreaterThanOrEqual(3);
+  });
+
+  it('old rules are unchanged when avalanche is off', () => {
+    const e = make(block(BLUE, 20, 30), null);
+    expect(e.runToEnd().status).toBe('stable');
+  });
+});
