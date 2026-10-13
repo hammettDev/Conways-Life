@@ -5,7 +5,9 @@ import { accumulateTowers } from './towers.js';
 import { scorePlots, outcomeFor, payoutFor } from './scoring.js';
 import { createEngine } from './engine.js';
 import { createRng } from './rng.js';
-import { FORTUNE_RULES, FORTUNE_RULES_LIVE_FENCE } from './fortuneRules.js';
+import {
+  FORTUNE_RULES, FORTUNE_RULES_LIVE_FENCE, DEFAULT_FORTUNE_RULES, fortuneRulesFor,
+} from './fortuneRules.js';
 import { seedUnderworld, rescueUnderworld, RESCUE_BELOW } from './underworld.js';
 
 const SIZE = COLS * ROWS;
@@ -535,5 +537,11 @@ describe('shipped fortune rules', () => {
     expect(FORTUNE_RULES_LIVE_FENCE.fence).toBe(true);
     expect(FORTUNE_RULES_LIVE_FENCE.maxBlocks).toBe(2);
     expect(FORTUNE_RULES.unit).toBe(0.25);
+  });
+
+  it('the live fence is the default, and one switch turns it off', () => {
+    expect(DEFAULT_FORTUNE_RULES).toBe(FORTUNE_RULES_LIVE_FENCE);
+    expect(fortuneRulesFor()).toBe(FORTUNE_RULES_LIVE_FENCE);
+    expect(fortuneRulesFor({ liveFence: false })).toBe(FORTUNE_RULES);
   });
 });

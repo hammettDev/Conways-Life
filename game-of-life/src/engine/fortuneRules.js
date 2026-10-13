@@ -25,3 +25,8 @@ export const FORTUNE_RULES = { ...CORE, fence: false };
 
 // Dramatic: a small tight fence of up to 2 blocks lands on clear ground on Board 1.
 export const FORTUNE_RULES_LIVE_FENCE = { ...CORE, fence: true, spread: true, spacing: 4, maxBlocks: 2 };
+
+// The game's default: the live fence is on. Flip `liveFence` off to switch to the
+// strategy-safest rules (Board 1 untouched by a topple) without changing anything else.
+export const DEFAULT_FORTUNE_RULES = FORTUNE_RULES_LIVE_FENCE;
+export const fortuneRulesFor = ({ liveFence = true } = {}) => (liveFence ? FORTUNE_RULES_LIVE_FENCE : FORTUNE_RULES);
