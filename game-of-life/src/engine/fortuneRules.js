@@ -19,7 +19,7 @@ const CORE = {
   pitSize: 10,
   splash: 1.6,
   hotValue: 5, // a chip landing on a Hot Spot becomes a stack of 5 of its own colour
-  unit: 0.25, // bonus plots = pit tile lead / unit, i.e. 4 plots per tile of lead
+  unit: 3, // bonus plots = pit tile lead / unit, i.e. 1 plot per 3 tiles of lead
   overtime: 150, // a settled board with flashers plays on (up to this many ticks) until the first topple
 };
 
@@ -29,7 +29,7 @@ export const FORTUNE_RULES = { ...CORE, fence: false };
 // Dramatic: a connected line of up to 15 single cells lands along the fall direction on clear ground on Board 1.
 export const FORTUNE_RULES_LIVE_FENCE = { ...CORE, fence: true, spread: true, line: 15, spacing: 4, maxBlocks: 2 };
 
-// The game's default: the live fence is on. Flip `liveFence` off to switch to the
-// strategy-safest rules (Board 1 untouched by a topple) without changing anything else.
-export const DEFAULT_FORTUNE_RULES = FORTUNE_RULES_LIVE_FENCE;
-export const fortuneRulesFor = ({ liveFence = true } = {}) => (liveFence ? FORTUNE_RULES_LIVE_FENCE : FORTUNE_RULES);
+// The game's default: no live fence (Board 1 is untouched by a topple; sweeps showed a
+// live fence turns results into a coin flip). `liveFence` brings it back for experiments.
+export const DEFAULT_FORTUNE_RULES = FORTUNE_RULES;
+export const fortuneRulesFor = ({ liveFence = false } = {}) => (liveFence ? FORTUNE_RULES_LIVE_FENCE : FORTUNE_RULES);

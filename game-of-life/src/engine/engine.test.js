@@ -581,13 +581,14 @@ describe('shipped fortune rules', () => {
     expect(FORTUNE_RULES.fence).toBe(false);
     expect(FORTUNE_RULES_LIVE_FENCE.fence).toBe(true);
     expect(FORTUNE_RULES_LIVE_FENCE.maxBlocks).toBe(2);
-    expect(FORTUNE_RULES.unit).toBe(0.25);
+    expect(FORTUNE_RULES.unit).toBe(3);
+    expect(FORTUNE_RULES.maxCrashes).toBe(Infinity); // no topple limit
   });
 
-  it('the live fence is the default, and one switch turns it off', () => {
-    expect(DEFAULT_FORTUNE_RULES).toBe(FORTUNE_RULES_LIVE_FENCE);
-    expect(fortuneRulesFor()).toBe(FORTUNE_RULES_LIVE_FENCE);
-    expect(fortuneRulesFor({ liveFence: false })).toBe(FORTUNE_RULES);
+  it('the live fence is off by default, and one switch turns it on', () => {
+    expect(DEFAULT_FORTUNE_RULES).toBe(FORTUNE_RULES);
+    expect(fortuneRulesFor()).toBe(FORTUNE_RULES);
+    expect(fortuneRulesFor({ liveFence: true })).toBe(FORTUNE_RULES_LIVE_FENCE);
   });
 
   describe('overtime for flashers', () => {
