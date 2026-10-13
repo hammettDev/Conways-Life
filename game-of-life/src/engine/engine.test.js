@@ -457,23 +457,45 @@ describe('fortune layer (stacks, coloured fences, Board 2 spill)', () => {
       expect(shared.length).toBeGreaterThan(0);
     });
 
-    it('a tile goes to the colour with more chips; a Hot Spot tile is worth x5; ties belong to nobody', () => {
-      const e = make({ ...PIT, hotValue: 5 });
-      e.hot2.fill(0);
+    it('a tile goes to the colour with more chips, one tile-point each; ties belong to nobody', () => {
+      const e = make({ ...PIT });
+      e.pit[BLUE][0] = 3; e.pit[RED][0] = 1; // blue ahead
+      e.pit[RED][1] = 2;                     // red only
+      e.pit[BLUE][2] = 2; e.pit[RED][2] = 2; // tie
+      e.pit[BLUE][3] = 1;                    // blue only
+      expect(e.fortune.blue).toBe(2);
+      expect(e.fortune.red).toBe(1);
+    });
+
+    it('a chip landing on a Hot Spot becomes a stack of 5 of its own colour; elsewhere it adds 1', () => {
       const cx = (COLS - 10) >> 1;
       const cy = (ROWS - 10) >> 1;
-      e.hot2[(cy + 2) * COLS + cx + 2] = 1; // pit tile (2,2) is hot
-      e.pit[BLUE][2 * 10 + 2] = 1;          // hot tile, blue only      -> blue +5
-      e.pit[BLUE][0] = 3; e.pit[RED][0] = 1; // plain tile, blue ahead   -> blue +1
-      e.pit[RED][1] = 2;                     // plain tile, red only     -> red +1
-      e.pit[BLUE][3] = 2; e.pit[RED][3] = 2; // tie                      -> nobody
-      expect(e.fortune.blue).toBe(6);
-      expect(e.fortune.red).toBe(1);
+      const total = (e) => e.pit[BLUE].reduce((a, v) => a + v, 0);
+      const hotPit = make({ ...PIT, hotValue: 5 });
+      for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) hotPit.hot2[(cy + y) * COLS + cx + x] = 1;
+      hotPit.setStack(30, 30, [[BLUE, 6]]);
+      hotPit.tick();
+      expect(total(hotPit)).toBe(6 * 5);   // every chip landed on a Hot Spot: 5 each
+      const coldPit = make({ ...PIT, hotValue: 5 });
+      coldPit.setStack(30, 30, [[BLUE, 6]]);
+      coldPit.tick();
+      expect(total(coldPit)).toBe(6);       // none on a Hot Spot: 1 each
+    });
+
+    it('a hot landing can swing a tile the other colour', () => {
+      const e = make({ ...PIT, hotValue: 5 });
+      const cx = (COLS - 10) >> 1;
+      const cy = (ROWS - 10) >> 1;
+      for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) e.hot2[(cy + y) * COLS + cx + x] = 1;
+      for (let k = 0; k < 100; k++) e.pit[RED][k] = 4;       // red holds every tile, 4 chips each
+      e.setStack(30, 30, [[BLUE, 12]]);                       // 12 blue chips, each a 5-stack
+      e.tick();
+      expect(e.fortune.blue).toBeGreaterThan(0);              // blue flipped tiles from red
+      expect(e.fortune.blue + e.fortune.red).toBeLessThanOrEqual(100);
     });
 
     it('the tile lead becomes bonus plots', () => {
       const e = make({ ...PIT, unit: 2 });
-      e.hot2.fill(0);
       for (let k = 0; k < 8; k++) e.pit[BLUE][k] = 1; // blue holds 8 tiles, red none
       expect(e.getScore().blue - e.getScore(false).blue).toBe(4);
     });

@@ -40,8 +40,9 @@ export function createEngine({
     resetTowers: false,               // a crash clears the stack only, not the scoring tower
     // The pit: Board 2 as a small tile-ownership battle. Overflow chips are
     // dropped down a gutter into the middle of a pitSize x pitSize board and
-    // splatter outward; each tile goes to the colour with more chips at the end,
-    // and a tile on a Hot Spot is worth hotValue. Off = the larger 60x40 board.
+    // splatter outward; each tile goes to the colour with more chips at the end.
+    // A chip that lands on a Hot Spot counts as a stack of hotValue. Off = the
+    // larger 60x40 board.
     pit: false, pitSize: 10, splash: 1.6,
     ...fortune,
   };
@@ -205,6 +206,8 @@ export function createEngine({
   const pitY0 = (ROWS - F?.pitSize) >> 1;
 
   // Chips drop into the middle and splatter outward; later chips splash wider.
+  // A chip that lands on a Hot Spot becomes a stack of hotValue chips of its
+  // own colour on that tile (a red chip on a hot spot adds 5 red).
   function splatter(chipTeams) {
     const n = F.pitSize;
     const c = (n - 1) / 2;
@@ -214,23 +217,20 @@ export function createEngine({
       const gy = (rng2() + rng2() + rng2() - 1.5) * 2;
       const px = Math.min(n - 1, Math.max(0, Math.round(c + gx * sigma)));
       const py = Math.min(n - 1, Math.max(0, Math.round(c + gy * sigma)));
-      pitChips[team][py * n + px]++;
+      const hotHere = hot2[(pitY0 + py) * COLS + pitX0 + px];
+      pitChips[team][py * n + px] += hotHere ? F.hotValue : 1;
     });
   }
 
   // Each pit tile belongs to the colour with more chips on it (ties belong to
-  // nobody); a tile on a Hot Spot is worth hotValue tile-points, others one.
+  // nobody) and is worth one tile-point.
   function pitTiles() {
     const n = F.pitSize;
     let blue = 0;
     let red = 0;
-    for (let py = 0; py < n; py++) {
-      for (let px = 0; px < n; px++) {
-        const k = py * n + px;
-        const value = hot2[(pitY0 + py) * COLS + pitX0 + px] ? F.hotValue : 1;
-        if (pitChips[BLUE][k] > pitChips[RED][k]) blue += value;
-        else if (pitChips[RED][k] > pitChips[BLUE][k]) red += value;
-      }
+    for (let k = 0; k < n * n; k++) {
+      if (pitChips[BLUE][k] > pitChips[RED][k]) blue++;
+      else if (pitChips[RED][k] > pitChips[BLUE][k]) red++;
     }
     return { blue, red };
   }
