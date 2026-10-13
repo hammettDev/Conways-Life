@@ -50,6 +50,16 @@ export function drawBoard(ctx, view) {
   ctx.fillStyle = THEME.field;
   ctx.fillRect(FIELD_X0 * tile, FIELD_Y0 * tile, (FIELD_X1 - FIELD_X0) * tile, (FIELD_Y1 - FIELD_Y0) * tile);
 
+  // Mown-turf stripes: every other 5-tile band is a shade lighter, with a faint yard line between bands.
+  for (let x = FIELD_X0; x < FIELD_X1; x += 5) {
+    if (((x - FIELD_X0) / 5) % 2 === 1) {
+      ctx.fillStyle = THEME.fieldStripe;
+      ctx.fillRect(x * tile, FIELD_Y0 * tile, 5 * tile, (FIELD_Y1 - FIELD_Y0) * tile);
+    }
+    ctx.fillStyle = THEME.yard;
+    ctx.fillRect(x * tile - 0.5, FIELD_Y0 * tile, 1, (FIELD_Y1 - FIELD_Y0) * tile);
+  }
+
   // Faint tile centres instead of a heavy grid.
   ctx.fillStyle = THEME.grid;
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) ctx.fillRect(x * tile + tile / 2 - 0.5, y * tile + tile / 2 - 0.5, 1, 1);

@@ -1,9 +1,10 @@
 :root {
-  --bg: #050912;
-  --panel: #0a1222;
-  --edge: rgba(120, 190, 255, 0.18);
-  --text: #e8f0ff;
-  --dim: #7f93b8;
+  --bg: #040b07;
+  --panel: #09170f;
+  --edge: rgba(120, 255, 170, 0.18);
+  --text: #e8f5ec;
+  --dim: #7fa88e;
+  --accent: #45e08a;
   --blue: #38a9ff;
   --red: #ff3d78;
   --hot: #ffb02e;
@@ -14,7 +15,7 @@
 
 body {
   margin: 0;
-  background: radial-gradient(1200px 600px at 70% -10%, #0e1c3a 0%, var(--bg) 60%);
+  background: radial-gradient(1200px 600px at 30% -10%, #0f2a1a 0%, var(--bg) 60%);
   color: var(--text);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   min-height: 100vh;
@@ -42,11 +43,11 @@ body {
   flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--edge);
   background: transparent; color: var(--dim); font-weight: 600; cursor: pointer;
 }
-.tabs button[aria-selected='true'] { color: var(--text); background: rgba(56, 169, 255, 0.16); border-color: var(--blue); }
+.tabs button[aria-selected='true'] { color: var(--text); background: rgba(69, 224, 138, 0.16); border-color: var(--accent); }
 
 .search {
   width: 100%; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--edge);
-  background: #070d1a; color: var(--text); font-size: 0.95rem;
+  background: #06110a; color: var(--text); font-size: 0.95rem;
 }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -54,7 +55,7 @@ body {
   padding: 5px 10px; border-radius: 999px; border: 1px solid var(--edge);
   background: transparent; color: var(--dim); cursor: pointer; font-size: 0.8rem;
 }
-.chip.on { color: #04101f; background: var(--blue); border-color: var(--blue); font-weight: 700; }
+.chip.on { color: #04140a; background: var(--accent); border-color: var(--accent); font-weight: 700; }
 
 .list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; min-height: 120px; display: flex; flex-direction: column; gap: 4px; }
 .item {
@@ -63,7 +64,7 @@ body {
   background: rgba(255, 255, 255, 0.03); color: var(--text); cursor: pointer;
 }
 .item:hover:not(:disabled) { border-color: var(--edge); }
-.item.on { border-color: var(--blue); background: rgba(56, 169, 255, 0.14); }
+.item.on { border-color: var(--accent); background: rgba(69, 224, 138, 0.14); }
 .item:disabled { opacity: 0.55; cursor: default; }
 .item .meta { color: var(--dim); font-size: 0.8rem; white-space: nowrap; }
 .empty { color: var(--dim); padding: 8px; }
@@ -80,7 +81,7 @@ body {
 /* Keep the whole stack (score bar, board, gutter, pit) inside the viewport. */
 .arena {
   display: block; border-radius: 14px; border: 1px solid var(--edge);
-  box-shadow: 0 0 40px rgba(56, 169, 255, 0.12);
+  box-shadow: 0 0 40px rgba(69, 224, 138, 0.14);
   width: min(100%, calc((100vh - 430px) * 80 / 60));
   min-width: 360px;
 }
@@ -99,7 +100,7 @@ body {
 
 .gutter {
   width: 22px; height: 26px; margin: -1px 0; position: relative;
-  background: linear-gradient(90deg, #0b1830, #1a3560 50%, #0b1830);
+  background: linear-gradient(90deg, #0a1d12, #1d4a2c 50%, #0a1d12);
   border-left: 1px solid var(--edge); border-right: 1px solid var(--edge);
 }
 .gutter span { position: absolute; left: 30px; top: 4px; font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
@@ -121,7 +122,7 @@ body {
 .ghost, .speeds button {
   padding: 8px 14px; border-radius: 10px; border: 1px solid var(--edge); background: transparent; color: var(--text); cursor: pointer;
 }
-.speeds button.on { background: var(--blue); color: #04101f; border-color: var(--blue); font-weight: 700; }
+.speeds button.on { background: var(--accent); color: #04140a; border-color: var(--accent); font-weight: 700; }
 
 .score { display: flex; align-items: baseline; gap: 14px; font-size: 2.2rem; font-weight: 800; }
 .score i { font-style: normal; font-size: 0.8rem; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
