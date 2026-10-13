@@ -29,5 +29,7 @@ describe('audible economy', () => {
     expect(C.AUDIBLE_PRICE).toBeLessThanOrEqual(C.WAGER / 2);
     expect(C.BOT_AUDIBLE_CHANCE).toBeGreaterThanOrEqual(0.25);
     expect(C.BOT_AUDIBLE_CHANCE).toBeLessThanOrEqual(0.35);
+    expect(C.AUDIBLE_PRICE).toBe(50);
+    expect(C.SCOUT_BOSS_AUDIBLE_CHANCE).toBe(1);
   });
 });

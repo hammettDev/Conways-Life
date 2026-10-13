@@ -34,7 +34,9 @@ export const MAX_PERIOD = 3;
 // AUDIBLE_PRICE to switch yours (pay-per-use, so you only call it when you are
 // in a bad matchup). If you call one, the bot may answer with its own hidden
 // counter-audible with probability BOT_AUDIBLE_CHANCE, which caps a perfect
-// counter-picker at roughly 75-80% instead of 90%. Not available against bosses.
-// Simulated on the 30-build pool.
-export const AUDIBLE_PRICE = 25;
+// counter-picker at roughly 75-80% instead of 90%. Simulated on the 30-build pool.
+// Bosses can be audibled against too, but The Scout always answers: calling an
+// audible against it just burns the fee, so you have to out-vary it instead.
+export const AUDIBLE_PRICE = 50;
 export const BOT_AUDIBLE_CHANCE = 0.3;
+export const SCOUT_BOSS_AUDIBLE_CHANCE = 1;
