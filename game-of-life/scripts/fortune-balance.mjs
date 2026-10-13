@@ -11,16 +11,15 @@ import { BLUE, RED } from '../src/engine/constants.js';
 
 const ME = fileURLToPath(import.meta.url);
 const K = Number(process.argv[2] || 3);
-const BASE = { threshold: 25, cooldown: 8, maxCrashes: 6, cold: true };
-const PIT = { ...BASE, pit: true, pitSize: 10 };
-const FENCE2 = { spread: true, spacing: 4, maxBlocks: 2 };
+import { FORTUNE_RULES_LIVE_FENCE as NOW } from '../src/engine/fortuneRules.js';
+const PREV = { ...NOW, maxCrashes: 6, shed: false, line: 0, maxBlocks: 2 }; // blocks of 2x2, 6 topples at most
 const MODES = [
-  { name: 'old rules', f: null },
-  { name: 'pit, no drops, unit 0.5', f: { ...PIT, unit: 0.5, fence: false } },
-  { name: 'pit, no drops, unit 0.33', f: { ...PIT, unit: 0.33, fence: false } },
-  { name: 'pit, no drops, unit 0.25', f: { ...PIT, unit: 0.25, fence: false } },
-  { name: 'pit + small fence(2), unit 0.33', f: { ...PIT, ...FENCE2, unit: 0.33 } },
-  { name: 'pit + small fence(2), unit 0.25', f: { ...PIT, ...FENCE2, unit: 0.25 } },
+  { name: 'old rules (no fortune)', f: null },
+  { name: 'previous: 2 blocks, cap 6', f: PREV },
+  { name: 'now: 15-line, no cap', f: NOW },
+  { name: 'now, no fence on Board 1', f: { ...NOW, fence: false } },
+  { name: 'now, 5-line', f: { ...NOW, line: 5 } },
+  { name: 'now, no cap, 2 blocks', f: { ...NOW, line: 0 } },
 ];
 const o2n = (o) => (o === 'win' ? 1 : o === 'push' ? 0.5 : 0);
 
