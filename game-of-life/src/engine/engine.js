@@ -76,6 +76,7 @@ export function createEngine({
   const fortuneScore = { blue: 0, red: 0 };
   const crashes = { total: 0, blue: 0, red: 0 }; // by the stack's majority colour
   let lastCrash = -Infinity;
+  let lastCrashInfo = null; // for the renderer: where the last topple happened and how much spilled
   let overtimeUntil = null; // set when the board has settled but flashers are still stacking
   let crashesAtSettle = 0;
 
@@ -88,6 +89,7 @@ export function createEngine({
     status = 'running';
     period = 0;
     overtimeUntil = null;
+    lastCrashInfo = null;
     blueTower.fill(0);
     redTower.fill(0);
     locked.fill(DEAD);
@@ -285,6 +287,7 @@ export function createEngine({
         ? layFenceSpread(x0, y, dir, chipTeams)
         : chipTeams.slice(layFence(x0, y, dir, chipTeams));
     }
+    lastCrashInfo = { id: crashes.total, tick: tickCount, owner, dir, x: x0, y, spilled: leftover.length };
     if (F.pit) splatter(leftover);
     else spill(leftover, y, dir);
   }
@@ -413,5 +416,6 @@ export function createEngine({
     get chips() { return chips; },
     get fortune() { return F && F.pit ? { ...pitTiles(), crashes: { ...crashes } } : { blue: fortuneScore.blue, red: fortuneScore.red, crashes: { ...crashes } }; },
     get pit() { return pitChips; },
+    get lastCrash() { return lastCrashInfo; },
   };
 }

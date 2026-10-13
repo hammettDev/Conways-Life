@@ -56,3 +56,47 @@ describe('Madden view mapping', () => {
     expect(seen.size).toBe(COLS * ROWS);
   });
 });
+
+import { spillPath, pointAlong, tableSize, APRON } from './drawBoard.js';
+
+describe('the gutter route', () => {
+  const blueCrash = { x: 30, y: 25, dir: 1, owner: 1, spilled: 12 };
+  const redCrash = { x: 50, y: 25, dir: -1, owner: 2, spilled: 12 };
+
+  it('the table is the board plus the pit apron underneath', () => {
+    expect(tableSize(true)).toEqual({ cols: ROWS, rows: COLS + APRON, boardRows: COLS });
+    expect(tableSize(false)).toEqual({ cols: COLS, rows: ROWS + APRON, boardRows: ROWS });
+  });
+
+  it('Madden: Blue chips leave off the top edge, run a side rail down, and end in the pit', () => {
+    const path = spillPath(blueCrash, true);
+    const { cols, boardRows } = tableSize(true);
+    expect(path[0][1]).toBeGreaterThan(path[1][1]);                 // first leg heads up the board
+    expect(path[1][1]).toBeLessThan(1);                              // to the top edge
+    expect(path.some(([x]) => x === 5 || x === cols - 5)).toBe(true); // down a side rail
+    const end = path[path.length - 1];
+    expect(end[0]).toBe(cols / 2);
+    expect(end[1]).toBeGreaterThan(boardRows);                       // finishes below the board, in the pit
+  });
+
+  it('Madden: Red chips leave off the bottom edge and drop straight to the pit', () => {
+    const path = spillPath(redCrash, true);
+    const { boardRows } = tableSize(true);
+    expect(path[1][1]).toBeGreaterThan(boardRows - 1);
+    expect(path[path.length - 1][1]).toBeGreaterThan(boardRows);
+  });
+
+  it('Sideways: each team uses its own side rail', () => {
+    const { cols } = tableSize(false);
+    expect(spillPath(blueCrash, false).some(([x]) => x === cols - 5)).toBe(true);
+    expect(spillPath(redCrash, false).some(([x]) => x === 5)).toBe(true);
+  });
+
+  it('pointAlong walks a polyline from start to end', () => {
+    const line = [[0, 0], [10, 0], [10, 10]];
+    expect(pointAlong(line, 0)).toEqual([0, 0]);
+    expect(pointAlong(line, 0.5)).toEqual([10, 0]);
+    expect(pointAlong(line, 1)).toEqual([10, 10]);
+    expect(pointAlong(line, 0.25)).toEqual([5, 0]);
+  });
+});
