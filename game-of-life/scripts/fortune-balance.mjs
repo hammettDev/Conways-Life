@@ -15,11 +15,12 @@ import { FORTUNE_RULES_LIVE_FENCE as NOW } from '../src/engine/fortuneRules.js';
 const PREV = { ...NOW, maxCrashes: 6, shed: false, line: 0, maxBlocks: 2 }; // blocks of 2x2, 6 topples at most
 const MODES = [
   { name: 'old rules (no fortune)', f: null },
-  { name: 'previous: 2 blocks, cap 6', f: PREV },
-  { name: 'now: 15-line, no cap', f: NOW },
-  { name: 'now, no fence on Board 1', f: { ...NOW, fence: false } },
-  { name: 'now, 5-line', f: { ...NOW, line: 5 } },
-  { name: 'now, no cap, 2 blocks', f: { ...NOW, line: 0 } },
+  { name: 'now: 15-line, unit 0.25', f: NOW },
+  { name: '15-line, unit 1', f: { ...NOW, unit: 1 } },
+  { name: '15-line, unit 3', f: { ...NOW, unit: 3 } },
+  { name: 'no Board 1 fence, unit 1', f: { ...NOW, fence: false, unit: 1 } },
+  { name: 'no Board 1 fence, unit 3', f: { ...NOW, fence: false, unit: 3 } },
+  { name: 'no Board 1 fence, unit 3, cap 6', f: { ...NOW, fence: false, unit: 3, maxCrashes: 6 } },
 ];
 const o2n = (o) => (o === 'win' ? 1 : o === 'push' ? 0.5 : 0);
 
