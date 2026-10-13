@@ -3,7 +3,7 @@
 // closest to 50% against the pool and is still inert alone is kept.
 //   node scripts/jitter.mjs [rounds] [variants] [opponentSample]
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { RAW, CANDIDATES, assemble, footprintOf, TARGET_TILES } from '../src/engine/library.js';
@@ -14,13 +14,15 @@ import { placeFormation, validateDraft } from '../src/engine/formations.js';
 import { createEngine } from '../src/engine/engine.js';
 import { createRng } from '../src/engine/rng.js';
 import { BLUE, RED } from '../src/engine/constants.js';
+import { DEFAULT_FORTUNE_RULES } from '../src/engine/fortuneRules.js';
 
 const ME = fileURLToPath(import.meta.url);
 
 if (!isMainThread) {
   const out = [];
   for (const [tag, blue, red, seed] of workerData.tasks) {
-    const e = createEngine({ seed, freezeUnderworld: true });
+    const fortune = process.env.FORTUNE ? DEFAULT_FORTUNE_RULES : null; // tune under the shipped rules
+    const e = createEngine({ seed, freezeUnderworld: !fortune, fortune });
     e.loadTeams([...placeFormation(blue, BLUE), ...placeFormation(red, RED)]);
     const r = e.runToEnd();
     out.push([tag, r.outcome === 'win' ? 1 : r.outcome === 'push' ? 0.5 : 0]);
@@ -59,7 +61,7 @@ if (!isMainThread) {
 
   const tuning = JSON.parse(JSON.stringify(TUNING));
   const rawById = new Map(RAW.map((b) => [b.id, b]));
-  const ids = ROSTER.free;
+  const ids = process.env.ROSTER_FILE ? JSON.parse(readFileSync(process.env.ROSTER_FILE, 'utf8')).free : ROSTER.free;
   let rng = createRng(12345);
 
   for (let round = 1; round <= rounds; round++) {
