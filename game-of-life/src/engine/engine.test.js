@@ -5,6 +5,7 @@ import { accumulateTowers } from './towers.js';
 import { scorePlots, outcomeFor, payoutFor } from './scoring.js';
 import { createEngine } from './engine.js';
 import { createRng } from './rng.js';
+import { FORTUNE_RULES, FORTUNE_RULES_LIVE_FENCE } from './fortuneRules.js';
 import { seedUnderworld, rescueUnderworld, RESCUE_BELOW } from './underworld.js';
 
 const SIZE = COLS * ROWS;
@@ -508,5 +509,31 @@ describe('fortune layer (stacks, coloured fences, Board 2 spill)', () => {
       expect(e.teams[at(31, 30)]).toBe(DEAD);                                  // no third
       expect(inPit(e).reduce((n, [, , c]) => n + c, 0)).toBe(4);               // 6 - 2 chips overflow
     });
+  });
+});
+
+describe('shipped fortune rules', () => {
+  const cells = [
+    [30, 28], [30, 29], [30, 30], [31, 28], [32, 29], [29, 31], [33, 31], [34, 29], [35, 30], [28, 30],
+  ].map(([x, y]) => ({ x, y, team: BLUE }))
+    .concat([[50, 28], [50, 29], [50, 30], [49, 28], [48, 29], [51, 31], [47, 31], [46, 29], [45, 30], [52, 30]]
+      .map(([x, y]) => ({ x, y, team: RED })));
+
+  it('run a full match with both rule sets and report the pit', () => {
+    for (const rules of [FORTUNE_RULES, FORTUNE_RULES_LIVE_FENCE]) {
+      const e = createEngine({ seed: 7, fortune: rules });
+      e.loadTeams(cells);
+      const r = e.runToEnd();
+      expect(['stable', 'cap', 'extinct']).toContain(r.status);
+      expect(r.fortune).toBeDefined();
+      expect(r.fortune.blue + r.fortune.red).toBeLessThanOrEqual(100); // pit is 10x10
+    }
+  });
+
+  it('the safe rules never touch Board 1 on a topple; the live-fence rules may', () => {
+    expect(FORTUNE_RULES.fence).toBe(false);
+    expect(FORTUNE_RULES_LIVE_FENCE.fence).toBe(true);
+    expect(FORTUNE_RULES_LIVE_FENCE.maxBlocks).toBe(2);
+    expect(FORTUNE_RULES.unit).toBe(0.25);
   });
 });
