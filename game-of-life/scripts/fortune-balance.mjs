@@ -13,11 +13,10 @@ const ME = fileURLToPath(import.meta.url);
 const K = Number(process.argv[2] || 3);
 const MODES = [
   { name: 'old rules', f: null },
-  { name: 'A  fences ON  T25 max6 unit5', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 5 } },
-  { name: 'B  fences ON  T40 max4 unit5', f: { threshold: 40, cooldown: 10, maxCrashes: 4, unit: 5 } },
-  { name: 'C  fences OFF T25 max6 unit3', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3, fence: false } },
-  { name: 'D  fences ON  T25 max6 unit3', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3 } },
-  { name: 'E  fences ON  T60 max3 unit5', f: { threshold: 60, cooldown: 12, maxCrashes: 3, unit: 5 } },
+  { name: 'no Board 1 fence, Board 2 only', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3, fence: false } },
+  { name: 'fence of 1 block', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3, maxBlocks: 1 } },
+  { name: 'fence of 3 blocks', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3, maxBlocks: 3 } },
+  { name: 'full fence to the edge', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3 } },
 ];
 const o2n = (o) => (o === 'win' ? 1 : o === 'push' ? 0.5 : 0);
 
@@ -86,7 +85,19 @@ if (!isMainThread) {
   for (const a of ids) for (const b of ids) if (a !== b) { const v = oldV(a, b); if (v === 1) wins.push([a, b]); if (v === 0) losses.push([a, b]); }
 
   console.log('old-rule decisive pairings:', wins.length, 'wins /', losses.length, 'losses of', ids.length * (ids.length - 1), '\n');
-  console.log('mode'.padEnd(32), 'ticks crash  win-stays-win  loss-stays-loss  best-counter  top3-counter  RNG(pairs vary)  B2 flips  corr   in40-60');
+  // Learn the matchups under THESE rules on seeds 0-1, then test the learned counter on seed 2.
+  const learned = (m, topN) => {
+    const per = (a, b) => by[m].get(`${a}|${b}`).map((r) => r.v);
+    const tests = ids.map((b) => {
+      const ranked = ids.filter((a) => a !== b)
+        .map((a) => { const v = per(a, b); return { a, train: m === 0 ? v[0] : (v[0] + v[1]) / 2, test: m === 0 ? v[0] : v[2] }; })
+        .sort((x, y) => y.train - x.train || (x.a < y.a ? -1 : 1));
+      return mean(ranked.slice(0, topN).map((r) => r.test));
+    });
+    return mean(tests);
+  };
+  const consistent = (m) => mean([...by[m].values()].map((rs) => (rs.every((r) => r.v === rs[0].v) ? 1 : 0)));
+  console.log('mode'.padEnd(32), 'ticks crash  win-stays-win  loss-stays-loss  best-counter(old table)  LEARNED counter  LEARNED top3  consistent pairs  B2 flips  corr   in40-60');
   MODES.forEach((mode, m) => {
     const all = [...by[m].values()].flat();
     const stayWin = mean(wins.map(([a, b]) => pNew(m, a, b)));
@@ -99,8 +110,8 @@ if (!isMainThread) {
     console.log(
       mode.name.padEnd(32), mean(all.map((r) => r.ticks)).toFixed(0).padStart(4), mean(all.map((r) => r.cr)).toFixed(1).padStart(5),
       `${(100 * stayWin).toFixed(0)}%`.padStart(12), `${(100 * stayLoss).toFixed(0)}%`.padStart(15),
-      `${(100 * bestC).toFixed(0)}%`.padStart(13), `${(100 * top3C).toFixed(0)}%`.padStart(13),
-      `${(100 * varying).toFixed(0)}%`.padStart(16), `${(100 * flips).toFixed(0)}%`.padStart(9),
+      `${(100 * bestC).toFixed(0)}%`.padStart(23), `${(100 * learned(m, 1)).toFixed(0)}%`.padStart(16), `${(100 * learned(m, 3)).toFixed(0)}%`.padStart(13),
+      `${(100 * consistent(m)).toFixed(0)}%`.padStart(17), `${(100 * flips).toFixed(0)}%`.padStart(9),
       pearson(base0, rt).toFixed(2).padStart(6), String(rt.filter((x) => x >= 0.4 && x <= 0.6).length).padStart(7),
     );
   });

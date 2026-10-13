@@ -34,7 +34,7 @@ export function createEngine({
 } = {}) {
   const F = fortune && {
     threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 3,
-    hotValue: 5, restValue: 1, unit: 5, fence: true, ...fortune,
+    hotValue: 5, restValue: 1, unit: 5, fence: true, maxBlocks: Infinity, ...fortune,
   };
   const rng = createRng(seed);
 
@@ -127,7 +127,7 @@ export function createEngine({
   // alone. Returns how many chips were used before the board edge.
   function layFence(x0, y, dir, chipTeams) {
     const y0 = y + 1 < ROWS ? y : y - 1;
-    const blocks = Math.floor(chipTeams.length / F.chipsPerBlock);
+    const blocks = Math.min(F.maxBlocks, Math.floor(chipTeams.length / F.chipsPerBlock));
     let placed = 0;
     for (let j = 0; j < blocks; j++) {
       const bx = x0 + dir * 2 + dir * 4 * j;
