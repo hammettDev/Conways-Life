@@ -23,3 +23,11 @@ describe('tutorial economy', () => {
     expect(C.STARTING_WALLET / C.WAGER).toBeGreaterThanOrEqual(3);
   });
 });
+
+describe('scouting economy', () => {
+  it('is cheap relative to a bet and the audible is a real but minority chance', () => {
+    expect(C.SCOUT_PRICE).toBeLessThanOrEqual(C.WAGER / 2);
+    expect(C.AUDIBLE_CHANCE).toBeGreaterThanOrEqual(0.25);
+    expect(C.AUDIBLE_CHANCE).toBeLessThanOrEqual(0.35);
+  });
+});

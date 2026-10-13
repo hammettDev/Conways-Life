@@ -29,3 +29,10 @@ export const HOT_BONUS = 2;
 export const BASE_GAIN = 1;
 export const MAX_TICKS = 500;
 export const MAX_PERIOD = 3;
+
+// Scouting: pay SCOUT_PRICE to see the bot's formation before you pick yours.
+// After you lock in, the bot calls an audible (swaps to a random other
+// formation) with probability AUDIBLE_CHANCE, which caps a perfect counter-
+// picker at roughly 75-80% instead of 90%. Simulated, 30-build pool.
+export const SCOUT_PRICE = 25;
+export const AUDIBLE_CHANCE = 0.3;
