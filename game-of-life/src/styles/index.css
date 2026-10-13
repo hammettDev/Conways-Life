@@ -86,6 +86,14 @@ body {
   min-width: 360px;
 }
 
+.arena.madden, .scorebar.madden { width: min(100%, calc((100vh - 200px) * 60 / 80)); min-width: 320px; }
+.top { position: relative; }
+.viewtoggle {
+  position: absolute; right: 0; top: 4px; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--edge); background: transparent; color: var(--text); font-size: 0.8rem;
+}
+.viewtoggle[aria-pressed='true'] { border-color: var(--accent); color: var(--accent); }
+
 .scorebar {
   width: min(100%, calc((100vh - 430px) * 80 / 60)); min-width: 360px;
   display: grid; grid-template-columns: 90px 1fr 90px; align-items: center; gap: 12px;

@@ -28,6 +28,14 @@ export default function App() {
   const [hud, setHud] = useState(null);
   const [result, setResult] = useState(null);
   const [botName, setBotName] = useState(null);
+  const [madden, setMadden] = useState(() => {
+    try { return localStorage.getItem('view') === 'madden'; } catch { return false; }
+  });
+  const toggleView = () => setMadden((m) => {
+    const next = !m;
+    try { localStorage.setItem('view', next ? 'madden' : 'side'); } catch { /* storage unavailable */ }
+    return next;
+  });
 
   const engineRef = useRef(newEngine(1)); // an empty board, so the Hot Zones show while drafting
   const phaseRef = useRef(phase);
@@ -108,11 +116,12 @@ export default function App() {
       <header className="top">
         <h1>Gridiron <span>Cellular Warfare</span></h1>
         <p>Pick a formation, lock it in, and watch the board decide.</p>
+        <button className="viewtoggle" onClick={toggleView} aria-pressed={madden}>View: {madden ? 'Madden' : 'Sideways'}</button>
       </header>
 
       <div className="layout">
         <main className="stage">
-          <section className="scorebar">
+          <section className={madden ? "scorebar madden" : "scorebar"}>
             <div className="side blue"><span className="num">{phase === 'done' && result ? result.score.blue : live.blue}</span><i>you</i></div>
             <div className="mid">
               {phase === 'draft' && <p>{selected ? <>Previewing <b>{selected.name}</b>. Press Lock In to commit.</> : 'Choose a formation from the sidebar.'}</p>}
@@ -144,7 +153,7 @@ export default function App() {
             <div className="side red"><span className="num">{phase === 'done' && result ? result.score.red : live.red}</span><i>bot</i></div>
           </section>
 
-          <Arena getView={getView} />
+          <Arena getView={getView} rotate={madden} />
 
           <div className="gutter" aria-hidden="true"><span>gutter</span></div>
 

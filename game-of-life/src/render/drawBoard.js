@@ -7,6 +7,14 @@ const GLOW = { [BLUE]: 'rgba(56,169,255,0.30)', [RED]: 'rgba(255,61,120,0.30)' }
 
 const MAX_DISCS = 14;
 
+// Sim tile (x, y) -> screen tile. Sideways: the teams face each other left to
+// right. Madden: the field runs top to bottom with Blue at the bottom facing
+// up, so the line of scrimmage is horizontal.
+export function toScreen(x, y, rotate) {
+  return rotate ? [y, COLS - 1 - x] : [x, y];
+}
+export const boardSize = (rotate) => (rotate ? { cols: ROWS, rows: COLS } : { cols: COLS, rows: ROWS });
+
 // One chip, seen slightly from above: a flat ellipse.
 function chip(ctx, cx, cy, r, team, lift = 0) {
   ctx.beginPath();
@@ -41,39 +49,56 @@ export function stackDiscs(runs, maxDiscs = MAX_DISCS) {
 // is the bright chip on top. Rows are drawn top to bottom so a tower in front
 // covers the one behind it.
 export function drawBoard(ctx, view) {
-  const { tile, teams, hot, stacks, ghost = [], time = 0 } = view;
-  const W = COLS * tile;
-  const H = ROWS * tile;
+  const { tile, teams, hot, stacks, ghost = [], time = 0, rotate = false } = view;
+  const { cols: SC, rows: SR } = boardSize(rotate);
+  const W = SC * tile;
+  const H = SR * tile;
+
+  // A rectangle given in sim tiles [x0, x1) x [y0, y1), as screen px [x, y, w, h].
+  const rect = (x0, y0, x1, y1) => (rotate
+    ? [y0 * tile, (COLS - x1) * tile, (y1 - y0) * tile, (x1 - x0) * tile]
+    : [x0 * tile, y0 * tile, (x1 - x0) * tile, (y1 - y0) * tile]);
+  // A point given in sim tile units, as screen px.
+  const pt = (x, y) => (rotate ? [y * tile, (COLS - x) * tile] : [x * tile, y * tile]);
 
   ctx.fillStyle = THEME.ring;
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = THEME.field;
-  ctx.fillRect(FIELD_X0 * tile, FIELD_Y0 * tile, (FIELD_X1 - FIELD_X0) * tile, (FIELD_Y1 - FIELD_Y0) * tile);
+  ctx.fillRect(...rect(FIELD_X0, FIELD_Y0, FIELD_X1, FIELD_Y1));
 
   // Mown-turf stripes: every other 5-tile band is a shade lighter, with a faint yard line between bands.
   for (let x = FIELD_X0; x < FIELD_X1; x += 5) {
     if (((x - FIELD_X0) / 5) % 2 === 1) {
       ctx.fillStyle = THEME.fieldStripe;
-      ctx.fillRect(x * tile, FIELD_Y0 * tile, 5 * tile, (FIELD_Y1 - FIELD_Y0) * tile);
+      ctx.fillRect(...rect(x, FIELD_Y0, x + 5, FIELD_Y1));
     }
-    ctx.fillStyle = THEME.yard;
-    ctx.fillRect(x * tile - 0.5, FIELD_Y0 * tile, 1, (FIELD_Y1 - FIELD_Y0) * tile);
+    ctx.strokeStyle = THEME.yard;
+    ctx.beginPath();
+    ctx.moveTo(...pt(x, FIELD_Y0));
+    ctx.lineTo(...pt(x, FIELD_Y1));
+    ctx.stroke();
   }
 
   // Faint tile centres instead of a heavy grid.
   ctx.fillStyle = THEME.grid;
-  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) ctx.fillRect(x * tile + tile / 2 - 0.5, y * tile + tile / 2 - 0.5, 1, 1);
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const [sx, sy] = toScreen(x, y, rotate);
+      ctx.fillRect(sx * tile + tile / 2 - 0.5, sy * tile + tile / 2 - 0.5, 1, 1);
+    }
+  }
+  const [fx, fy, fw, fh] = rect(FIELD_X0, FIELD_Y0, FIELD_X1, FIELD_Y1);
   ctx.strokeStyle = THEME.gridField;
   ctx.lineWidth = 1;
-  ctx.strokeRect(FIELD_X0 * tile + 0.5, FIELD_Y0 * tile + 0.5, (FIELD_X1 - FIELD_X0) * tile, (FIELD_Y1 - FIELD_Y0) * tile);
+  ctx.strokeRect(fx + 0.5, fy + 0.5, fw, fh);
 
   // Line of scrimmage.
   ctx.save();
   ctx.setLineDash([6, 6]);
   ctx.strokeStyle = THEME.midline;
   ctx.beginPath();
-  ctx.moveTo((COLS / 2) * tile, FIELD_Y0 * tile);
-  ctx.lineTo((COLS / 2) * tile, FIELD_Y1 * tile);
+  ctx.moveTo(...pt(COLS / 2, FIELD_Y0));
+  ctx.lineTo(...pt(COLS / 2, FIELD_Y1));
   ctx.stroke();
   ctx.restore();
 
@@ -82,9 +107,10 @@ export function drawBoard(ctx, view) {
     if (!hot[i]) continue;
     const x = i % COLS;
     const y = (i / COLS) | 0;
+    const [sx, sy] = toScreen(x, y, rotate);
     const pulse = 0.22 + 0.16 * Math.sin(time * 2.4 + (x + y) * 0.45);
     ctx.beginPath();
-    ctx.ellipse(x * tile + tile / 2, y * tile + tile / 2 + tile * 0.12, tile * 0.46, tile * 0.28, 0, 0, Math.PI * 2);
+    ctx.ellipse(sx * tile + tile / 2, sy * tile + tile / 2 + tile * 0.12, tile * 0.46, tile * 0.28, 0, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(255,176,46,${pulse})`;
     ctx.fill();
   }
@@ -93,11 +119,14 @@ export function drawBoard(ctx, view) {
   const step = Math.max(1.5, tile * 0.19);
   const ghostAt = new Map(ghost.map((g) => [g.y * COLS + g.x, g.team]));
 
-  for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < COLS; x++) {
+  // Back to front on screen, so a tower in front covers the one behind it.
+  for (let sy = 0; sy < SR; sy++) {
+    for (let sx = 0; sx < SC; sx++) {
+      const x = rotate ? COLS - 1 - sy : sx;
+      const y = rotate ? sx : sy;
       const i = y * COLS + x;
-      const cx = x * tile + tile / 2;
-      const base = y * tile + tile * 0.62;
+      const cx = sx * tile + tile / 2;
+      const base = sy * tile + tile * 0.62;
       const discs = stackDiscs(stacks && stacks[i]);
       const live = teams[i];
 
