@@ -1,5 +1,6 @@
 import { COLS, ROWS, DEAD, MAX_TICKS, MAX_PERIOD } from './constants.js';
 import { createRng } from './rng.js';
+import { seedUnderworld, rescueUnderworld } from './underworld.js';
 import { stepTeams, stepUnderworld } from './life.js';
 import { accumulateTowers } from './towers.js';
 import { scorePlots, outcomeFor } from './scoring.js';
@@ -20,15 +21,13 @@ function isEmpty(a) {
 export function createEngine({
   seed,
   maxTicks = MAX_TICKS,
-  hotDensity = 0.25,
-  hotMinPopulation = 0.06,
   freezeUnderworld = false,
 } = {}) {
   const rng = createRng(seed);
 
   let teams = new Uint8Array(SIZE);
   let nextTeams = new Uint8Array(SIZE);
-  let hot = new Uint8Array(SIZE);
+  let hot = seedUnderworld(rng);
   let nextHot = new Uint8Array(SIZE);
   const blueTower = new Uint16Array(SIZE);
   const redTower = new Uint16Array(SIZE);
@@ -41,8 +40,6 @@ export function createEngine({
   let status = 'running';
   let period = 0;
 
-  for (let i = 0; i < SIZE; i++) hot[i] = rng() < hotDensity ? 1 : 0;
-
   function loadTeams(cells) {
     teams.fill(DEAD);
     for (const { x, y, team } of cells) teams[y * COLS + x] = team;
@@ -54,21 +51,6 @@ export function createEngine({
     blueTower.fill(0);
     redTower.fill(0);
     locked.fill(DEAD);
-  }
-
-  // Keep the Hot Zones alive: if the underworld thins out, scatter new live
-  // cells until it is back at the minimum population.
-  function replenishHot() {
-    let live = 0;
-    for (let i = 0; i < SIZE; i++) live += hot[i];
-    let need = Math.ceil(SIZE * hotMinPopulation) - live;
-    while (need > 0) {
-      const i = Math.floor(rng() * SIZE);
-      if (!hot[i]) {
-        hot[i] = 1;
-        need--;
-      }
-    }
   }
 
   function lockCycle(p) {
@@ -106,7 +88,7 @@ export function createEngine({
     if (!freezeUnderworld) {
       stepUnderworld(hot, nextHot);
       [hot, nextHot] = [nextHot, hot];
-      replenishHot();
+      rescueUnderworld(hot, rng);
     }
 
     tickCount++;

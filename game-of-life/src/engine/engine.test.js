@@ -5,6 +5,7 @@ import { accumulateTowers } from './towers.js';
 import { scorePlots, outcomeFor, payoutFor } from './scoring.js';
 import { createEngine } from './engine.js';
 import { createRng } from './rng.js';
+import { seedUnderworld, rescueUnderworld, RESCUE_BELOW } from './underworld.js';
 
 const SIZE = COLS * ROWS;
 const at = (x, y) => y * COLS + x;
@@ -183,19 +184,47 @@ describe('engine', () => {
     };
     expect(run()).toBe(run());
   });
-
-  it('keeps the underworld populated', () => {
-    const e = createEngine({ seed: 7, hotDensity: 0.01 });
-    e.loadTeams(cells(block(BLUE)));
-    for (let i = 0; i < 20; i++) e.tick();
-    const live = e.hot.reduce((a, v) => a + v, 0);
-    expect(live).toBeGreaterThan(SIZE * 0.05);
-  });
 });
 
 describe('rng', () => {
   it('is reproducible by seed', () => {
     const a = createRng(5); const b = createRng(5);
     expect([a(), a(), a()]).toEqual([b(), b(), b()]);
+  });
+});
+
+describe('underworld seeding', () => {
+  const live = (g) => g.reduce((a, v) => a + v, 0);
+
+  it('plants an acorn in the middle with soup only on the outskirts', () => {
+    const g = seedUnderworld(createRng(3));
+    const cx = COLS >> 1;
+    const cy = ROWS >> 1;
+    expect(g[at(cx - 3 + 1, cy - 1)]).toBe(1); // acorn head
+    let centerLive = 0;
+    for (let y = cy - 8; y < cy + 8; y++) for (let x = cx - 8; x < cx + 8; x++) centerLive += g[at(x, y)];
+    expect(centerLive).toBe(7);
+    expect(live(g)).toBeGreaterThan(SIZE * 0.08);
+  });
+
+  it('stays alive for a full match without any injection', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      let a = seedUnderworld(createRng(seed));
+      let b = new Uint8Array(SIZE);
+      for (let t = 0; t < 500; t++) {
+        stepUnderworld(a, b);
+        [a, b] = [b, a];
+      }
+      expect(live(a)).toBeGreaterThanOrEqual(RESCUE_BELOW);
+    }
+  });
+
+  it('only rescues a nearly empty layer', () => {
+    const rng = createRng(9);
+    const healthy = seedUnderworld(rng);
+    expect(rescueUnderworld(healthy, rng)).toBe(false);
+    const empty = new Uint8Array(SIZE);
+    expect(rescueUnderworld(empty, rng)).toBe(true);
+    expect(live(empty)).toBeGreaterThan(0);
   });
 });
