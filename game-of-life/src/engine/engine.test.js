@@ -142,6 +142,20 @@ describe('engine', () => {
     expect(e.runToEnd().score.blue).toBe(4);
   });
 
+  it('level plots are broken by tower height, and a true dead heat is a push', () => {
+    const setup = (heat) => {
+      const e = createEngine({ seed: 1, freezeUnderworld: true });
+      e.hot.fill(0);
+      if (heat) e.hot[at(X, Y)] = 1; // a Hot Zone under one of Blue's block cells
+      e.loadTeams(cells([...block(BLUE), ...block(RED).map(([x, y, t]) => [x + 20, y, t])]));
+      return e.runToEnd();
+    };
+    const hot = setup(true);
+    expect(hot.score.blue).toBe(hot.score.red);
+    expect(hot.outcome).toBe('win');   // Blue's extra chips break the tie
+    expect(setup(false).outcome).toBe('push'); // no luck either way: a true dead heat
+  });
+
   it('ends as extinct when everything dies, and pushes', () => {
     const e = createEngine({ seed: 1, freezeUnderworld: true });
     e.loadTeams(cells([[X, Y, BLUE], [X + 10, Y, RED]]));
@@ -543,5 +557,46 @@ describe('shipped fortune rules', () => {
     expect(DEFAULT_FORTUNE_RULES).toBe(FORTUNE_RULES_LIVE_FENCE);
     expect(fortuneRulesFor()).toBe(FORTUNE_RULES_LIVE_FENCE);
     expect(fortuneRulesFor({ liveFence: false })).toBe(FORTUNE_RULES);
+  });
+
+  describe('overtime for flashers', () => {
+    const OT = { threshold: 4, cooldown: 2, maxCrashes: 3, chipsPerBlock: 1, chipCap: 2, unit: 5, fence: false, cold: true, coldAfter: 2, overtime: 40 };
+    const blinker = [[30, 30], [31, 30], [32, 30]].map(([x, y]) => ({ x, y, team: BLUE }));
+    const run = (fortune) => {
+      const e = createEngine({ seed: 1, freezeUnderworld: true, fortune });
+      e.hot.fill(0);
+      e.loadTeams(blinker);
+      return { e, r: e.runToEnd() };
+    };
+
+    it('a settled board with flashers plays on until the first topple', () => {
+      const { e, r } = run(OT);
+      expect(r.status).toBe('stable');
+      expect(r.ticks).toBeGreaterThan(4);               // it did not stop at the settle (tick 2)
+      expect(e.fortune.crashes.total).toBeGreaterThanOrEqual(1);
+      expect(r.ticks).toBeLessThan(OT.overtime + 4);   // and it stopped soon after the topple
+    });
+
+    it('the static middle stays cold; only the outer flashers stack', () => {
+      const { e } = run({ ...OT, threshold: 999 }); // no topple, so the stacks stay readable
+      expect(e.stackHeight[at(31, 30)]).toBeLessThanOrEqual(OT.coldAfter + 2); // the middle cell goes cold
+      expect(e.stackHeight[at(30, 30)] + e.stackHeight[at(32, 30)]).toBeGreaterThan(e.stackHeight[at(31, 30)]);
+    });
+
+    it('gives up at the overtime limit if nothing ever topples', () => {
+      const { r } = run({ ...OT, threshold: 999, overtime: 20 });
+      expect(r.status).toBe('stable');
+      expect(r.ticks).toBeLessThanOrEqual(2 + 20 + 1);
+      expect(r.ticks).toBeGreaterThan(20);
+    });
+
+    it('all-still boards and the old rules end at once', () => {
+      const still = createEngine({ seed: 1, freezeUnderworld: true, fortune: OT });
+      still.loadTeams([[30, 30], [31, 30], [30, 31], [31, 31]].map(([x, y]) => ({ x, y, team: BLUE })));
+      expect(still.runToEnd().ticks).toBeLessThanOrEqual(2);
+      const old = createEngine({ seed: 1, freezeUnderworld: true });
+      old.loadTeams(blinker);
+      expect(old.runToEnd().ticks).toBeLessThanOrEqual(3);
+    });
   });
 });

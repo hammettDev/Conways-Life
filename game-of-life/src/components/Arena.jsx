@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { COLS, ROWS } from '../engine/constants.js';
 import { drawBoard } from '../render/drawBoard.js';
 
-const TILE = 11;
+const TILE = 12;
 
 // Board 1. `getView` is called every frame and returns what to draw, so React
 // never re-renders for the simulation itself.

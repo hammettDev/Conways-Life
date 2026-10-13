@@ -1,7 +1,7 @@
 import { P, spread, build } from './helpers.js';
 
 const SPAN = { 1: 0, 2: 9, 3: 13, 4: 15, 5: 17 };
-const D = { F: 0, AM: 5, M: 8, DM: 11, D: 15, GK: 19 };
+const D = { F: 1, AM: 5, M: 8, DM: 11, D: 15, GK: 19 };
 const SHAPE = { F: 'dart', AM: 'bar', M: 'bar', DM: 'bar', D: 'ell', GK: 'ell' };
 
 // lines: [[line, count], ...]; always ends with a keeper.

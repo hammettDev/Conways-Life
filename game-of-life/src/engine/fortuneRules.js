@@ -18,6 +18,7 @@ const CORE = {
   splash: 1.6,
   hotValue: 5, // a chip landing on a Hot Spot becomes a stack of 5 of its own colour
   unit: 0.25, // bonus plots = pit tile lead / unit, i.e. 4 plots per tile of lead
+  overtime: 150, // a settled board with flashers plays on (up to this many ticks) until the first topple
 };
 
 // Strategy-safest: Board 1 is not touched by a topple (the fence is only drawn).

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { drawPit } from '../render/drawBoard.js';
 
-const TILE = 24;
+const TILE = 34;
 
 // Board 2, the pit. `getView` returns { size, hot, blue, red } each frame.
 export default function Pit({ getView, size = 10 }) {

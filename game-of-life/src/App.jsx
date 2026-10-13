@@ -11,7 +11,8 @@ import { createRng } from './engine/rng.js';
 import { createSfx } from './audio/sfx.js';
 import { BLUE, RED, COLS, ROWS } from './engine/constants.js';
 
-const TICKS_PER_SECOND = 12;
+const TICKS_PER_SECOND = 6; // at 1x; games used to run at 24 a second and felt far too fast
+const SPEEDS = [0.5, 1, 2, 4];
 const PIT = DEFAULT_FORTUNE_RULES.pitSize;
 const PIT_X0 = (COLS - PIT) >> 1;
 const PIT_Y0 = (ROWS - PIT) >> 1;
@@ -23,7 +24,7 @@ export default function App() {
   const [phase, setPhase] = useState('draft'); // draft -> locked -> playing -> done
   const [selectedId, setSelectedId] = useState(null);
   const [objectId, setObjectId] = useState(null);
-  const [speed, setSpeed] = useState(2);
+  const [speed, setSpeed] = useState(1);
   const [hud, setHud] = useState(null);
   const [result, setResult] = useState(null);
   const [botName, setBotName] = useState(null);
@@ -44,7 +45,7 @@ export default function App() {
 
   const getView = useCallback(() => {
     const e = engineRef.current;
-    return { teams: e.teams, hot: e.hot, blueTower: e.blueTower, redTower: e.redTower, ghost: ghostRef.current };
+    return { teams: e.teams, hot: e.hot, stacks: e.stacks, ghost: ghostRef.current };
   }, []);
 
   const getPitView = useCallback(() => {
@@ -100,6 +101,8 @@ export default function App() {
 
   const outcomeText = result && { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome];
 
+  const live = hud || { tick: 0, blue: 0, red: 0, crashes: 0 };
+
   return (
     <div className="app">
       <header className="top">
@@ -108,55 +111,56 @@ export default function App() {
       </header>
 
       <div className="layout">
-        <Sidebar
-          builds={FREE_BUILDS} objects={OBJECTS}
-          selectedId={selectedId} onSelect={setSelectedId}
-          objectId={objectId} onObject={setObjectId}
-          locked={phase !== 'draft'} onLockIn={lockIn}
-        />
-
         <main className="stage">
-          <Arena getView={getView} />
-
-          <div className="below">
-            <section className="panel hud">
-              <h2>{phase === 'draft' ? 'Draft' : phase === 'locked' ? 'Ready' : phase === 'playing' ? 'Live' : 'Final'}</h2>
+          <section className="scorebar">
+            <div className="side blue"><span className="num">{phase === 'done' && result ? result.score.blue : live.blue}</span><i>you</i></div>
+            <div className="mid">
               {phase === 'draft' && <p>{selected ? <>Previewing <b>{selected.name}</b>. Press Lock In to commit.</> : 'Choose a formation from the sidebar.'}</p>}
               {phase === 'locked' && (
                 <>
-                  <p>You: <b>{selected.name}</b> vs <b className="red">{botName}</b></p>
+                  <p><b>{selected.name}</b> vs <b className="red">{botName}</b></p>
                   <div className="row"><button className="go" onClick={snap}>Snap</button><button className="ghost" onClick={reset}>Cancel</button></div>
                 </>
               )}
-              {phase === 'playing' && hud && (
+              {phase === 'playing' && (
                 <>
-                  <div className="score"><span className="blue">{hud.blue}</span><i>plots</i><span className="red">{hud.red}</span></div>
-                  <p>Tick {hud.tick} · crashes {hud.crashes}</p>
+                  <p>Tick {live.tick} · {live.crashes} toppled</p>
                   <div className="row speeds">
-                    {[1, 2, 4, 8].map((s) => <button key={s} className={s === speed ? 'on' : ''} onClick={() => setSpeed(s)}>{s}x</button>)}
+                    {SPEEDS.map((s) => <button key={s} className={s === speed ? 'on' : ''} onClick={() => setSpeed(s)}>{s}x</button>)}
                   </div>
                 </>
               )}
               {phase === 'done' && result && (
                 <>
                   <div className={`verdict ${result.outcome}`}>{outcomeText}</div>
-                  <div className="score"><span className="blue">{result.score.blue}</span><i>plots</i><span className="red">{result.score.red}</span></div>
-                  <p>
-                    Ended {result.status} at tick {result.ticks}. Pit: <b className="blue">{result.fortune.blue}</b> – <b className="red">{result.fortune.red}</b> tiles
+                  <p className="note">
+                    Ended {result.status} at tick {result.ticks} · pit {result.fortune.blue}–{result.fortune.red}
                     {result.tileOutcome !== result.outcome && <> · <b>the pit decided it</b></>}
                   </p>
                   <button className="go" onClick={reset}>New match</button>
                 </>
               )}
-            </section>
+            </div>
+            <div className="side red"><span className="num">{phase === 'done' && result ? result.score.red : live.red}</span><i>bot</i></div>
+          </section>
 
-            <section className="panel">
-              <h2>The Pit</h2>
-              <Pit getView={getPitView} size={PIT} />
-              <p className="note">Overflow chips drop in here. More chips owns the tile; a hot landing counts x5.</p>
-            </section>
-          </div>
+          <Arena getView={getView} />
+
+          <div className="gutter" aria-hidden="true"><span>gutter</span></div>
+
+          <section className="pitwrap">
+            <h2>The Pit</h2>
+            <Pit getView={getPitView} size={PIT} />
+            <p className="note">Overflow chips drop in here. More chips owns the tile; a hot landing counts x5.</p>
+          </section>
         </main>
+
+        <Sidebar
+          builds={FREE_BUILDS} objects={OBJECTS}
+          selectedId={selectedId} onSelect={setSelectedId}
+          objectId={objectId} onObject={setObjectId}
+          locked={phase !== 'draft'} onLockIn={lockIn}
+        />
       </div>
     </div>
   );

@@ -24,6 +24,20 @@ export function scorePlots(blueTower, redTower, locked) {
   return { blue, red, neutral };
 }
 
+// Total tower height each team has built on the Playing Field. Hot Zones add
+// double chips, so this is the tiebreaker when plots are exactly level.
+export function fieldHeat(blueTower, redTower) {
+  let blue = 0;
+  let red = 0;
+  for (let y = FIELD_Y0; y < FIELD_Y1; y++) {
+    for (let x = FIELD_X0; x < FIELD_X1; x++) {
+      blue += blueTower[y * COLS + x];
+      red += redTower[y * COLS + x];
+    }
+  }
+  return { blue, red };
+}
+
 // Even-money outcome for the player (Blue): 'win' | 'lose' | 'push'.
 export function outcomeFor(score) {
   if (score.blue > score.red) return 'win';

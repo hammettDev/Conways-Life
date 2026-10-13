@@ -32,8 +32,10 @@ export function assemble(raw, moves = []) {
 export const CANDIDATES = RAW.map((b) => assemble(b, TUNING[b.id]));
 
 // Candidates that made the cut after balance testing (see scripts/cull.mjs).
-const chosen = new Set([...ROSTER.free, ...ROSTER.tutorial, ...ROSTER.boss]);
-const tierOf = (id) => (ROSTER.tutorial.includes(id) ? 'tutorial' : ROSTER.boss.includes(id) ? 'boss' : 'free');
+const TUTORIAL = ROSTER.tutorial || [];
+const BOSS = ROSTER.boss || [];
+const chosen = new Set([...ROSTER.free, ...TUTORIAL, ...BOSS]);
+const tierOf = (id) => (TUTORIAL.includes(id) ? 'tutorial' : BOSS.includes(id) ? 'boss' : 'free');
 export const BASE_BUILDS = CANDIDATES.filter((b) => chosen.has(b.id));
 
 // Every build is free to use. `tier` says where it appears: the balanced pool

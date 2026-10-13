@@ -6,7 +6,7 @@ import { createRng } from './rng.js';
 import { seedUnderworld, rescueUnderworld } from './underworld.js';
 import { stepTeams, stepUnderworld } from './life.js';
 import { accumulateTowers } from './towers.js';
-import { scorePlots, outcomeFor } from './scoring.js';
+import { scorePlots, outcomeFor, fieldHeat } from './scoring.js';
 
 const SIZE = COLS * ROWS;
 
@@ -35,6 +35,7 @@ export function createEngine({
   const F = fortune && {
     threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 3,
     hotValue: 5, restValue: 1, unit: 5, fence: true, maxBlocks: Infinity,
+    overtime: 0,                      // ticks to play on after settling while flashers are still stacking, until the first topple
     spread: false, spacing: 6,        // drop pieces far apart, only into clear space
     cold: false, coldAfter: 4,        // still cells stop adding chips after this many quiet ticks
     resetTowers: false,               // a crash clears the stack only, not the scoring tower
@@ -75,6 +76,8 @@ export function createEngine({
   const fortuneScore = { blue: 0, red: 0 };
   const crashes = { total: 0, blue: 0, red: 0 }; // by the stack's majority colour
   let lastCrash = -Infinity;
+  let overtimeUntil = null; // set when the board has settled but flashers are still stacking
+  let crashesAtSettle = 0;
 
   function loadTeams(cells) {
     teams.fill(DEAD);
@@ -84,6 +87,7 @@ export function createEngine({
     tickCount = 0;
     status = 'running';
     period = 0;
+    overtimeUntil = null;
     blueTower.fill(0);
     redTower.fill(0);
     locked.fill(DEAD);
@@ -290,11 +294,23 @@ export function createEngine({
       status = 'extinct';
       return;
     }
+    if (overtimeUntil !== null) {
+      // Settled, but flashers keep stacking: play on until one stack topples.
+      if (crashes.total > crashesAtSettle || tickCount >= overtimeUntil || tickCount >= maxTicks) status = 'stable';
+      return;
+    }
     for (let p = 1; p <= MAX_PERIOD && p < history.length; p++) {
       if (sameGrid(teams, history[p])) {
-        status = 'stable';
         period = p;
         lockCycle(p);
+        // A period-1 board is all still life: nothing is stacking, so it is over.
+        // With flashers (period 2+) and overtime on, keep going.
+        if (F && F.overtime && p >= 2) {
+          overtimeUntil = tickCount + F.overtime;
+          crashesAtSettle = crashes.total;
+        } else {
+          status = 'stable';
+        }
         return;
       }
     }
@@ -348,15 +364,24 @@ export function createEngine({
     return diff > 0 ? { ...base, blue: base.blue + bonus } : { ...base, red: base.red + bonus };
   }
 
+  // Level plots are broken by total tower height (Hot Zone luck); only a dead
+  // heat on that too is a push.
+  function decide(score) {
+    const outcome = outcomeFor(score);
+    if (outcome !== 'push') return outcome;
+    const heat = fieldHeat(blueTower, redTower);
+    return heat.blue > heat.red ? 'win' : heat.blue < heat.red ? 'lose' : 'push';
+  }
+
   function getResult() {
     const score = getScore();
-    const result = { status, period, ticks: tickCount, score, outcome: outcomeFor(score) };
+    const result = { status, period, ticks: tickCount, score, outcome: decide(score) };
     if (F) {
       const pt = F.pit ? pitTiles() : null;
       result.fortune = pt
         ? { blue: pt.blue, red: pt.red, crashes: { ...crashes } }
         : { blue: fortuneScore.blue, red: fortuneScore.red, crashes: { ...crashes } };
-      result.tileOutcome = outcomeFor(getScore(false)); // what Board 1 alone would have decided
+      result.tileOutcome = decide(getScore(false)); // what Board 1 alone would have decided
     }
     return result;
   }

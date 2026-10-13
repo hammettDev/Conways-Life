@@ -10,8 +10,8 @@ import {
 
 export const CENTER_Y = (FIELD_Y0 + FIELD_Y1) >> 1;
 export const HALF_X = (FIELD_X0 + FIELD_X1) >> 1; // first column of Red's half
-export const LOS_GAP = 3; // columns between the two front lines
-export const BLUE_LOS_X = HALF_X - 2;
+export const LOS_GAP = 1; // front lines sit in adjacent columns either side of the middle, so every match starts with a clash
+export const BLUE_LOS_X = HALF_X - 1;
 export const RED_LOS_X = BLUE_LOS_X + LOS_GAP;
 
 // Expand a formation into team cells. `flip` mirrors it top-to-bottom.

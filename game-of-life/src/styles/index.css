@@ -26,7 +26,7 @@ body {
 .top h1 span { color: var(--hot); text-shadow: 0 0 18px rgba(255, 176, 46, 0.45); }
 .top p { margin: 4px 0 16px; color: var(--dim); }
 
-.layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+.layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
 
 .sidebar, .panel {
   background: var(--panel);
@@ -75,17 +75,45 @@ body {
 }
 .lock:disabled { opacity: 0.4; box-shadow: none; cursor: default; }
 
-.stage { min-width: 0; }
+.stage { min-width: 0; display: flex; flex-direction: column; align-items: center; }
+
+/* Keep the whole stack (score bar, board, gutter, pit) inside the viewport. */
 .arena {
-  width: 100%; display: block; border-radius: 14px; border: 1px solid var(--edge);
+  display: block; border-radius: 14px; border: 1px solid var(--edge);
   box-shadow: 0 0 40px rgba(56, 169, 255, 0.12);
+  width: min(100%, calc((100vh - 430px) * 80 / 60));
+  min-width: 360px;
 }
 
-.below { display: grid; grid-template-columns: 1fr 280px; gap: 16px; margin-top: 16px; }
-.panel h2 { margin: 0 0 8px; font-size: 0.8rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.scorebar {
+  width: min(100%, calc((100vh - 430px) * 80 / 60)); min-width: 360px;
+  display: grid; grid-template-columns: 90px 1fr 90px; align-items: center; gap: 12px;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 14px; margin-bottom: 10px;
+}
+.scorebar .side { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.scorebar .num { font-size: 2rem; font-weight: 800; }
+.scorebar i { font-style: normal; font-size: 0.7rem; color: var(--dim); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 4px; }
+.scorebar .mid { text-align: center; min-height: 52px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; }
+.scorebar .mid p { margin: 0; }
+.scorebar .row { margin-top: 2px; justify-content: center; }
+
+.gutter {
+  width: 22px; height: 26px; margin: -1px 0; position: relative;
+  background: linear-gradient(90deg, #0b1830, #1a3560 50%, #0b1830);
+  border-left: 1px solid var(--edge); border-right: 1px solid var(--edge);
+}
+.gutter span { position: absolute; left: 30px; top: 4px; font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+
+.pitwrap {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 10px 14px 12px;
+}
+.pitwrap h2 { margin: 0; font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.pitwrap .note { margin: 0; max-width: 330px; text-align: center; }
+.pit { width: 224px; height: 224px; display: block; border-radius: 10px; border: 1px solid var(--edge); }
+
 .panel p { margin: 6px 0; }
 .note { color: var(--dim); font-size: 0.85rem; }
-.pit { width: 100%; max-width: 240px; display: block; border-radius: 10px; border: 1px solid var(--edge); }
 
 .blue { color: var(--blue); }
 .red { color: var(--red); }
@@ -97,13 +125,13 @@ body {
 
 .score { display: flex; align-items: baseline; gap: 14px; font-size: 2.2rem; font-weight: 800; }
 .score i { font-style: normal; font-size: 0.8rem; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
-.verdict { font-size: 1.6rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; }
+.verdict { font-size: 1.4rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em; }
 .verdict.win { color: #5dffa6; text-shadow: 0 0 18px rgba(93, 255, 166, 0.5); }
 .verdict.lose { color: var(--red); }
 .verdict.push { color: var(--dim); }
 
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
-  .sidebar { position: static; max-height: 420px; }
-  .below { grid-template-columns: 1fr; }
+  .sidebar { position: static; max-height: 420px; order: 2; }
+  .arena, .scorebar { width: 100%; min-width: 0; }
 }
