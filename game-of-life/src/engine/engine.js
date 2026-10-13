@@ -38,6 +38,7 @@ export function createEngine({
     overtime: 0,                      // ticks to play on after settling while flashers are still stacking, until the first topple
     spread: false, spacing: 6,        // drop pieces far apart, only into clear space
     cold: false, coldAfter: 4,        // still cells stop adding chips after this many quiet ticks
+    flicker: false,                   // a flasher stays lit: a tile whose cell just went dark still adds a chip that tick
     resetTowers: false,               // a crash clears the stack only, not the scoring tower
     // The pit: Board 2 as a small tile-ownership battle. Overflow chips are
     // dropped down a gutter into the middle of a pitSize x pitSize board and
@@ -121,7 +122,9 @@ export function createEngine({
     for (let i = 0; i < SIZE; i++) {
       // Cells that changed this tick are warm; a still cell goes cold after a while.
       if (teams[i] !== nextTeams[i]) lastChange[i] = tickCount;
-      const t = teams[i];
+      let t = teams[i];
+      // A flasher is dark half the time; without this it would stack at half speed.
+      if (t === DEAD && F.flicker && nextTeams[i] !== DEAD) t = nextTeams[i];
       if (t === DEAD) continue;
       if (F.cold && tickCount - lastChange[i] > F.coldAfter) continue;
       const g = hot[i] ? HOT_BONUS : BASE_GAIN;
@@ -217,6 +220,7 @@ export function createEngine({
   function splatter(chipTeams) {
     const n = F.pitSize;
     const c = (n - 1) / 2;
+    const landings = []; // [team, tile, chips added], for a renderer that wants to land them later
     chipTeams.forEach((team, k) => {
       const sigma = F.splash * (1 + k * 0.03);
       const gx = (rng2() + rng2() + rng2() - 1.5) * 2; // roughly normal, sd ~1
@@ -224,8 +228,11 @@ export function createEngine({
       const px = Math.min(n - 1, Math.max(0, Math.round(c + gx * sigma)));
       const py = Math.min(n - 1, Math.max(0, Math.round(c + gy * sigma)));
       const hotHere = hot2[(pitY0 + py) * COLS + pitX0 + px];
-      pitChips[team][py * n + px] += hotHere ? F.hotValue : 1;
+      const add = hotHere ? F.hotValue : 1;
+      pitChips[team][py * n + px] += add;
+      landings.push([team, py * n + px, add]);
     });
+    return landings;
   }
 
   // Each pit tile belongs to the colour with more chips on it (ties belong to
@@ -287,9 +294,8 @@ export function createEngine({
         ? layFenceSpread(x0, y, dir, chipTeams)
         : chipTeams.slice(layFence(x0, y, dir, chipTeams));
     }
-    lastCrashInfo = { id: crashes.total, tick: tickCount, owner, dir, x: x0, y, spilled: leftover.length };
-    if (F.pit) splatter(leftover);
-    else spill(leftover, y, dir);
+    const landings = F.pit ? splatter(leftover) : (spill(leftover, y, dir), []);
+    lastCrashInfo = { id: crashes.total, tick: tickCount, owner, dir, x: x0, y, spilled: leftover.length, landings };
   }
 
   function detectStability() {

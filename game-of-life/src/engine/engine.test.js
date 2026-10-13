@@ -599,4 +599,47 @@ describe('shipped fortune rules', () => {
       expect(old.runToEnd().ticks).toBeLessThanOrEqual(3);
     });
   });
+
+  describe('flickering tiles stay lit, and topples report where chips land', () => {
+    const base = { threshold: 12, cooldown: 2, maxCrashes: 3, chipsPerBlock: 1, chipCap: 2, unit: 5, fence: false, cold: true, coldAfter: 2, overtime: 120 };
+    const blinker = [[30, 30], [31, 30], [32, 30]].map(([x, y]) => ({ x, y, team: BLUE }));
+    const ticksToTopple = (fortune) => {
+      const e = createEngine({ seed: 1, freezeUnderworld: true, fortune: { ...base, ...fortune } });
+      e.hot.fill(0);
+      e.loadTeams(blinker);
+      while (e.status === 'running' && e.fortune.crashes.total === 0) e.tick();
+      return e.tickCount;
+    };
+
+    it('a flasher stacks every tick, so it topples about twice as fast', () => {
+      const slow = ticksToTopple({ flicker: false });
+      const fast = ticksToTopple({ flicker: true });
+      expect(fast).toBeLessThan(slow);
+      expect(fast).toBeLessThanOrEqual(base.threshold + 3); // about one chip a tick
+      expect(slow).toBeGreaterThanOrEqual(base.threshold * 2 - 4); // about one chip every other tick
+    });
+
+    it('the static middle of a blinker still goes cold with flicker on', () => {
+      const e = createEngine({ seed: 1, freezeUnderworld: true, fortune: { ...base, flicker: true, threshold: 999 } });
+      e.hot.fill(0);
+      e.loadTeams(blinker);
+      for (let i = 0; i < 20; i++) e.tick();
+      expect(e.stackHeight[at(31, 30)]).toBeLessThanOrEqual(base.coldAfter + 2);
+      expect(e.stackHeight[at(30, 30)]).toBeGreaterThanOrEqual(15);
+    });
+
+    it('lastCrash lists every landing, and they add up to the pit', () => {
+      const e = createEngine({ seed: 1, freezeUnderworld: true, fortune: { ...base, pit: true, pitSize: 10 } });
+      e.hot.fill(0);
+      e.loadTeams([]);
+      e.setStack(30, 30, [[BLUE, 12]]);
+      e.tick();
+      const lc = e.lastCrash;
+      expect(lc.spilled).toBe(12);
+      expect(lc.landings).toHaveLength(12);
+      const landed = lc.landings.reduce((n, [, , add]) => n + add, 0);
+      const inPit = e.pit[BLUE].reduce((a, v) => a + v, 0) + e.pit[RED].reduce((a, v) => a + v, 0);
+      expect(landed).toBe(inPit);
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { COLS, ROWS, FIELD_X0, FIELD_X1, FIELD_Y0, FIELD_Y1, BLUE, RED, DEAD } from '../engine/constants.js';
 import { THEME } from './theme.js';
+import { TRAVEL_MS, STAGGER_MS } from './pitDisplay.js';
 
 const FILL = { [BLUE]: THEME.blue, [RED]: THEME.red };
 const EDGE = { [BLUE]: THEME.blueDeep, [RED]: THEME.redDeep };
@@ -401,12 +402,12 @@ export function drawTable(ctx, view) {
   ctx.fillText('THE PIT', cx * tile, (rows + 1.6) * tile);
 
   // Chips running down the pipes after a topple.
-  const DURATION = 1500;
+  const DURATION = TRAVEL_MS;
   for (const sp of spills) {
     const n = Math.min(6, Math.max(1, sp.crash.spilled));
     const path = spillPath(sp.crash, rotate);
     for (let k = 0; k < n; k++) {
-      const t = (now - sp.born - k * 110) / DURATION;
+      const t = (now - sp.born - k * STAGGER_MS) / DURATION;
       if (t < 0 || t > 1) continue;
       const eased = t * t * (3 - 2 * t);
       const [x, y] = pointAlong(path, eased);

@@ -10,6 +10,7 @@ import { createRng } from './engine/rng.js';
 import { createSfx } from './audio/sfx.js';
 import { BLUE, RED, COLS, ROWS } from './engine/constants.js';
 import { tableSize } from './render/drawBoard.js';
+import { createPitDisplay, pitLead } from './render/pitDisplay.js';
 
 const TICKS_PER_SECOND = 6; // at 1x; games used to run at 24 a second and felt far too fast
 const SPEEDS = [0.5, 1, 2, 4];
@@ -60,6 +61,7 @@ export default function App() {
   );
   const ghostRef = useRef(ghost);
   ghostRef.current = ghost;
+  const pitDisplay = useMemo(() => createPitDisplay(PIT), []); // what the pit shows: chips land after their animation
   const spillsRef = useRef([]); // chips running down the pipes after a topple
   const lastCrashId = useRef(0);
 
@@ -68,14 +70,15 @@ export default function App() {
     const hot = new Array(PIT * PIT);
     for (let py = 0; py < PIT; py++) for (let px = 0; px < PIT; px++) hot[py * PIT + px] = e.hot2[(PIT_Y0 + py) * COLS + PIT_X0 + px];
     const now = performance.now();
-    spillsRef.current = spillsRef.current.filter((sp) => now - sp.born < 2600);
+    pitDisplay.update(spillsRef.current, now); // land chips whose trip down the gutter has finished
+    spillsRef.current = spillsRef.current.filter((sp) => !sp.landed || now - sp.born < 2600);
     return {
       teams: e.teams, hot: e.hot, stacks: e.stacks, blueTower: e.blueTower, redTower: e.redTower,
       ghost: ghostRef.current, look: lookRef.current,
-      pit: { size: PIT, hot, blue: e.pit[BLUE], red: e.pit[RED] },
+      pit: { size: PIT, hot, blue: pitDisplay.blue, red: pitDisplay.red },
       spills: spillsRef.current,
     };
-  }, []);
+  }, [pitDisplay]);
 
   const lockIn = () => {
     sfx.play('lockIn');
@@ -85,6 +88,7 @@ export default function App() {
     e.loadTeams([...placeFormation(selected, BLUE), ...bot.cells]);
     engineRef.current = e;
     spillsRef.current = [];
+    pitDisplay.reset();
     lastCrashId.current = 0;
     setBotName(bot.formation.name);
     setPhase('locked');
@@ -95,6 +99,7 @@ export default function App() {
   const reset = () => {
     engineRef.current = newEngine(1);
     spillsRef.current = [];
+    pitDisplay.reset();
     lastCrashId.current = 0;
     setPhase('draft'); setResult(null); setHud(null); setBotName(null);
   };
@@ -122,16 +127,27 @@ export default function App() {
         }
         if (now - hudAt > 90) {
           hudAt = now;
-          const s = e.getScore();
-          setHud({ tick: e.tickCount, blue: s.blue, red: s.red, crashes: e.fortune.crashes.total, pitBlue: e.fortune.blue, pitRed: e.fortune.red });
+          // Score what the player can see: the pit counts only chips that have landed.
+          pitDisplay.update(spillsRef.current, performance.now());
+          const s = e.getScore(false);
+          const lead = pitLead(pitDisplay.blue, pitDisplay.red);
+          const bonus = Math.floor(Math.abs(lead.blue - lead.red) / DEFAULT_FORTUNE_RULES.unit);
+          setHud({
+            tick: e.tickCount, crashes: e.fortune.crashes.total, pitBlue: lead.blue, pitRed: lead.red,
+            blue: s.blue + (lead.blue > lead.red ? bonus : 0), red: s.red + (lead.red > lead.blue ? bonus : 0),
+          });
         }
-        if (e.status !== 'running') { setResult(e.getResult()); setPhase('done'); }
+        if (e.status !== 'running') {
+          pitDisplay.update(spillsRef.current, 0, true); // chips still in the pipes land now so the board matches the result
+          setResult(e.getResult());
+          setPhase('done');
+        }
       }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [pitDisplay]);
 
   const outcomeText = result && { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome];
 

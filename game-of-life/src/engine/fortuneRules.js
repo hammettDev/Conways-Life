@@ -13,6 +13,7 @@ const CORE = {
   maxCrashes: 6,
   cold: true,
   coldAfter: 4,
+  flicker: true, // flashers stay lit, so a blinker's outer cells stack every tick and topple in about 25
   pit: true,
   pitSize: 10,
   splash: 1.6,
