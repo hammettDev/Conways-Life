@@ -272,8 +272,8 @@ describe('fortune layer (stacks, coloured fences, Board 2 spill)', () => {
     expect(e.fortune.crashes.total).toBe(1);
     // blocks every 4 tiles from x = 22; colours follow the stack bottom to top
     expect([22, 26, 30, 34, 38].map((x) => e.teams[at(x, 30)])).toEqual([BLUE, BLUE, RED, RED, BLUE]);
-    expect(e.blueTower[at(20, 30)] + e.redTower[at(20, 30)]).toBe(0); // the tile is cleared
-    expect(e.stacks[at(20, 30)]).toBeNull();
+    expect(e.stacks[at(20, 30)]).toBeNull(); // the stack is cleared
+    expect(e.stackHeight[at(20, 30)]).toBe(0);
   });
 
   it('topples toward the enemy of its majority colour', () => {
@@ -366,5 +366,74 @@ describe('fortune layer (stacks, coloured fences, Board 2 spill)', () => {
     const tilesOnly = e.getScore(false);
     expect(withBonus.blue - tilesOnly.blue).toBe(6); // floor(13 / 2)
     expect(withBonus.red).toBe(tilesOnly.red);
+  });
+
+  it('a crash clears the stack but leaves the scoring tower alone (unless asked)', () => {
+    const e = make({ ...FORT, fence: false });
+    e.setStack(40, 30, [[BLUE, 6]]);
+    e.blueTower[at(40, 30)] = 17;
+    e.tick();
+    expect(e.stackHeight[at(40, 30)]).toBe(0);
+    expect(e.blueTower[at(40, 30)]).toBe(17);
+    const f = make({ ...FORT, fence: false, resetTowers: true });
+    f.setStack(40, 30, [[BLUE, 6]]);
+    f.blueTower[at(40, 30)] = 17;
+    f.tick();
+    expect(f.blueTower[at(40, 30)]).toBe(0);
+  });
+
+  describe('spread drops', () => {
+    const SPREAD = { ...FORT, spread: true, spacing: 6 };
+
+    it('pieces land one per slot, spaced far apart, in stack order and colour', () => {
+      const e = make(SPREAD);
+      e.setStack(20, 30, [[BLUE, 3], [RED, 2]]); // blue majority -> topples right
+      e.tick();
+      const xs = [23, 29, 35, 41, 47];
+      expect(xs.map((x) => e.teams[at(x, 30)])).toEqual([BLUE, BLUE, BLUE, RED, RED]);
+      // nothing fills the gaps: pieces do not touch each other
+      expect([25, 26, 27, 31, 32, 33].every((x) => e.teams[at(x, 30)] === DEAD)).toBe(true);
+    });
+
+    it('a piece already sitting on the spot wins; the chip spills to Board 2 instead', () => {
+      const e = make(SPREAD);
+      e.loadTeams([{ x: 29, y: 30, team: RED }, { x: 30, y: 30, team: RED }, { x: 29, y: 31, team: RED }, { x: 30, y: 31, team: RED }]);
+      e.setStack(20, 30, [[BLUE, 5]]);
+      e.tick();
+      expect(e.teams[at(29, 30)]).toBe(RED);           // the original piece stays
+      expect([23, 35, 41, 47].map((x) => e.teams[at(x, 30)])).toEqual([BLUE, BLUE, BLUE, BLUE]);
+      expect(total(e, BLUE)).toBe(1);                   // the blocked chip went to Board 2
+    });
+
+    it('pieces landing in clear space leave the rest of the board untouched', () => {
+      const e = make(SPREAD);
+      e.loadTeams([{ x: 60, y: 45, team: RED }, { x: 61, y: 45, team: RED }, { x: 60, y: 46, team: RED }, { x: 61, y: 46, team: RED }]);
+      e.setStack(20, 30, [[BLUE, 3]]);
+      e.tick();
+      expect([[60, 45], [61, 45], [60, 46], [61, 46]].every(([x, y]) => e.teams[at(x, y)] === RED)).toBe(true);
+    });
+  });
+
+  describe('cold pieces', () => {
+    const alive = [[61, 45], [62, 45], [60, 46], [61, 46], [61, 47]]; // R-pentomino keeps the match going
+    const run = (fortune) => {
+      const e = createEngine({ seed: 1, freezeUnderworld: true, fortune: { ...FORT, threshold: 999, ...fortune } });
+      e.hot.fill(0);
+      e.loadTeams([
+        ...alive.map(([x, y]) => ({ x, y, team: RED })),
+        ...[[20, 30], [21, 30], [20, 31], [21, 31]].map(([x, y]) => ({ x, y, team: BLUE })), // a still block
+        ...[[30, 30], [31, 30], [32, 30]].map(([x, y]) => ({ x, y, team: BLUE })),           // a blinker
+      ]);
+      for (let i = 0; i < 10; i++) e.tick();
+      return e;
+    };
+
+    it('a still block stops adding chips once cold, a flasher keeps adding', () => {
+      const warm = run({ cold: false });
+      const cold = run({ cold: true, coldAfter: 2 });
+      expect(warm.stackHeight[at(20, 30)]).toBe(10);          // never cold: a chip every tick
+      expect(cold.stackHeight[at(20, 30)]).toBeLessThan(5);   // went cold after ~2 quiet ticks
+      expect(cold.stackHeight[at(30, 30)] + cold.stackHeight[at(32, 30)]).toBeGreaterThan(cold.stackHeight[at(20, 30)]);
+    });
   });
 });
