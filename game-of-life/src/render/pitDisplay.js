@@ -14,9 +14,59 @@ export function createPitDisplay(size) {
   const blue = new Uint16Array(n);
   const red = new Uint16Array(n);
   const arrays = { 1: blue, 2: red };
+  // A cosmetic Life layer so the pit never sits still: cells that are not owned
+  // tiles live, die and breed around the owned ones by Conway's rules, and sparks
+  // keep dropping next to them. It is drawing only and never touches the score.
+  let ghost = new Uint8Array(n);
+  let ghostAt = 0;
+  const owner = (k) => (blue[k] > red[k] ? 1 : red[k] > blue[k] ? 2 : 0);
+  function stepGhost() {
+    const next = new Uint8Array(n);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const k = y * size + x;
+        if (owner(k)) continue; // owned tiles are the anchors, not ghosts
+        let c = 0;
+        let b = 0;
+        let r = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const xx = x + dx;
+            const yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= size || yy >= size) continue;
+            const j = yy * size + xx;
+            const t = owner(j) || ghost[j];
+            if (t) { c++; if (t === 1) b++; else r++; }
+          }
+        }
+        if (ghost[k] && (c === 2 || c === 3)) next[k] = ghost[k];
+        else if (!ghost[k] && c === 3) next[k] = b > r ? 1 : 2;
+      }
+    }
+    // sparks: a few new cells beside owned tiles keep the pit moving
+    const anchors = [];
+    for (let k = 0; k < n; k++) if (owner(k)) anchors.push(k);
+    for (let s = 0; s < 3 && anchors.length; s++) {
+      const a = anchors[(Math.random() * anchors.length) | 0];
+      const x = (a % size) + ((Math.random() * 3) | 0) - 1;
+      const y = ((a / size) | 0) + ((Math.random() * 3) | 0) - 1;
+      if (x < 0 || y < 0 || x >= size || y >= size) continue;
+      const k = y * size + x;
+      if (!owner(k)) next[k] = owner(a);
+    }
+    ghost = next;
+  }
   return {
     blue,
     red,
+    get ghost() { return ghost; },
+    // Advance the cosmetic layer about 4 times a second.
+    animate(now) {
+      if (now - ghostAt < 250) return;
+      ghostAt = now;
+      stepGhost();
+    },
     // Land every spill whose animation has finished (or all of them, with force).
     update(spills, now, force = false) {
       let applied = 0;
@@ -29,7 +79,7 @@ export function createPitDisplay(size) {
       }
       return applied;
     },
-    reset() { blue.fill(0); red.fill(0); },
+    reset() { blue.fill(0); red.fill(0); ghost = new Uint8Array(n); },
   };
 }
 

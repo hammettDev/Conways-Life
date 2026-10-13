@@ -120,6 +120,7 @@ export default function App() {
     const hot = new Array(PIT * PIT);
     for (let py = 0; py < PIT; py++) for (let px = 0; px < PIT; px++) hot[py * PIT + px] = e.hot2[(PIT_Y0 + py) * COLS + PIT_X0 + px];
     const now = performance.now();
+    pitDisplay.animate(now);
     pitDisplay.update(spillsRef.current, now); // chips land once their trip down the gutter has finished
     spillsRef.current = spillsRef.current.filter((sp) => !sp.landed || now - sp.born < 2600);
 
@@ -135,7 +136,7 @@ export default function App() {
     return {
       teams: e.teams, hot: e.hot, stacks: e.stacks, blueTower: e.blueTower, redTower: e.redTower,
       ghost, look: lk,
-      pit: { size: PIT, hot, blue: pitDisplay.blue, red: pitDisplay.red },
+      pit: { size: PIT, hot, blue: pitDisplay.blue, red: pitDisplay.red, ghost: pitDisplay.ghost, time: now },
       spills: spillsRef.current,
     };
   }, [pitDisplay]);

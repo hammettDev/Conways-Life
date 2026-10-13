@@ -228,9 +228,20 @@ export function drawPit(ctx, view) {
         const b = blue[k];
         const rd = red[k];
         const lead = Math.abs(b - rd);
+        const phase = (((px * 7 + py * 13) % 17) / 17) * Math.PI * 2;
+        const breathe = 0.88 + 0.12 * Math.sin((view.time || 0) / 260 + phase);
+        const g0 = view.ghost && view.ghost[k];
+        if (g0) {
+          // a cosmetic Life cell drifting around the owned tiles
+          const gc = g0 === 1 ? '56,169,255' : '255,61,120';
+          ctx.fillStyle = `rgba(${gc},0.3)`;
+          ctx.fillRect(x + 3, y + 3, tile - 6, tile - 6);
+          ctx.fillStyle = `rgba(${gc},0.18)`;
+          ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
+        }
         if (b !== rd) {
           // heat: the bigger the lead, the hotter the tile (no numbers)
-          const a = Math.min(0.62, 0.1 + 0.07 * Math.sqrt(lead));
+          const a = Math.min(0.62, 0.1 + 0.07 * Math.sqrt(lead)) * breathe;
           ctx.fillStyle = b > rd ? `rgba(56,169,255,${a})` : `rgba(255,61,120,${a})`;
           ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
           if (lead >= 4) {
@@ -244,7 +255,7 @@ export function drawPit(ctx, view) {
         }
         if (hot[k]) {
           const g = ctx.createRadialGradient(x + tile / 2, y + tile / 2, 1, x + tile / 2, y + tile / 2, tile * 0.55);
-          g.addColorStop(0, 'rgba(255,190,70,0.5)');
+          g.addColorStop(0, `rgba(255,190,70,${0.3 + 0.25 * breathe})`);
           g.addColorStop(1, 'rgba(255,176,46,0)');
           ctx.fillStyle = g;
           ctx.fillRect(x, y, tile, tile);
