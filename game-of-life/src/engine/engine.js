@@ -188,22 +188,28 @@ export function createEngine({
   // laid along the fall direction, the bottom chip nearest the tower. It slides
   // outward to the first spot whose whole run, plus a one-tile margin, is clear.
   function layFenceLine(x0, y, dir, chipTeams) {
+    if (y < 1 || y >= ROWS - 1) return chipTeams;
     const n = Math.min(F.line, chipTeams.length);
     for (let off = 3; off <= 3 + F.slide; off++) {
+      // cells that would run off the board are lost to the pit instead
       const xs = [];
-      for (let j = 0; j < n; j++) xs.push(x0 + dir * (off + j));
-      const lo = Math.min(...xs);
-      const hi = Math.max(...xs);
-      if (lo < 1 || hi >= COLS - 1 || y < 1 || y >= ROWS - 1) break;
+      for (let j = 0; j < n; j++) {
+        const xx = x0 + dir * (off + j);
+        if (xx < 0 || xx >= COLS) break;
+        xs.push(xx);
+      }
+      if (!xs.length) break;
+      const lo = Math.min(...xs) - 2;
+      const hi = Math.max(...xs) + 2;
       let clear = true;
       for (let yy = y - 2; yy <= y + 2 && clear; yy++) {
-        for (let xx = lo - 2; xx <= hi + 2; xx++) {
-          if (xx >= 0 && xx < COLS && yy >= 0 && yy < ROWS && teams[yy * COLS + xx] !== DEAD) { clear = false; break; }
+        for (let xx = Math.max(0, lo); xx <= Math.min(COLS - 1, hi); xx++) {
+          if (teams[yy * COLS + xx] !== DEAD) { clear = false; break; }
         }
       }
       if (!clear) continue;
       xs.forEach((xx, j) => { teams[y * COLS + xx] = chipTeams[j]; fencePieces.push([xx, y]); });
-      return chipTeams.slice(n);
+      return chipTeams.slice(xs.length);
     }
     return chipTeams; // nowhere clear: everything spills
   }
@@ -305,7 +311,8 @@ export function createEngine({
   }
 
   function runCrash() {
-    if (crashes.total >= F.maxCrashes || tickCount - lastCrash < F.cooldown) return;
+    // The crash cap does not apply in overtime: a flasher board plays on until something topples.
+    if ((crashes.total >= F.maxCrashes && overtimeUntil === null) || tickCount - lastCrash < F.cooldown) return;
     const i = tallest();
     if (i < 0) return;
     const r = runs[i];
