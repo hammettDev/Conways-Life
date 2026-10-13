@@ -25,8 +25,8 @@ const CORE = {
 // Strategy-safest: Board 1 is not touched by a topple (the fence is only drawn).
 export const FORTUNE_RULES = { ...CORE, fence: false };
 
-// Dramatic: a small tight fence of up to 2 blocks lands on clear ground on Board 1.
-export const FORTUNE_RULES_LIVE_FENCE = { ...CORE, fence: true, spread: true, spacing: 4, maxBlocks: 2 };
+// Dramatic: a connected line of up to 5 single cells lands along the fall direction on clear ground on Board 1.
+export const FORTUNE_RULES_LIVE_FENCE = { ...CORE, fence: true, spread: true, line: 5, spacing: 4, maxBlocks: 2 };
 
 // The game's default: the live fence is on. Flip `liveFence` off to switch to the
 // strategy-safest rules (Board 1 untouched by a topple) without changing anything else.

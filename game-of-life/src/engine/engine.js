@@ -36,7 +36,7 @@ export function createEngine({
     threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 3,
     hotValue: 5, restValue: 1, unit: 5, fence: true, maxBlocks: Infinity,
     overtime: 0,                      // ticks to play on after settling while flashers are still stacking, until the first topple
-    spread: false, spacing: 6, slide: 30,        // drop pieces far apart, only into clear space
+    spread: false, line: 0, spacing: 6, slide: 30,        // drop pieces far apart, only into clear space
     cold: false, coldAfter: 4,        // still cells stop adding chips after this many quiet ticks
     flicker: false,                   // a flasher stays lit: a tile whose cell just went dark still adds a chip that tick
     resetTowers: false,               // a crash clears the stack only, not the scoring tower
@@ -184,7 +184,32 @@ export function createEngine({
     return true;
   }
 
+  // The line version: a connected run of single cells (one per chip, up to F.line)
+  // laid along the fall direction, the bottom chip nearest the tower. It slides
+  // outward to the first spot whose whole run, plus a one-tile margin, is clear.
+  function layFenceLine(x0, y, dir, chipTeams) {
+    const n = Math.min(F.line, chipTeams.length);
+    for (let off = 3; off <= 3 + F.slide; off++) {
+      const xs = [];
+      for (let j = 0; j < n; j++) xs.push(x0 + dir * (off + j));
+      const lo = Math.min(...xs);
+      const hi = Math.max(...xs);
+      if (lo < 1 || hi >= COLS - 1 || y < 1 || y >= ROWS - 1) break;
+      let clear = true;
+      for (let yy = y - 2; yy <= y + 2 && clear; yy++) {
+        for (let xx = lo - 2; xx <= hi + 2; xx++) {
+          if (xx >= 0 && xx < COLS && yy >= 0 && yy < ROWS && teams[yy * COLS + xx] !== DEAD) { clear = false; break; }
+        }
+      }
+      if (!clear) continue;
+      xs.forEach((xx, j) => { teams[y * COLS + xx] = chipTeams[j]; fencePieces.push([xx, y]); });
+      return chipTeams.slice(n);
+    }
+    return chipTeams; // nowhere clear: everything spills
+  }
+
   function layFenceSpread(x0, y, dir, chipTeams) {
+    if (F.line > 0) return layFenceLine(x0, y, dir, chipTeams);
     const y0 = y + 1 < ROWS ? y : y - 1;
     let from = 3; // distance of the next piece's nominal slot from the tower
     for (let n = 0; n < chipTeams.length; n++) {
