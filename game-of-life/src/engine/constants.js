@@ -40,3 +40,10 @@ export const MAX_PERIOD = 3;
 export const AUDIBLE_PRICE = 50;
 export const BOT_AUDIBLE_CHANCE = 0.3;
 export const SCOUT_BOSS_AUDIBLE_CHANCE = 1;
+
+// Bailout: when the wallet cannot cover a bet, a player can take a bailout, but it
+// shrinks every time so going broke is never better than playing well, and it never
+// exceeds STARTING_WALLET (so busting out cannot beat a fresh start).
+export const BAILOUT_START = 300;
+export const BAILOUT_STEP = 100;
+export const BAILOUT_MIN = 100;

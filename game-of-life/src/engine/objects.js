@@ -1,4 +1,6 @@
-import { placeFormation } from './formations.js';
+import { placeFormation, validateDraft, BLUE_LOS_X, CENTER_Y } from './formations.js';
+import { SHAPES } from './shapes.js';
+import { BLUE } from './constants.js';
 import { OBJECT_PRICES } from './objectPrices.js';
 
 // Purchasable objects: single patterns a player buys with in-game currency
@@ -49,4 +51,27 @@ export function cellsWithObject(build, team, object, drop, { flip = false } = {}
     ...placeFormation(front, team, { flip }),
     ...placeObject(object, team, { ...drop, flip }),
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Placing a bought object on the board.
+// ---------------------------------------------------------------------------
+
+// Where a piece lands when the player puts its centre on sim tile (x, y): the
+// (depth, lat) drop that placeObject understands.
+export function dropAt(object, x, y) {
+  const cells = SHAPES[object.shape];
+  const meanU = cells.reduce((n, [du]) => n + du, 0) / cells.length;
+  const meanV = cells.reduce((n, [, dv]) => n + dv, 0) / cells.length;
+  return { depth: Math.round(BLUE_LOS_X - x - meanU), lat: Math.round(y - CENTER_Y - meanV) };
+}
+
+// Is this a legal place for a Blue object? Own half, inside the field, and not on
+// top of the formation (its reserves are swapped out, so those tiles are free).
+export function placementOk(build, object, drop) {
+  const cells = placeObject(object, BLUE, drop);
+  if (!validateDraft(cells, BLUE).ok) return false;
+  const front = placeFormation({ ...build, players: build.players.filter((p) => p.role !== 'RS') }, BLUE);
+  const taken = new Set(front.map((c) => `${c.x},${c.y}`));
+  return !cells.some((c) => taken.has(`${c.x},${c.y}`));
 }

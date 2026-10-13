@@ -14,6 +14,10 @@ const MAX_DISCS = 14;
 export function toScreen(x, y, rotate) {
   return rotate ? [y, COLS - 1 - x] : [x, y];
 }
+// The inverse of toScreen: a screen tile back to the sim tile under it.
+export function fromScreen(sx, sy, rotate) {
+  return rotate ? [COLS - 1 - sy, sx] : [sx, sy];
+}
 export const boardSize = (rotate) => (rotate ? { cols: ROWS, rows: COLS } : { cols: COLS, rows: ROWS });
 
 // One chip, seen slightly from above: a flat ellipse.
@@ -221,20 +225,30 @@ export function drawPit(ctx, view) {
         const k = py * size + px;
         const x = px * tile;
         const y = py * tile;
-        if (hot[k]) {
-          ctx.fillStyle = 'rgba(255,176,46,0.22)';
-          ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
-        }
         const b = blue[k];
         const rd = red[k];
-        if (b === rd) continue;
-        ctx.fillStyle = b > rd ? 'rgba(56,169,255,0.6)' : 'rgba(255,61,120,0.6)';
-        ctx.fillRect(x + 2, y + 2, tile - 4, tile - 4);
-        ctx.fillStyle = THEME.text;
-        ctx.font = `bold ${Math.round(tile * 0.42)}px system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(Math.abs(b - rd)), x + tile / 2, y + tile / 2);
+        const lead = Math.abs(b - rd);
+        if (b !== rd) {
+          // heat: the bigger the lead, the hotter the tile (no numbers)
+          const a = Math.min(0.62, 0.1 + 0.07 * Math.sqrt(lead));
+          ctx.fillStyle = b > rd ? `rgba(56,169,255,${a})` : `rgba(255,61,120,${a})`;
+          ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
+          if (lead >= 4) {
+            ctx.fillStyle = b > rd ? 'rgba(160,220,255,0.35)' : 'rgba(255,160,190,0.35)';
+            const m = tile * 0.3;
+            ctx.fillRect(x + m, y + m, tile - 2 * m, tile - 2 * m);
+          }
+        } else if (b > 0) {
+          ctx.fillStyle = 'rgba(200,200,200,0.1)';
+          ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
+        }
+        if (hot[k]) {
+          const g = ctx.createRadialGradient(x + tile / 2, y + tile / 2, 1, x + tile / 2, y + tile / 2, tile * 0.55);
+          g.addColorStop(0, 'rgba(255,190,70,0.5)');
+          g.addColorStop(1, 'rgba(255,176,46,0)');
+          ctx.fillStyle = g;
+          ctx.fillRect(x, y, tile, tile);
+        }
       }
     }
     ctx.strokeStyle = THEME.gridField;

@@ -1,107 +1,252 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Arena from './components/Arena.jsx';
 import Sidebar from './components/Sidebar.jsx';
+import SaveDialog from './components/SaveDialog.jsx';
 import { createEngine } from './engine/engine.js';
 import { FREE_BUILDS } from './engine/library.js';
-import { OBJECTS } from './engine/objects.js';
+import {
+  OBJECTS, getObject, placeObject, cellsWithObject, dropAt, placementOk,
+} from './engine/objects.js';
 import { placeFormation, pickBotSetup } from './engine/formations.js';
 import { DEFAULT_FORTUNE_RULES } from './engine/fortuneRules.js';
 import { createRng } from './engine/rng.js';
 import { createSfx } from './audio/sfx.js';
-import { BLUE, RED, COLS, ROWS } from './engine/constants.js';
+import { BLUE, RED, COLS, ROWS, WAGER, AUDIBLE_PRICE } from './engine/constants.js';
 import { tableSize } from './render/drawBoard.js';
 import { createPitDisplay, pitLead } from './render/pitDisplay.js';
+import { loadSave, persistSave, exportCode, importCode } from './game/saveStore.js';
+import {
+  placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout,
+} from './game/wallet.js';
+import { botAnswers, counterFor } from './game/audible.js';
 
-const TICKS_PER_SECOND = 6; // at 1x; games used to run at 24 a second and felt far too fast
+const TICKS_PER_SECOND = 6; // at 1x
 const SPEEDS = [0.5, 1, 2, 4];
 const PIT = DEFAULT_FORTUNE_RULES.pitSize;
 const PIT_X0 = (COLS - PIT) >> 1;
 const PIT_Y0 = (ROWS - PIT) >> 1;
 
 const newEngine = (seed) => createEngine({ seed, fortune: DEFAULT_FORTUNE_RULES });
+const randomSeed = () => (Math.random() * 2 ** 31) | 0;
+const money = (n) => `$${n.toLocaleString()}`;
+const findBuild = (id) => FREE_BUILDS.find((b) => b.id === id) || null;
+
+// A formation's cells, with the bought piece swapped in for the reserves if there is one.
+const blueCells = (build, obj, drop) => (obj && drop ? cellsWithObject(build, BLUE, obj, drop) : placeFormation(build, BLUE));
 
 export default function App() {
   const sfx = useMemo(() => createSfx(), []);
-  const [phase, setPhase] = useState('draft'); // draft -> locked -> playing -> done
+  const pitDisplay = useMemo(() => createPitDisplay(PIT), []);
+
+  const [save, setSave] = useState(() => loadSave());
+  useEffect(() => { persistSave(save); }, [save]);
+
+  const [phase, setPhase] = useState('draft'); // draft -> locked -> (audible) -> playing -> done
   const [selectedId, setSelectedId] = useState(null);
   const [objectId, setObjectId] = useState(null);
+  const [drop, setDrop] = useState(null);       // where the bought piece sits: { depth, lat }
+  const [armed, setArmed] = useState(false);    // waiting for a click on the board to place the piece
+  const [audibleChoice, setAudibleChoice] = useState(null);
+  const [audibleUsed, setAudibleUsed] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [hud, setHud] = useState(null);
   const [result, setResult] = useState(null);
   const [botName, setBotName] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [showSave, setShowSave] = useState(false);
   const [madden, setMadden] = useState(() => {
     try { return localStorage.getItem('view') !== 'side'; } catch { return true; } // Madden is the default
   });
   const [look, setLook] = useState(() => {
-    try { return localStorage.getItem('look') === 'chips' ? 'chips' : 'heat'; } catch { return 'heat'; } // the clean look is the default
+    try { return localStorage.getItem('look') === 'chips' ? 'chips' : 'heat'; } catch { return 'heat'; }
+  });
+  const toggleView = () => setMadden((m) => {
+    const next = !m;
+    try { localStorage.setItem('view', next ? 'madden' : 'side'); } catch { /* storage unavailable */ }
+    return next;
   });
   const toggleLook = () => setLook((l) => {
     const next = l === 'chips' ? 'heat' : 'chips';
     try { localStorage.setItem('look', next); } catch { /* storage unavailable */ }
     return next;
   });
-  const lookRef = useRef(look);
-  lookRef.current = look;
-  const toggleView = () => setMadden((m) => {
-    const next = !m;
-    try { localStorage.setItem('view', next ? 'madden' : 'side'); } catch { /* storage unavailable */ }
-    return next;
-  });
 
+  const selected = findBuild(selectedId);
+  const obj = objectId ? getObject(objectId) : null;
+  const cost = WAGER + (obj ? obj.price : 0);
+
+  // Everything the per-frame callbacks and window listeners need, kept current.
+  const live = useRef({});
+  live.current = { phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
   const engineRef = useRef(newEngine(1)); // an empty board, so the Hot Zones show while drafting
-  const phaseRef = useRef(phase);
-  const speedRef = useRef(speed);
-  phaseRef.current = phase;
-  speedRef.current = speed;
-
-  const selected = FREE_BUILDS.find((b) => b.id === selectedId) || null;
-  const ghost = useMemo(
-    () => (selected && phase === 'draft' ? placeFormation(selected, BLUE) : []),
-    [selected, phase],
-  );
-  const ghostRef = useRef(ghost);
-  ghostRef.current = ghost;
-  const pitDisplay = useMemo(() => createPitDisplay(PIT), []); // what the pit shows: chips land after their animation
-  const spillsRef = useRef([]); // chips running down the pipes after a topple
+  const spillsRef = useRef([]);
   const lastCrashId = useRef(0);
+  const escrowRef = useRef(0);
+  const seedRef = useRef(1);
+  const botRef = useRef(null);
+  const botPendingRef = useRef(null);
+  const settledRef = useRef(true);
+  const hoverRef = useRef(null);
+  const arenaRef = useRef(null);
+
+  const startEngine = (blue, red, seed) => {
+    const e = newEngine(seed);
+    e.loadTeams([...blue, ...red]);
+    engineRef.current = e;
+    spillsRef.current = [];
+    pitDisplay.reset();
+    lastCrashId.current = 0;
+  };
+  const emptyBoard = () => {
+    engineRef.current = newEngine(1);
+    spillsRef.current = [];
+    pitDisplay.reset();
+    lastCrashId.current = 0;
+  };
 
   const getView = useCallback(() => {
     const e = engineRef.current;
+    const { phase: ph, selected: sel, obj: o, drop: d, armed: arm, audibleChoice: ac, look: lk } = live.current;
     const hot = new Array(PIT * PIT);
     for (let py = 0; py < PIT; py++) for (let px = 0; px < PIT; px++) hot[py * PIT + px] = e.hot2[(PIT_Y0 + py) * COLS + PIT_X0 + px];
     const now = performance.now();
-    pitDisplay.update(spillsRef.current, now); // land chips whose trip down the gutter has finished
+    pitDisplay.update(spillsRef.current, now); // chips land once their trip down the gutter has finished
     spillsRef.current = spillsRef.current.filter((sp) => !sp.landed || now - sp.born < 2600);
+
+    // Previews on your half: the formation (with the piece swapped in), and the piece under the cursor.
+    let ghost = [];
+    if (ph === 'draft' && sel) ghost = blueCells(sel, o, d);
+    if (ph === 'audible' && ac) { const b = findBuild(ac); if (b) ghost = placeFormation(b, BLUE); }
+    if (ph === 'draft' && o && arm && hoverRef.current && sel) {
+      const dd = dropAt(o, hoverRef.current[0], hoverRef.current[1]);
+      const ok = placementOk(sel, o, dd);
+      ghost = ghost.concat(placeObject(o, BLUE, dd).map((c) => ({ ...c, team: ok ? BLUE : RED })));
+    }
     return {
       teams: e.teams, hot: e.hot, stacks: e.stacks, blueTower: e.blueTower, redTower: e.redTower,
-      ghost: ghostRef.current, look: lookRef.current,
+      ghost, look: lk,
       pit: { size: PIT, hot, blue: pitDisplay.blue, red: pitDisplay.red },
       spills: spillsRef.current,
     };
   }, [pitDisplay]);
 
+  // ---- placing the bought piece -------------------------------------------------
+  const tryPlace = (tile) => {
+    const { selected: sel, obj: o } = live.current;
+    if (!sel || !o || !tile) return;
+    const d = dropAt(o, tile[0], tile[1]);
+    if (placementOk(sel, o, d)) { setDrop(d); setArmed(false); hoverRef.current = null; setNotice(''); }
+    else setNotice('Not there: keep it on your half, off your formation.');
+  };
+
+  const onDragStart = (e) => {
+    if (live.current.phase !== 'draft' || !live.current.obj) return;
+    e.preventDefault();
+    const sx = e.clientX;
+    const sy = e.clientY;
+    let moved = false;
+    setArmed(true);
+    const move = (ev) => {
+      if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 5) moved = true;
+      hoverRef.current = arenaRef.current ? arenaRef.current.tileAt(ev.clientX, ev.clientY) : null;
+    };
+    const up = (ev) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      const tile = arenaRef.current ? arenaRef.current.tileAt(ev.clientX, ev.clientY) : null;
+      if (moved && tile) tryPlace(tile);
+      else if (moved) { setArmed(false); hoverRef.current = null; } // dropped off the board: cancel
+      // a plain click leaves it armed, for click-to-place
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') { setArmed(false); setShowSave(false); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // ---- the match flow -----------------------------------------------------------
   const lockIn = () => {
+    if (!selected || (obj && !drop)) return;
+    const held = placeBet(save, cost);
+    if (!held) return;
     sfx.play('lockIn');
-    const seed = (Math.random() * 2 ** 31) | 0;
+    setSave(held);
+    escrowRef.current = cost;
+    settledRef.current = false;
+    const seed = randomSeed();
+    seedRef.current = seed;
     const bot = pickBotSetup(createRng(seed), FREE_BUILDS);
-    const e = newEngine(seed);
-    e.loadTeams([...placeFormation(selected, BLUE), ...bot.cells]);
-    engineRef.current = e;
-    spillsRef.current = [];
-    pitDisplay.reset();
-    lastCrashId.current = 0;
+    botRef.current = bot;
+    botPendingRef.current = null;
+    startEngine(blueCells(selected, obj, drop), bot.cells, seed);
     setBotName(bot.formation.name);
+    setNotice('');
+    setAudibleUsed(false);
     setPhase('locked');
   };
 
-  const snap = () => { setResult(null); setPhase('playing'); };
+  const cancelMatch = () => {
+    setSave((s) => refund(s, escrowRef.current)); // the bet and the piece come back; an audible fee does not
+    escrowRef.current = 0;
+    settledRef.current = true;
+    emptyBoard();
+    setPhase('draft');
+    setNotice('');
+  };
 
-  const reset = () => {
-    engineRef.current = newEngine(1);
-    spillsRef.current = [];
-    pitDisplay.reset();
-    lastCrashId.current = 0;
-    setPhase('draft'); setResult(null); setHud(null); setBotName(null);
+  const callAudible = () => { setAudibleChoice(null); setPhase('audible'); };
+  const cancelAudible = () => { setAudibleChoice(null); setPhase('locked'); };
+
+  const confirmAudible = () => {
+    const next = findBuild(audibleChoice);
+    const paid = spend(save, AUDIBLE_PRICE);
+    if (!next || !paid) return;
+    setSave(paid);
+    setAudibleUsed(true);
+    setSelectedId(next.id);
+    // The bot may answer with its own audible, kept hidden until the snap.
+    const seed = randomSeed();
+    const rng = createRng(seed ^ 0x9e3779b9);
+    let bot = botRef.current;
+    botPendingRef.current = null;
+    if (botAnswers(rng)) {
+      const c = counterFor(next.id, FREE_BUILDS, rng);
+      const flip = rng() < 0.5;
+      bot = { formation: c, flip, cells: placeFormation(c, RED, { flip }) };
+      botPendingRef.current = { name: c.name, notice: `The bot called an audible: ${c.name}.` };
+    }
+    botRef.current = bot;
+    seedRef.current = seed;
+    startEngine(blueCells(next, obj, drop), bot.cells, seed);
+    setAudibleChoice(null);
+    setPhase('locked');
+  };
+
+  const snap = () => {
+    const pending = botPendingRef.current;
+    if (pending) { setBotName(pending.name); setNotice(pending.notice); botPendingRef.current = null; }
+    setResult(null);
+    setPhase('playing');
+  };
+
+  const newMatch = () => {
+    emptyBoard();
+    setPhase('draft');
+    setResult(null);
+    setHud(null);
+    setObjectId(null);   // the piece was used up
+    setDrop(null);
+    setArmed(false);
+    setNotice('');
+  };
+
+  const takeBail = () => {
+    const r = takeBailout(save);
+    if (r) { setSave(r.save); setNotice(`Bailout: +${money(r.amount)}. It shrinks each time, so play it smart.`); }
   };
 
   // Drive the simulation at a fixed tick rate, independent of the frame rate.
@@ -114,8 +259,8 @@ export default function App() {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
       const e = engineRef.current;
-      if (phaseRef.current === 'playing') {
-        acc += dt * TICKS_PER_SECOND * speedRef.current;
+      if (live.current.phase === 'playing') {
+        acc += dt * TICKS_PER_SECOND * live.current.speed;
         while (acc >= 1 && e.status === 'running') {
           e.tick();
           acc -= 1;
@@ -139,8 +284,13 @@ export default function App() {
         }
         if (e.status !== 'running') {
           pitDisplay.update(spillsRef.current, 0, true); // chips still in the pipes land now so the board matches the result
-          setResult(e.getResult());
+          const r = e.getResult();
+          setResult(r);
           setPhase('done');
+          if (!settledRef.current) {
+            settledRef.current = true;
+            setSave((s) => settle(s, r.outcome, WAGER));
+          }
         }
       }
       raf = requestAnimationFrame(frame);
@@ -149,10 +299,21 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, [pitDisplay]);
 
-  const outcomeText = result && { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome];
+  // ---- what the UI shows ----------------------------------------------------------
+  const drafting = phase === 'draft';
+  const afford = canAfford(save, cost);
+  const canLock = drafting && Boolean(selected) && (!obj || Boolean(drop)) && afford;
+  const lockHint = !drafting ? '' : !selected ? 'Choose a formation.'
+    : obj && !drop ? 'Place your piece on the board first.'
+      : !afford ? 'Not enough cash for this bet.' : '';
+  const lockLabel = drafting ? `Lock In · ${money(cost)}` : 'Locked in';
+  const audibleBuild = findBuild(audibleChoice);
+  const canAudible = Boolean(audibleBuild) && audibleBuild.id !== selectedId && canAfford(save, AUDIBLE_PRICE);
 
-  const live = hud || { tick: 0, blue: 0, red: 0, crashes: 0 };
+  const live2 = hud || { tick: 0, blue: 0, red: 0, crashes: 0, pitBlue: 0, pitRed: 0 };
   const TABLE = tableSize(madden);
+  const verdict = result && { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome];
+  const net = result && (result.outcome === 'win' ? `+${money(WAGER)}` : result.outcome === 'lose' ? `−${money(WAGER)}` : 'bet returned');
 
   return (
     <div className="app">
@@ -160,6 +321,13 @@ export default function App() {
         <h1>Gridiron <span>Cellular Warfare</span></h1>
         <p>Pick a formation, lock it in, and watch the board decide.</p>
         <div className="toggles">
+          <div className="wallet" title={`${save.stats.wins} wins · ${save.stats.losses} losses · best streak ${save.stats.bestStreak}`}>
+            <span className="cash">{money(save.balance)}</span>
+            {drafting && bailoutAvailable(save) && (
+              <button className="ghost small" onClick={takeBail}>Bailout +{money(bailoutAmount(save))}</button>
+            )}
+          </div>
+          <button className="viewtoggle" onClick={() => setShowSave(true)}>Save</button>
           <button className="viewtoggle" onClick={toggleLook} aria-pressed={look === 'chips'}>Look: {look === 'chips' ? 'Chips' : 'Clean'}</button>
           <button className="viewtoggle" onClick={toggleView} aria-pressed={madden}>View: {madden ? 'Madden' : 'Sideways'}</button>
         </div>
@@ -168,51 +336,83 @@ export default function App() {
       <div className="layout">
         <main className="stage">
           <div className="table" style={{ width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
-          <section className="scorebar">
-            <div className="side blue"><span className="num">{phase === 'done' && result ? result.score.blue : live.blue}</span><i>you</i></div>
-            <div className="mid">
-              {phase === 'draft' && <p>{selected ? <>Previewing <b>{selected.name}</b>. Press Lock In to commit.</> : 'Choose a formation from the sidebar.'}</p>}
-              {phase === 'locked' && (
-                <>
-                  <p><b>{selected.name}</b> vs <b className="red">{botName}</b></p>
-                  <div className="row"><button className="go" onClick={snap}>Snap</button><button className="ghost" onClick={reset}>Cancel</button></div>
-                </>
-              )}
-              {phase === 'playing' && (
-                <>
-                  <p>Tick {live.tick} · {live.crashes} toppled · pit {live.pitBlue ?? 0}–{live.pitRed ?? 0}</p>
-                  <div className="row speeds">
-                    {SPEEDS.map((s) => <button key={s} className={s === speed ? 'on' : ''} onClick={() => setSpeed(s)}>{s}x</button>)}
-                  </div>
-                </>
-              )}
-              {phase === 'done' && result && (
-                <>
-                  <div className="line">
-                    <span className={`verdict ${result.outcome}`}>{outcomeText}</span>
-                    <button className="go small" onClick={reset}>New match</button>
-                  </div>
-                  <p className="note">
-                    pit {result.fortune.blue}–{result.fortune.red}
-                    {result.tileOutcome !== result.outcome && <b> · pit decided it</b>}
-                  </p>
-                </>
-              )}
-            </div>
-            <div className="side red"><span className="num">{phase === 'done' && result ? result.score.red : live.red}</span><i>bot</i></div>
-          </section>
-
-          <Arena getView={getView} rotate={madden} />
+            <section className="scorebar">
+              <div className="side blue"><span className="num">{phase === 'done' && result ? result.score.blue : live2.blue}</span><i>you</i></div>
+              <div className="mid">
+                {drafting && <p>{notice || (selected ? <>Previewing <b>{selected.name}</b>. Lock In to bet {money(cost)}.</> : 'Choose a formation from the sidebar.')}</p>}
+                {phase === 'locked' && (
+                  <>
+                    <p><b>{selected && selected.name}</b> vs <b className="red">{botName}</b></p>
+                    <div className="row">
+                      <button className="go small" onClick={snap}>Snap</button>
+                      <button className="ghost small" onClick={callAudible} disabled={audibleUsed || !canAfford(save, AUDIBLE_PRICE)} title="Switch your formation after seeing the bot's">
+                        Audible {money(AUDIBLE_PRICE)}
+                      </button>
+                      <button className="ghost small" onClick={cancelMatch}>Cancel</button>
+                    </div>
+                  </>
+                )}
+                {phase === 'audible' && (
+                  <>
+                    <p>Pick your new formation in the sidebar.</p>
+                    <div className="row"><button className="ghost small" onClick={cancelAudible}>Back</button></div>
+                  </>
+                )}
+                {phase === 'playing' && (
+                  <>
+                    <p>Tick {live2.tick} · {live2.crashes} toppled · pit {live2.pitBlue}–{live2.pitRed}</p>
+                    {notice && <p className="note">{notice}</p>}
+                    <div className="row speeds">
+                      {SPEEDS.map((s) => <button key={s} className={s === speed ? 'on' : ''} onClick={() => setSpeed(s)}>{s}x</button>)}
+                    </div>
+                  </>
+                )}
+                {phase === 'done' && result && (
+                  <>
+                    <div className="line">
+                      <span className={`verdict ${result.outcome}`}>{verdict}</span>
+                      <button className="go small" onClick={newMatch}>New match</button>
+                    </div>
+                    <p className="note">
+                      {net} · pit {result.fortune.blue}–{result.fortune.red}
+                      {result.tileOutcome !== result.outcome && <b> · pit decided it</b>}
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="side red"><span className="num">{phase === 'done' && result ? result.score.red : live2.red}</span><i>bot</i></div>
+            </section>
+            <Arena
+              ref={arenaRef} getView={getView} rotate={madden}
+              onHover={(t) => { hoverRef.current = t; }}
+              onTileClick={(t) => { if (live.current.armed && t) tryPlace(t); }}
+            />
           </div>
         </main>
 
         <Sidebar
-          builds={FREE_BUILDS} objects={OBJECTS}
-          selectedId={selectedId} onSelect={setSelectedId}
-          objectId={objectId} onObject={setObjectId}
-          locked={phase !== 'draft'} onLockIn={lockIn}
+          builds={FREE_BUILDS} objects={OBJECTS} balance={save.balance} wager={WAGER} phase={phase}
+          selectedId={selectedId}
+          onSelect={(id) => (phase === 'audible' ? setAudibleChoice(id) : setSelectedId(id))}
+          objectId={objectId}
+          onObject={(id) => { setObjectId(id); setDrop(null); setArmed(false); setNotice(''); }}
+          placed={Boolean(drop)} armed={armed}
+          onArm={() => setArmed(true)} onDragStart={onDragStart}
+          onClearPlace={() => { setDrop(null); setArmed(false); }}
+          lockLabel={lockLabel} lockHint={lockHint} canLock={canLock} onLockIn={lockIn}
+          audibleChoiceId={audibleChoice} canAudible={canAudible}
+          audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${money(AUDIBLE_PRICE)}` : 'Pick a formation'}
+          onAudibleConfirm={confirmAudible}
         />
       </div>
+
+      {showSave && (
+        <SaveDialog
+          code={exportCode(save)}
+          onImport={(text) => { const s = importCode(text); if (s) { setSave(s); return true; } return false; }}
+          onClose={() => setShowSave(false)}
+        />
+      )}
     </div>
   );
 }

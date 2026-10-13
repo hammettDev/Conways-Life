@@ -133,3 +133,31 @@ body {
   .sidebar { position: static; max-height: 420px; order: 2; }
   .table { min-width: 0; }
 }
+
+/* ---- wallet, shop previews, audible, save dialog ---- */
+.wallet { display: flex; align-items: center; gap: 8px; padding: 4px 12px; border: 1px solid var(--edge); border-radius: 999px; }
+.wallet .cash { font-weight: 800; color: #5dffa6; letter-spacing: 0.02em; }
+.ghost.small { padding: 4px 10px; font-size: 0.75rem; border-radius: 9px; }
+
+.banner { margin: 0; padding: 8px 10px; border-radius: 10px; background: rgba(255, 176, 46, 0.14); border: 1px solid rgba(255, 176, 46, 0.45); color: var(--hot); font-weight: 600; }
+.hint { margin: 0; color: var(--dim); font-size: 0.8rem; text-align: center; }
+
+.shopcard { border: 1px solid var(--edge); border-radius: 12px; padding: 8px; background: rgba(255, 255, 255, 0.03); display: flex; flex-direction: column; gap: 6px; }
+.shopcard.armed { border-color: var(--hot); }
+.shopcard.placed { border-color: var(--accent); }
+.dragzone { position: relative; cursor: grab; border-radius: 8px; overflow: hidden; user-select: none; }
+.dragzone:active { cursor: grabbing; }
+.minipreview { display: block; width: 100%; aspect-ratio: 32 / 20; border-radius: 8px; }
+.draghint { position: absolute; left: 6px; bottom: 6px; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; background: rgba(4, 11, 7, 0.82); color: var(--text); }
+.cardrow { display: flex; justify-content: space-between; align-items: baseline; }
+.cardrow .price { color: var(--hot); font-weight: 700; }
+.shopcard .note { margin: 0; }
+.shopcard .note span { color: var(--dim); }
+.item.withthumb { align-items: center; display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; }
+.thumb { display: block; }
+
+.overlay { position: fixed; inset: 0; background: rgba(2, 8, 5, 0.72); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+.dialog { width: min(480px, 100%); background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.dialog h2 { margin: 0; font-size: 1rem; }
+.dialog textarea { width: 100%; padding: 8px; border-radius: 10px; border: 1px solid var(--edge); background: #06110a; color: var(--text); font-family: ui-monospace, monospace; font-size: 0.8rem; resize: vertical; }
+.toggles { flex-wrap: wrap; justify-content: flex-end; max-width: 70%; }
