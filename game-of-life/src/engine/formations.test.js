@@ -6,9 +6,10 @@ import { createEngine } from './engine.js';
 import {
   HALF_X, placeFormation, validateDraft, pickBotSetup,
 } from './formations.js';
+import { BASE_BUILDS, FREE_BUILDS, TARGET_TILES } from './library.js';
 import {
-  BASE_BUILDS, BUILDS, FREE_BUILDS, FREE_MAX, TARGET_TILES, priceFor,
-} from './library.js';
+  OBJECTS, OBJECT_CATALOG, MAX_OBJECTS, MIN_PRICE, getObject, placeObject, totalPrice,
+} from './objects.js';
 import { createRng } from './rng.js';
 
 const SIZE = COLS * ROWS;
@@ -26,11 +27,10 @@ for (const [name, cells] of Object.entries(SHAPES)) {
 }
 
 describe('build library', () => {
-  it('has 50+ free builds across several sports, plus paid weapon packs', () => {
-    const sports = new Set(FREE_BUILDS.map((b) => b.sport));
-    expect(FREE_BUILDS.length).toBeGreaterThanOrEqual(50);
-    expect(sports).toEqual(new Set(['football', 'soccer', 'basketball', 'baseball', 'hockey']));
-    expect(BASE_BUILDS.some((b) => b.sport === 'arsenal')).toBe(true);
+  it('is mostly football, with a few builds from other sports', () => {
+    const football = FREE_BUILDS.filter((b) => b.sport === 'football');
+    expect(FREE_BUILDS.length).toBeGreaterThanOrEqual(25);
+    expect(football.length).toBeGreaterThanOrEqual(FREE_BUILDS.length * 0.4);
     expect(new Set(BASE_BUILDS.map((b) => b.id)).size).toBe(BASE_BUILDS.length);
   });
 
@@ -60,8 +60,8 @@ describe('build library', () => {
   });
 
   it('keeps teams on their own halves with no shared tiles', () => {
-    const blue = placeFormation(BUILDS[0], BLUE);
-    const red = placeFormation(BUILDS[0], RED);
+    const blue = placeFormation(FREE_BUILDS[0], BLUE);
+    const red = placeFormation(FREE_BUILDS[0], RED);
     expect(Math.max(...blue.map((c) => c.x))).toBeLessThan(HALF_X);
     expect(Math.min(...red.map((c) => c.x))).toBeGreaterThanOrEqual(HALF_X);
   });
@@ -78,8 +78,7 @@ describe('build library', () => {
   });
 });
 
-describe('weapons', () => {
-  const unit = (shape, team) => placeFormation({ players: [{ role: 'W', shape, depth: 14, lat: 0 }] }, team);
+describe('purchasable objects', () => {
   const step = (cells, n) => {
     let a = new Uint8Array(SIZE);
     let b = new Uint8Array(SIZE);
@@ -91,40 +90,40 @@ describe('weapons', () => {
   };
   const shifted = (cells, dx, dy) =>
     cells.map((c) => [c.x + dx, c.y + dy]).sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const drop = (id, team) => placeObject(getObject(id), team, { depth: 14, lat: 0 });
 
   it('gliders and spaceships travel toward the enemy', () => {
-    expect(step(unit('glider', BLUE), 4)).toEqual(shifted(unit('glider', BLUE), 1, 1));
-    expect(step(unit('lwss', BLUE), 4)).toEqual(shifted(unit('lwss', BLUE), 2, 0));
-    expect(step(unit('mwss', BLUE), 4)).toEqual(shifted(unit('mwss', BLUE), 2, 0));
-    expect(step(unit('hwss', BLUE), 4)).toEqual(shifted(unit('hwss', BLUE), 2, 0));
-  });
-
-  it('mirror for Red so they also advance toward the middle', () => {
-    expect(step(unit('lwss', RED), 4)).toEqual(shifted(unit('lwss', RED), -2, 0));
-    expect(step(unit('glider', RED), 4)).toEqual(shifted(unit('glider', RED), -1, 1));
-  });
-});
-
-describe('pricing', () => {
-  it('is free up to the ceiling and charges the edge above it', () => {
-    expect(priceFor(null)).toBe(0);
-    expect(priceFor(0.5)).toBe(0);
-    expect(priceFor(FREE_MAX)).toBe(0);
-    expect(priceFor(0.7)).toBe(40); // wins 70% -> +40% edge -> $40 on a $100 bet
-    expect(priceFor(0.9)).toBe(80);
-  });
-
-  it('never gets cheaper as builds get stronger', () => {
-    let last = 0;
-    for (let r = 0.4; r <= 1; r += 0.01) {
-      const p = priceFor(r);
-      expect(p).toBeGreaterThanOrEqual(last);
-      last = p;
+    expect(step(drop('glider', BLUE), 4)).toEqual(shifted(drop('glider', BLUE), 1, 1));
+    for (const id of ['lwss', 'mwss', 'hwss']) {
+      expect(step(drop(id, BLUE), 4), id).toEqual(shifted(drop(id, BLUE), 2, 0));
     }
   });
 
-  it('only paid builds cost money', () => {
-    for (const b of BUILDS) expect(b.cost === 0 || b.winRate > FREE_MAX).toBe(true);
+  it('mirror for Red so they also advance toward the middle', () => {
+    expect(step(drop('lwss', RED), 4)).toEqual(shifted(drop('lwss', RED), -2, 0));
+    expect(step(drop('glider', RED), 4)).toEqual(shifted(drop('glider', RED), -1, 1));
+  });
+
+  it('every object can be dropped legally on its own half', () => {
+    for (const o of OBJECTS) {
+      for (const team of [BLUE, RED]) {
+        expect(validateDraft(placeObject(o, team, { depth: 10, lat: 0 }), team), o.id).toEqual({ ok: true });
+      }
+    }
+  });
+
+  it('are the only paid items: each has a price and a cell count', () => {
+    expect(OBJECTS).toHaveLength(OBJECT_CATALOG.length);
+    for (const o of OBJECTS) {
+      expect(o.price, o.id).toBeGreaterThanOrEqual(MIN_PRICE);
+      expect(o.cells, o.id).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it('caps how many can be bought and sums their prices', () => {
+    expect(totalPrice(['glider', 'glider'])).toBe(getObject('glider').price * 2);
+    expect(totalPrice(Array(MAX_OBJECTS + 1).fill('glider'))).toBeNull();
+    expect(totalPrice([])).toBe(0);
   });
 });
 
@@ -160,7 +159,6 @@ describe('bot setup', () => {
     const b = pickBotSetup(createRng(11), FREE_BUILDS);
     expect(a.formation.id).toBe(b.formation.id);
     expect(a.flip).toBe(b.flip);
-    expect(a.formation.cost).toBe(0);
     expect(validateDraft(a.cells, RED)).toEqual({ ok: true });
   });
 
@@ -168,6 +166,6 @@ describe('bot setup', () => {
     const rng = createRng(2);
     const sports = new Set();
     for (let i = 0; i < 300; i++) sports.add(pickBotSetup(rng, FREE_BUILDS).formation.sport);
-    expect(sports.size).toBe(5);
+    expect(sports.size).toBeGreaterThanOrEqual(2);
   });
 });
