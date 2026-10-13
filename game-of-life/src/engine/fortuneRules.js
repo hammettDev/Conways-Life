@@ -6,11 +6,12 @@
 //   + small fence  -> same flip rate, 80% learned counter, 79% consistent.
 // Stacks grow 1 chip a tick (2 on a Hot Zone) but still cells go cold after
 // 4 quiet ticks; the tallest stack at 25 chips topples (one at a time, 8 ticks
-// apart, at most 6 a match); overflow goes down the gutter into a 10x10 pit.
+// apart, no limit); overflow goes down the gutter into a 10x10 pit.
 const CORE = {
   threshold: 25,
   cooldown: 8,
-  maxCrashes: 6,
+  maxCrashes: Infinity, // no topple limit: every stack that reaches 25 falls
+  shed: true, // a topple drops the bottom 25 chips; anything above stays to topple again
   cold: true,
   coldAfter: 4,
   flicker: true, // flashers stay lit, so a blinker's outer cells stack every tick and topple in about 25

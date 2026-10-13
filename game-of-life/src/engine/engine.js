@@ -34,7 +34,7 @@ export function createEngine({
 } = {}) {
   const F = fortune && {
     threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 3,
-    hotValue: 5, restValue: 1, unit: 5, fence: true, maxBlocks: Infinity,
+    hotValue: 5, restValue: 1, unit: 5, fence: true, shed: false, maxBlocks: Infinity,
     overtime: 0,                      // ticks to play on after settling while flashers are still stacking, until the first topple
     spread: false, line: 0, spacing: 6, slide: 30,        // drop pieces far apart, only into clear space
     cold: false, coldAfter: 4,        // still cells stop adding chips after this many quiet ticks
@@ -315,19 +315,28 @@ export function createEngine({
     if ((crashes.total >= F.maxCrashes && overtimeUntil === null) || tickCount - lastCrash < F.cooldown) return;
     const i = tallest();
     if (i < 0) return;
-    const r = runs[i];
+    // With `shed` on, only the bottom `threshold` chips fall; a taller stack keeps the rest.
+    const full = runs[i];
+    const limit = F.shed ? F.threshold : Infinity;
+    const r = [];
+    const keep = [];
     const chipTeams = [];
     let blue = 0;
     let red = 0;
-    for (const [t, c] of r) {
-      for (let k = 0; k < c; k++) chipTeams.push(t);
-      if (t === BLUE) blue += c; else red += c;
+    for (const [t, c] of full) {
+      const take = Math.min(c, limit - chipTeams.length);
+      if (take > 0) {
+        r.push([t, take]);
+        for (let k = 0; k < take; k++) chipTeams.push(t);
+        if (t === BLUE) blue += take; else red += take;
+      }
+      if (c - take > 0) keep.push([t, c - take]);
     }
     // It topples toward the enemy of its majority colour (the top chip breaks ties).
     const owner = blue > red ? BLUE : red > blue ? RED : r[r.length - 1][0];
     const dir = owner === BLUE ? 1 : -1;
-    runs[i] = null;
-    stackH[i] = 0;
+    runs[i] = keep.length ? keep : null;
+    stackH[i] -= chipTeams.length;
     if (F.resetTowers) { blueTower[i] = 0; redTower[i] = 0; }
     crashes.total++;
     crashes[owner === BLUE ? 'blue' : 'red']++;

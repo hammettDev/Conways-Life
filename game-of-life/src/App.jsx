@@ -11,7 +11,7 @@ import { placeFormation, pickBotSetup } from './engine/formations.js';
 import { DEFAULT_FORTUNE_RULES } from './engine/fortuneRules.js';
 import { createRng } from './engine/rng.js';
 import { createSfx } from './audio/sfx.js';
-import { BLUE, RED, COLS, ROWS, WAGER, AUDIBLE_PRICE, TUTORIAL_STAKE } from './engine/constants.js';
+import { BLUE, RED, COLS, ROWS, WAGER, MIN_BET, BET_STEP, AUDIBLE_PRICE, TUTORIAL_STAKE } from './engine/constants.js';
 import { tableSize } from './render/drawBoard.js';
 import { createPitDisplay, pitLead } from './render/pitDisplay.js';
 import { loadSave, persistSave, exportCode, importCode } from './game/saveStore.js';
@@ -76,8 +76,12 @@ export default function App() {
   const obj = objectId ? getObject(objectId) : null;
   const tutorial = !save.tutorialDone;           // the guided first match: fixed stake, free pieces and audible
   const [tStep, setTStep] = useState('pick');
-  const wager = tutorial ? TUTORIAL_STAKE : WAGER;
-  const cost = wager + (obj && !tutorial ? obj.price : 0);
+  const [betPref, setBetPref] = useState(WAGER);
+  const pieceCost = obj && !tutorial ? obj.price : 0;
+  const maxBet = Math.max(MIN_BET, save.balance - pieceCost);   // up to everything left after the piece
+  const wager = tutorial ? TUTORIAL_STAKE : Math.min(Math.max(betPref, MIN_BET), maxBet);
+  const cost = wager + pieceCost;
+  const stepBet = (d) => setBetPref(Math.min(maxBet, Math.max(MIN_BET, wager + d)));
   const audiblePrice = tutorial ? 0 : AUDIBLE_PRICE;
 
   // Everything the per-frame callbacks and window listeners need, kept current.
@@ -335,7 +339,7 @@ export default function App() {
   const live2 = hud || { tick: 0, blue: 0, red: 0, crashes: 0, pitBlue: 0, pitRed: 0 };
   const TABLE = tableSize(madden);
   const verdict = result && (tutorial ? 'Insured win' : { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome]);
-  const net = result && (tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(WAGER)}` : result.outcome === 'lose' ? `−${money(WAGER)}` : 'bet returned');
+  const net = result && (tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(wagerRef.current)}` : result.outcome === 'lose' ? `−${money(wagerRef.current)}` : 'bet returned');
 
   return (
     <div className={tutorial ? "app tutorial" : "app"}>
@@ -427,7 +431,7 @@ export default function App() {
         </main>
 
         <Sidebar
-          builds={FREE_BUILDS} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} phase={phase}
+          builds={FREE_BUILDS} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} bet={tutorial ? null : wager} canDec={wager > MIN_BET} canInc={wager < maxBet} onBet={stepBet} betStep={BET_STEP} phase={phase}
           selectedId={selectedId}
           onSelect={(id) => (phase === 'audible' ? setAudibleChoice(id) : setSelectedId(id))}
           objectId={objectId}

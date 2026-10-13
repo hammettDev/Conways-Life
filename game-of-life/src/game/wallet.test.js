@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { WAGER, STARTING_WALLET } from '../engine/constants.js';
+import { WAGER, MIN_BET, STARTING_WALLET } from '../engine/constants.js';
 import {
   newSave, newPlayerSave, placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout,
 } from './wallet.js';
@@ -44,7 +44,7 @@ describe('wallet', () => {
   });
 
   it('a bailout is only for a player who cannot cover a bet, and it shrinks each time', () => {
-    const broke = { ...newSave(), balance: WAGER - 1 };
+    const broke = { ...newSave(), balance: MIN_BET - 1 };
     expect(bailoutAvailable(newSave())).toBe(false);
     expect(takeBailout(newSave())).toBeNull();
     expect(bailoutAvailable(broke)).toBe(true);

@@ -1,5 +1,5 @@
 import {
-  WAGER, STARTING_WALLET, TUTORIAL_BANKROLL, BAILOUT_START, BAILOUT_STEP, BAILOUT_MIN,
+  WAGER, MIN_BET, STARTING_WALLET, TUTORIAL_BANKROLL, BAILOUT_START, BAILOUT_STEP, BAILOUT_MIN,
 } from '../engine/constants.js';
 
 // The player's save: wallet, bailout count and a few stats. All functions are
@@ -61,7 +61,7 @@ export function settle(save, outcome, wager = WAGER, multiplier = 1) {
 }
 
 export const bailoutAmount = (save) => Math.max(BAILOUT_MIN, BAILOUT_START - BAILOUT_STEP * save.bailouts);
-export const bailoutAvailable = (save) => save.balance < WAGER;
+export const bailoutAvailable = (save) => save.balance < MIN_BET;
 
 export function takeBailout(save) {
   if (!bailoutAvailable(save)) return null;
