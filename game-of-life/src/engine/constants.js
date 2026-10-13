@@ -30,9 +30,11 @@ export const BASE_GAIN = 1;
 export const MAX_TICKS = 500;
 export const MAX_PERIOD = 3;
 
-// Scouting: pay SCOUT_PRICE to see the bot's formation before you pick yours.
-// After you lock in, the bot calls an audible (swaps to a random other
-// formation) with probability AUDIBLE_CHANCE, which caps a perfect counter-
-// picker at roughly 75-80% instead of 90%. Simulated, 30-build pool.
-export const SCOUT_PRICE = 25;
-export const AUDIBLE_CHANCE = 0.3;
+// Audible: after you lock in, the bot's formation is revealed and you may pay
+// AUDIBLE_PRICE to switch yours (pay-per-use, so you only call it when you are
+// in a bad matchup). If you call one, the bot may answer with its own hidden
+// counter-audible with probability BOT_AUDIBLE_CHANCE, which caps a perfect
+// counter-picker at roughly 75-80% instead of 90%. Not available against bosses.
+// Simulated on the 30-build pool.
+export const AUDIBLE_PRICE = 25;
+export const BOT_AUDIBLE_CHANCE = 0.3;
