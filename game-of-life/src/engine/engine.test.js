@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { COLS, ROWS, BLUE, RED, DEAD, FIELD_X0, FIELD_Y0 } from './constants.js';
+import { COLS, ROWS, BLUE, RED, DEAD, FIELD_X0, FIELD_Y0, BOSS_PAYOUT } from './constants.js';
 import { stepTeams, stepUnderworld } from './life.js';
 import { accumulateTowers } from './towers.js';
 import { scorePlots, outcomeFor, payoutFor } from './scoring.js';
@@ -98,6 +98,13 @@ describe('scoring', () => {
     expect(payoutFor('win', 100)).toBe(100);
     expect(payoutFor('lose', 100)).toBe(-100);
     expect(payoutFor('push', 100)).toBe(0);
+  });
+
+  it('pays x5 for beating a boss but still costs one wager to lose', () => {
+    expect(BOSS_PAYOUT).toBe(5);
+    expect(payoutFor('win', 100, BOSS_PAYOUT)).toBe(500);
+    expect(payoutFor('lose', 100, BOSS_PAYOUT)).toBe(-100);
+    expect(payoutFor('push', 100, BOSS_PAYOUT)).toBe(0);
   });
 });
 

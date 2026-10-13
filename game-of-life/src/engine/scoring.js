@@ -31,9 +31,10 @@ export function outcomeFor(score) {
   return 'push';
 }
 
-export function payoutFor(outcome, wager) {
-  // Net change to the wallet.
-  if (outcome === 'win') return wager;
+// Net change to the wallet. `multiplier` scales a win (bosses pay more);
+// a loss always costs one wager and a push returns it.
+export function payoutFor(outcome, wager, multiplier = 1) {
+  if (outcome === 'win') return wager * multiplier;
   if (outcome === 'lose') return -wager;
   return 0;
 }

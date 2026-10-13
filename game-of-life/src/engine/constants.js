@@ -10,6 +10,9 @@ export const FIELD_Y1 = FIELD_Y0 + FIELD_ROWS;
 export const WAGER = 100;
 export const MAX_DRAFT = 50;
 
+// Beating a boss pays this many times the wager (losing still costs one wager).
+export const BOSS_PAYOUT = 5;
+
 export const DEAD = 0;
 export const BLUE = 1;
 export const RED = 2;
