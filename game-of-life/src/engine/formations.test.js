@@ -120,9 +120,11 @@ describe('purchasable objects', () => {
     }
   });
 
-  it('caps how many can be bought and sums their prices', () => {
-    expect(totalPrice(['glider', 'glider'])).toBe(getObject('glider').price * 2);
-    expect(totalPrice(Array(MAX_OBJECTS + 1).fill('glider'))).toBeNull();
+  it('allows only one object per player', () => {
+    expect(MAX_OBJECTS).toBe(1);
+    expect(totalPrice(['glider'])).toBe(getObject('glider').price);
+    expect(totalPrice(['glider', 'glider'])).toBeNull();
+    expect(totalPrice(['glider', 'acorn'])).toBeNull();
     expect(totalPrice([])).toBe(0);
   });
 });

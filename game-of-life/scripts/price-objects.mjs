@@ -1,5 +1,8 @@
 // Price each purchasable object by what it adds to a random build's score.
-// A win-probability gain of d on an even-money bet is worth 2 * d * wager.
+// Fair odds would be 2 * gain * wager (a $20 edge for +10%), but with one
+// object per match we price steeply instead: PRICE_SCALE dollars per full
+// point of win probability, so a +10% object costs $1,000 and strong objects
+// are a real splurge rather than something a rich player farms.
 //   node scripts/price-objects.mjs [trials] [--write]
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { writeFileSync } from 'node:fs';
@@ -10,10 +13,12 @@ import { OBJECT_CATALOG, MIN_PRICE, placeObject } from '../src/engine/objects.js
 import { placeFormation, validateDraft } from '../src/engine/formations.js';
 import { createEngine } from '../src/engine/engine.js';
 import { createRng } from '../src/engine/rng.js';
-import { BLUE, RED, WAGER } from '../src/engine/constants.js';
+import { BLUE, RED } from '../src/engine/constants.js';
 
 const ME = fileURLToPath(import.meta.url);
 const flag = (f) => process.argv.includes(f);
+const PRICE_SCALE = 10000;
+const PRICE_STEP = 25;
 
 if (!isMainThread) {
   const out = [];
@@ -73,7 +78,7 @@ if (!isMainThread) {
       gain += d; n++; if (d > 0) helped++;
     }
     const delta = gain / n;
-    const price = Math.max(MIN_PRICE, Math.round((2 * delta * WAGER) / 5) * 5);
+    const price = Math.max(MIN_PRICE, Math.round((delta * PRICE_SCALE) / PRICE_STEP) * PRICE_STEP);
     prices[obj.id] = price;
     console.log(`${obj.id.padEnd(8)} gain ${(delta * 100).toFixed(1).padStart(6)}%  helped ${(100 * helped / n).toFixed(0)}%  -> $${price}  (${n} trials)`);
   }

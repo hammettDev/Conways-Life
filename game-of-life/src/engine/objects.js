@@ -2,9 +2,10 @@ import { placeFormation } from './formations.js';
 import { OBJECT_PRICES } from './objectPrices.js';
 
 // Purchasable objects: single patterns a player buys with in-game currency
-// and drags onto their own half. Builds are free; these are the only paid items.
-export const MAX_OBJECTS = 3;
-export const MIN_PRICE = 5;
+// and drags onto their own half. Builds are free; these are the only paid
+// items. One per player per match, so money cannot be stacked into an edge.
+export const MAX_OBJECTS = 1;
+export const MIN_PRICE = 50;
 
 const O = (id, name, shape, blurb) => ({ id, name, shape, blurb });
 
