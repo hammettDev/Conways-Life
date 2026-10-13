@@ -11,12 +11,14 @@ import { BLUE, RED } from '../src/engine/constants.js';
 
 const ME = fileURLToPath(import.meta.url);
 const K = Number(process.argv[2] || 3);
+const BASE = { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3 };
 const MODES = [
   { name: 'old rules', f: null },
-  { name: 'no Board 1 fence, Board 2 only', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3, fence: false } },
-  { name: 'fence of 1 block', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3, maxBlocks: 1 } },
-  { name: 'fence of 3 blocks', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3, maxBlocks: 3 } },
-  { name: 'full fence to the edge', f: { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3 } },
+  { name: 'Board 2 only (no Board 1 drop)', f: { ...BASE, fence: false } },
+  { name: 'Board 2 only + cold statics', f: { ...BASE, fence: false, cold: true } },
+  { name: 'spread drops', f: { ...BASE, spread: true } },
+  { name: 'spread drops + cold statics', f: { ...BASE, spread: true, cold: true } },
+  { name: 'tight fence + cold (reference)', f: { ...BASE, cold: true } },
 ];
 const o2n = (o) => (o === 'win' ? 1 : o === 'push' ? 0.5 : 0);
 
