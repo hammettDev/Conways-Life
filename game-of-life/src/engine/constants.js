@@ -9,3 +9,12 @@ export const FIELD_Y1 = FIELD_Y0 + FIELD_ROWS;
 
 export const WAGER = 100;
 export const MAX_DRAFT = 50;
+
+export const DEAD = 0;
+export const BLUE = 1;
+export const RED = 2;
+
+export const HOT_BONUS = 2;
+export const BASE_GAIN = 1;
+export const MAX_TICKS = 500;
+export const MAX_PERIOD = 3;
