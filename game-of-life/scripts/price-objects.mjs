@@ -8,7 +8,7 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import { writeFileSync } from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { BASE_BUILDS } from '../src/engine/library.js';
+import { FREE_BUILDS } from '../src/engine/library.js';
 import { OBJECT_CATALOG, MIN_PRICE, placeObject } from '../src/engine/objects.js';
 import { placeFormation, validateDraft } from '../src/engine/formations.js';
 import { createEngine } from '../src/engine/engine.js';
@@ -52,24 +52,26 @@ if (!isMainThread) {
   for (const obj of OBJECT_CATALOG) {
     const tasks = [];
     for (let t = 0; t < trials; t++) {
-      const a = pick(BASE_BUILDS);
-      let b = pick(BASE_BUILDS);
-      while (b === a) b = pick(BASE_BUILDS);
+      const a = pick(FREE_BUILDS);
+      let b = pick(FREE_BUILDS);
+      while (b === a) b = pick(FREE_BUILDS);
       const blue = placeFormation(a, BLUE);
       const red = placeFormation(b, RED);
+      // With an object, the build's reserves are swapped out (see objects.js).
+      const front = placeFormation({ ...a, players: a.players.filter((p) => p.role !== 'RS') }, BLUE);
       let extra = null;
       for (let tries = 0; tries < 40 && !extra; tries++) {
         const cells = placeObject(obj, BLUE, {
           depth: 3 + Math.floor(rng() * 17), lat: -17 + Math.floor(rng() * 32), flip: rng() < 0.5,
         });
-        const taken = new Set(blue.map((c) => `${c.x},${c.y}`));
+        const taken = new Set(front.map((c) => `${c.x},${c.y}`));
         // Objects are extras outside the 50-cell draft cap: check the object
         // alone sits legally on our half and does not overlap the build.
         if (validateDraft(cells, BLUE).ok && !cells.some((c) => taken.has(`${c.x},${c.y}`))) extra = cells;
       }
       if (!extra) continue;
       tasks.push([blue, red, t + 1]);              // baseline
-      tasks.push([[...blue, ...extra], red, t + 1]); // with the object
+      tasks.push([[...front, ...extra], red, t + 1]); // object replaces reserves
     }
     const res = await evaluate(tasks);
     let gain = 0; let n = 0; let helped = 0;

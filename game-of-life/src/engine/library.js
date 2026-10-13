@@ -32,11 +32,16 @@ export function assemble(raw, moves = []) {
 export const CANDIDATES = RAW.map((b) => assemble(b, TUNING[b.id]));
 
 // Candidates that made the cut after balance testing (see scripts/cull.mjs).
-const chosen = new Set(ROSTER.free);
+const chosen = new Set([...ROSTER.free, ...ROSTER.tutorial, ...ROSTER.boss]);
+const tierOf = (id) => (ROSTER.tutorial.includes(id) ? 'tutorial' : ROSTER.boss.includes(id) ? 'boss' : 'free');
 export const BASE_BUILDS = CANDIDATES.filter((b) => chosen.has(b.id));
 
-// Every build is free; winRate is its measured score against the rest of the pool.
-export const BUILDS = BASE_BUILDS.map((b) => ({ ...b, winRate: RATINGS[b.id] ?? null }));
-export const FREE_BUILDS = BUILDS;
+// Every build is free to use. `tier` says where it appears: the balanced pool
+// the bot draws from, weak tutorial showcase builds, or strong boss builds.
+// winRate is the measured score against the balanced pool.
+export const BUILDS = BASE_BUILDS.map((b) => ({ ...b, tier: tierOf(b.id), winRate: RATINGS[b.id] ?? null }));
+export const FREE_BUILDS = BUILDS.filter((b) => b.tier === 'free');
+export const TUTORIAL_BUILDS = BUILDS.filter((b) => b.tier === 'tutorial');
+export const BOSS_BUILDS = BUILDS.filter((b) => b.tier === 'boss');
 
 export const getBuild = (id) => BUILDS.find((b) => b.id === id);

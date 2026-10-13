@@ -32,10 +32,13 @@ if (!isMainThread) {
 } else {
   const roster = opt('--roster') ? JSON.parse(readFileSync(opt('--roster'), 'utf8')) : ROSTER;
   const free = roster.free;
+  const rated = [...(roster.tutorial || []), ...(roster.boss || [])]; // play the pool, not each other
   const tasks = [];
   let seed = 1;
   const add = (a, b) => { for (let k = 0; k < seedsPer; k++) tasks.push([a, b, seed++]); };
   for (const a of free) for (const b of free) if (a !== b) add(a, b);
+
+  for (const w of rated) for (const b of free) { add(w, b); add(b, w); }
 
   const n = Math.min(os.cpus().length, 8);
   const slices = Array.from({ length: n }, () => []);
@@ -47,7 +50,7 @@ if (!isMainThread) {
     w.on('error', rej);
   })))).flat();
 
-  const stat = new Map(free.map((id) => [id, { pts: 0, games: 0, ticks: 0, caps: 0 }]));
+  const stat = new Map([...free, ...rated].map((id) => [id, { pts: 0, games: 0, ticks: 0, caps: 0 }]));
   const give = (id, pts, ticks, status) => {
     const s = stat.get(id);
     s.pts += pts; s.games++; s.ticks += ticks; if (status === 'cap') s.caps++;

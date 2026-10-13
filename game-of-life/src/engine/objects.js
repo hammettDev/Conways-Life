@@ -39,3 +39,14 @@ export function totalPrice(ids) {
   if (ids.length > MAX_OBJECTS) return null;
   return ids.reduce((n, id) => n + getObject(id).price, 0);
 }
+
+// Buying an object swaps out the build's rear-row reserves (the tile padding),
+// so an object is worth what it does on the board and not simply the extra
+// tiles it adds. Returns the team's full cell list: build + object.
+export function cellsWithObject(build, team, object, drop, { flip = false } = {}) {
+  const front = { ...build, players: build.players.filter((p) => p.role !== 'RS') };
+  return [
+    ...placeFormation(front, team, { flip }),
+    ...placeObject(object, team, { ...drop, flip }),
+  ];
+}

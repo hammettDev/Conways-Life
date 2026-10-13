@@ -6,9 +6,11 @@ import { createEngine } from './engine.js';
 import {
   HALF_X, placeFormation, validateDraft, pickBotSetup,
 } from './formations.js';
-import { BASE_BUILDS, FREE_BUILDS, TARGET_TILES } from './library.js';
 import {
-  OBJECTS, OBJECT_CATALOG, MAX_OBJECTS, MIN_PRICE, getObject, placeObject, totalPrice,
+  BASE_BUILDS, CANDIDATES, FREE_BUILDS, TUTORIAL_BUILDS, BOSS_BUILDS, TARGET_TILES,
+} from './library.js';
+import {
+  OBJECTS, OBJECT_CATALOG, MAX_OBJECTS, MIN_PRICE, getObject, placeObject, totalPrice, cellsWithObject,
 } from './objects.js';
 import { createRng } from './rng.js';
 
@@ -78,6 +80,31 @@ describe('build library', () => {
   });
 });
 
+describe('free formations never contain paid-object behaviour', () => {
+  const PAID_SHAPES = ['glider', 'lwss', 'mwss', 'hwss', 'acorn', 'rpent'];
+
+  it('no formation is built from a moving or exploding unit', () => {
+    for (const b of CANDIDATES) {
+      expect(b.players.filter((p) => PAID_SHAPES.includes(p.shape)), b.id).toEqual([]);
+    }
+  });
+
+  it('the balanced pool stays within 40-60% against itself', () => {
+    expect(FREE_BUILDS.length).toBeGreaterThanOrEqual(25);
+    for (const b of FREE_BUILDS) {
+      expect(b.winRate, b.id).toBeGreaterThanOrEqual(0.4);
+      expect(b.winRate, b.id).toBeLessThanOrEqual(0.6);
+    }
+  });
+
+  it('tutorial builds are clearly weaker and boss builds clearly stronger than the pool', () => {
+    expect(TUTORIAL_BUILDS.length).toBeGreaterThan(0);
+    expect(BOSS_BUILDS.length).toBeGreaterThan(0);
+    for (const b of TUTORIAL_BUILDS) expect(b.winRate, b.id).toBeLessThan(0.45);
+    for (const b of BOSS_BUILDS) expect(b.winRate, b.id).toBeGreaterThan(0.55);
+  });
+});
+
 describe('purchasable objects', () => {
   const step = (cells, n) => {
     let a = new Uint8Array(SIZE);
@@ -118,6 +145,18 @@ describe('purchasable objects', () => {
       expect(o.price, o.id).toBeGreaterThanOrEqual(MIN_PRICE);
       expect(o.cells, o.id).toBeGreaterThanOrEqual(4);
     }
+  });
+
+  it('buying an object swaps out the build\'s reserves', () => {
+    const build = FREE_BUILDS[0];
+    const reserves = build.players.filter((p) => p.role === 'RS');
+    expect(reserves.length).toBeGreaterThan(0);
+    const plain = placeFormation(build, BLUE);
+    const withGlider = cellsWithObject(build, BLUE, getObject('glider'), { depth: 8, lat: 0 });
+    const reserveCells = reserves.reduce((n, p) => n + SHAPES[p.shape].length, 0);
+    expect(withGlider).toHaveLength(plain.length - reserveCells + 5);
+    // the object itself is outside the 50-cell draft cap, the formation is not
+    expect(validateDraft(withGlider.slice(0, plain.length - reserveCells), BLUE).ok).toBe(true);
   });
 
   it('allows only one object per player', () => {
