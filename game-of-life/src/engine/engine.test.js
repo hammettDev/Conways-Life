@@ -436,4 +436,55 @@ describe('fortune layer (stacks, coloured fences, Board 2 spill)', () => {
       expect(cold.stackHeight[at(30, 30)] + cold.stackHeight[at(32, 30)]).toBeGreaterThan(cold.stackHeight[at(20, 30)]);
     });
   });
+
+  describe('the pit (Board 2 as a small tile battle)', () => {
+    const PIT = { ...FORT, fence: false, pit: true, pitSize: 10, unit: 2 };
+    const inPit = (e) => {
+      const out = [];
+      for (const team of [BLUE, RED]) e.pit[team].forEach((c, k) => { if (c) out.push([team, k, c]); });
+      return out;
+    };
+
+    it('overflow splatters inside the 10x10 pit and both colours land on the same tiles', () => {
+      const e = make(PIT);
+      e.setStack(30, 30, [[BLUE, 14], [RED, 14]]);
+      e.tick();
+      const spots = inPit(e);
+      expect(spots.reduce((n, [, , c]) => n + c, 0)).toBe(28);
+      expect(spots.every(([, k]) => k >= 0 && k < 100)).toBe(true);
+      const blueTiles = new Set(spots.filter(([t]) => t === BLUE).map(([, k]) => k));
+      const shared = spots.filter(([t, k]) => t === RED && blueTiles.has(k));
+      expect(shared.length).toBeGreaterThan(0);
+    });
+
+    it('a tile goes to the colour with more chips; a Hot Spot tile is worth x5; ties belong to nobody', () => {
+      const e = make({ ...PIT, hotValue: 5 });
+      e.hot2.fill(0);
+      const cx = (COLS - 10) >> 1;
+      const cy = (ROWS - 10) >> 1;
+      e.hot2[(cy + 2) * COLS + cx + 2] = 1; // pit tile (2,2) is hot
+      e.pit[BLUE][2 * 10 + 2] = 1;          // hot tile, blue only      -> blue +5
+      e.pit[BLUE][0] = 3; e.pit[RED][0] = 1; // plain tile, blue ahead   -> blue +1
+      e.pit[RED][1] = 2;                     // plain tile, red only     -> red +1
+      e.pit[BLUE][3] = 2; e.pit[RED][3] = 2; // tie                      -> nobody
+      expect(e.fortune.blue).toBe(6);
+      expect(e.fortune.red).toBe(1);
+    });
+
+    it('the tile lead becomes bonus plots', () => {
+      const e = make({ ...PIT, unit: 2 });
+      e.hot2.fill(0);
+      for (let k = 0; k < 8; k++) e.pit[BLUE][k] = 1; // blue holds 8 tiles, red none
+      expect(e.getScore().blue - e.getScore(false).blue).toBe(4);
+    });
+
+    it('a tight small fence still drops on Board 1; the rest goes down the gutter to the pit', () => {
+      const e = make({ ...PIT, fence: true, spread: true, spacing: 4, maxBlocks: 2 });
+      e.setStack(20, 30, [[BLUE, 6]]);
+      e.tick();
+      expect([23, 27].map((x) => e.teams[at(x, 30)])).toEqual([BLUE, BLUE]); // two blocks, 4 apart
+      expect(e.teams[at(31, 30)]).toBe(DEAD);                                  // no third
+      expect(inPit(e).reduce((n, [, , c]) => n + c, 0)).toBe(4);               // 6 - 2 chips overflow
+    });
+  });
 });

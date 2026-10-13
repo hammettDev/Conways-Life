@@ -38,6 +38,11 @@ export function createEngine({
     spread: false, spacing: 6,        // drop pieces far apart, only into clear space
     cold: false, coldAfter: 4,        // still cells stop adding chips after this many quiet ticks
     resetTowers: false,               // a crash clears the stack only, not the scoring tower
+    // The pit: Board 2 as a small tile-ownership battle. Overflow chips are
+    // dropped down a gutter into the middle of a pitSize x pitSize board and
+    // splatter outward; each tile goes to the colour with more chips at the end,
+    // and a tile on a Hot Spot is worth hotValue. Off = the larger 60x40 board.
+    pit: false, pitSize: 10, splash: 1.6,
     ...fortune,
   };
   const rng = createRng(seed);
@@ -65,6 +70,7 @@ export function createEngine({
   let hot2 = F ? seedUnderworld(rng2) : null;
   let nextHot2 = F ? new Uint8Array(SIZE) : null;
   const chips = { [BLUE]: new Uint8Array(F ? SIZE : 0), [RED]: new Uint8Array(F ? SIZE : 0) };
+  const pitChips = { [BLUE]: new Uint16Array(F ? 400 : 0), [RED]: new Uint16Array(F ? 400 : 0) };
   const fortuneScore = { blue: 0, red: 0 };
   const crashes = { total: 0, blue: 0, red: 0 }; // by the stack's majority colour
   let lastCrash = -Infinity;
@@ -85,6 +91,7 @@ export function createEngine({
       stackH.fill(0);
       lastChange.fill(0);
       chips[BLUE].fill(0); chips[RED].fill(0);
+      pitChips[BLUE].fill(0); pitChips[RED].fill(0);
       fortuneScore.blue = 0; fortuneScore.red = 0;
       crashes.total = 0; crashes.blue = 0; crashes.red = 0;
       lastCrash = -Infinity;
@@ -159,6 +166,7 @@ export function createEngine({
     const y0 = y + 1 < ROWS ? y : y - 1;
     const left = [];
     for (let n = 0; n < chipTeams.length; n++) {
+      if (n >= F.maxBlocks) return left.concat(chipTeams.slice(n));
       const bx = x0 + dir * (3 + F.spacing * n);
       const a = dir > 0 ? bx : bx - 1;
       if (a < 0 || a + 1 >= COLS || y0 < 0) return left.concat(chipTeams.slice(n));
@@ -189,6 +197,42 @@ export function createEngine({
     }
     tiles.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
     return tiles.map((t) => t[2]);
+  }
+
+  // --- The pit ---------------------------------------------------------
+  // The pit is the central pitSize x pitSize window of Board 2's Hot Spot grid.
+  const pitX0 = (COLS - F?.pitSize) >> 1;
+  const pitY0 = (ROWS - F?.pitSize) >> 1;
+
+  // Chips drop into the middle and splatter outward; later chips splash wider.
+  function splatter(chipTeams) {
+    const n = F.pitSize;
+    const c = (n - 1) / 2;
+    chipTeams.forEach((team, k) => {
+      const sigma = F.splash * (1 + k * 0.03);
+      const gx = (rng2() + rng2() + rng2() - 1.5) * 2; // roughly normal, sd ~1
+      const gy = (rng2() + rng2() + rng2() - 1.5) * 2;
+      const px = Math.min(n - 1, Math.max(0, Math.round(c + gx * sigma)));
+      const py = Math.min(n - 1, Math.max(0, Math.round(c + gy * sigma)));
+      pitChips[team][py * n + px]++;
+    });
+  }
+
+  // Each pit tile belongs to the colour with more chips on it (ties belong to
+  // nobody); a tile on a Hot Spot is worth hotValue tile-points, others one.
+  function pitTiles() {
+    const n = F.pitSize;
+    let blue = 0;
+    let red = 0;
+    for (let py = 0; py < n; py++) {
+      for (let px = 0; px < n; px++) {
+        const k = py * n + px;
+        const value = hot2[(pitY0 + py) * COLS + pitX0 + px] ? F.hotValue : 1;
+        if (pitChips[BLUE][k] > pitChips[RED][k]) blue += value;
+        else if (pitChips[RED][k] > pitChips[BLUE][k]) red += value;
+      }
+    }
+    return { blue, red };
   }
 
   // The overflow lands as a cluster, literal colours, up to chipCap chips per
@@ -237,7 +281,8 @@ export function createEngine({
         ? layFenceSpread(x0, y, dir, chipTeams)
         : chipTeams.slice(layFence(x0, y, dir, chipTeams));
     }
-    spill(leftover, y, dir);
+    if (F.pit) splatter(leftover);
+    else spill(leftover, y, dir);
   }
 
   function detectStability() {
@@ -298,7 +343,7 @@ export function createEngine({
   function getScore(withFortune = true) {
     const base = scorePlots(blueTower, redTower, status === 'stable' ? locked : null);
     if (!F || !withFortune) return base;
-    const diff = fortuneScore.blue - fortuneScore.red;
+    const diff = F.pit ? pitTiles().blue - pitTiles().red : fortuneScore.blue - fortuneScore.red;
     const bonus = Math.floor(Math.abs(diff) / F.unit);
     return diff > 0 ? { ...base, blue: base.blue + bonus } : { ...base, red: base.red + bonus };
   }
@@ -307,7 +352,10 @@ export function createEngine({
     const score = getScore();
     const result = { status, period, ticks: tickCount, score, outcome: outcomeFor(score) };
     if (F) {
-      result.fortune = { blue: fortuneScore.blue, red: fortuneScore.red, crashes: { ...crashes } };
+      const pt = F.pit ? pitTiles() : null;
+      result.fortune = pt
+        ? { blue: pt.blue, red: pt.red, crashes: { ...crashes } }
+        : { blue: fortuneScore.blue, red: fortuneScore.red, crashes: { ...crashes } };
       result.tileOutcome = outcomeFor(getScore(false)); // what Board 1 alone would have decided
     }
     return result;
@@ -338,6 +386,7 @@ export function createEngine({
     get stacks() { return runs; },
     get stackHeight() { return stackH; },
     get chips() { return chips; },
-    get fortune() { return { blue: fortuneScore.blue, red: fortuneScore.red, crashes: { ...crashes } }; },
+    get fortune() { return F && F.pit ? { ...pitTiles(), crashes: { ...crashes } } : { blue: fortuneScore.blue, red: fortuneScore.red, crashes: { ...crashes } }; },
+    get pit() { return pitChips; },
   };
 }

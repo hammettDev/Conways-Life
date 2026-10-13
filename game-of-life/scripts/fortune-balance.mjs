@@ -11,14 +11,17 @@ import { BLUE, RED } from '../src/engine/constants.js';
 
 const ME = fileURLToPath(import.meta.url);
 const K = Number(process.argv[2] || 3);
-const BASE = { threshold: 25, cooldown: 8, maxCrashes: 6, unit: 3 };
+const BASE = { threshold: 25, cooldown: 8, maxCrashes: 6, cold: true };
+const PIT = { ...BASE, pit: true, pitSize: 10 };
+const FENCE4 = { spread: true, spacing: 4, maxBlocks: 4 };
 const MODES = [
   { name: 'old rules', f: null },
-  { name: 'Board 2 only (no Board 1 drop)', f: { ...BASE, fence: false } },
-  { name: 'Board 2 only + cold statics', f: { ...BASE, fence: false, cold: true } },
-  { name: 'spread drops', f: { ...BASE, spread: true } },
-  { name: 'spread drops + cold statics', f: { ...BASE, spread: true, cold: true } },
-  { name: 'tight fence + cold (reference)', f: { ...BASE, cold: true } },
+  { name: 'ref: Board 2 60x40, no drops', f: { ...BASE, unit: 3, fence: false } },
+  { name: 'pit 10x10, no drops, unit 4', f: { ...PIT, unit: 4, fence: false } },
+  { name: 'pit 10x10, no drops, unit 8', f: { ...PIT, unit: 8, fence: false } },
+  { name: 'pit 10x10 + small fence(4), u4', f: { ...PIT, ...FENCE4, unit: 4 } },
+  { name: 'pit 10x10 + small fence(2), u4', f: { ...PIT, spread: true, spacing: 4, maxBlocks: 2, unit: 4 } },
+  { name: 'pit 16x16 + small fence(4), u6', f: { ...PIT, pitSize: 16, ...FENCE4, unit: 6 } },
 ];
 const o2n = (o) => (o === 'win' ? 1 : o === 'push' ? 0.5 : 0);
 
