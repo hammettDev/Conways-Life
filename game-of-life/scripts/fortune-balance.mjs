@@ -13,15 +13,14 @@ const ME = fileURLToPath(import.meta.url);
 const K = Number(process.argv[2] || 3);
 const BASE = { threshold: 25, cooldown: 8, maxCrashes: 6, cold: true };
 const PIT = { ...BASE, pit: true, pitSize: 10 };
-const FENCE4 = { spread: true, spacing: 4, maxBlocks: 4 };
+const FENCE2 = { spread: true, spacing: 4, maxBlocks: 2 };
 const MODES = [
   { name: 'old rules', f: null },
-  { name: 'ref: Board 2 60x40, no drops', f: { ...BASE, unit: 3, fence: false } },
-  { name: 'pit 10x10, no drops, unit 4', f: { ...PIT, unit: 4, fence: false } },
-  { name: 'pit 10x10, no drops, unit 8', f: { ...PIT, unit: 8, fence: false } },
-  { name: 'pit 10x10 + small fence(4), u4', f: { ...PIT, ...FENCE4, unit: 4 } },
-  { name: 'pit 10x10 + small fence(2), u4', f: { ...PIT, spread: true, spacing: 4, maxBlocks: 2, unit: 4 } },
-  { name: 'pit 16x16 + small fence(4), u6', f: { ...PIT, pitSize: 16, ...FENCE4, unit: 6 } },
+  { name: 'pit, no drops, unit 0.5', f: { ...PIT, unit: 0.5, fence: false } },
+  { name: 'pit, no drops, unit 0.33', f: { ...PIT, unit: 0.33, fence: false } },
+  { name: 'pit, no drops, unit 0.25', f: { ...PIT, unit: 0.25, fence: false } },
+  { name: 'pit + small fence(2), unit 0.33', f: { ...PIT, ...FENCE2, unit: 0.33 } },
+  { name: 'pit + small fence(2), unit 0.25', f: { ...PIT, ...FENCE2, unit: 0.25 } },
 ];
 const o2n = (o) => (o === 'win' ? 1 : o === 'push' ? 0.5 : 0);
 
