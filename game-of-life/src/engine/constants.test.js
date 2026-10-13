@@ -13,9 +13,13 @@ describe('grid constants', () => {
 });
 
 describe('tutorial economy', () => {
-  it('a won tutorial bet lands the player on the normal $100 stack', () => {
+  it('a won tutorial bet lands the player on the normal $300 stack', () => {
     const afterWin = C.TUTORIAL_BANKROLL + payoutFor('win', C.TUTORIAL_STAKE);
     expect(C.TUTORIAL_STAKE).toBeLessThanOrEqual(C.TUTORIAL_BANKROLL);
-    expect(afterWin).toBe(C.WAGER);
+    expect(afterWin).toBe(C.STARTING_WALLET);
+  });
+
+  it('a fresh stack covers several real bets', () => {
+    expect(C.STARTING_WALLET / C.WAGER).toBeGreaterThanOrEqual(3);
   });
 });
