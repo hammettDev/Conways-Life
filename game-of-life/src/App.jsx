@@ -403,7 +403,6 @@ export default function App() {
                   <>
                     <div className="line">
                       <span className={`verdict ${tutorial ? 'win' : result.outcome}`}>{verdict}</span>
-                      <button className="go small" onClick={newMatch}>New match</button>
                     </div>
                     <p className="note">
                       {net} · pit {result.fortune.blue}–{result.fortune.red}
@@ -435,7 +434,7 @@ export default function App() {
           audibleChoiceId={audibleChoice} canAudible={canAudible}
           audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${tutorial ? 'free' : money(AUDIBLE_PRICE)}` : 'Pick a formation'}
           onAudibleConfirm={confirmAudible}
-          onSnap={snap} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
+          onNewMatch={newMatch} onSnap={snap} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(AUDIBLE_PRICE)}
         />
