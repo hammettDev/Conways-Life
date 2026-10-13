@@ -11,19 +11,21 @@ import { ROSTER } from '../src/engine/roster.js';
 import { placeFormation } from '../src/engine/formations.js';
 import { createEngine } from '../src/engine/engine.js';
 import { BLUE, RED } from '../src/engine/constants.js';
+import { DEFAULT_FORTUNE_RULES } from '../src/engine/fortuneRules.js';
 
 const ME = fileURLToPath(import.meta.url);
 const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(n);
 const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
 const frozen = flag('--frozen');
+const fortune = flag('--fortune') ? DEFAULT_FORTUNE_RULES : null; // measure under the shipped rules
 const seedsPer = Number(opt('--seeds', 1));
 
 if (!isMainThread) {
   const byId = new Map(CANDIDATES.map((b) => [b.id, b]));
   const out = [];
   for (const [blueId, redId, seed] of workerData.tasks) {
-    const e = createEngine({ seed, freezeUnderworld: frozen });
+    const e = createEngine({ seed, freezeUnderworld: frozen, fortune });
     e.loadTeams([...placeFormation(byId.get(blueId), BLUE), ...placeFormation(byId.get(redId), RED)]);
     const r = e.runToEnd();
     out.push([blueId, redId, r.outcome, r.ticks, r.status]);
