@@ -7,7 +7,7 @@ import {
   HALF_X, placeFormation, validateDraft, pickBotSetup,
 } from './formations.js';
 import {
-  BASE_BUILDS, BUILDS, FREE_BUILDS, FREE_MAX, priceFor,
+  BASE_BUILDS, BUILDS, FREE_BUILDS, FREE_MAX, TARGET_TILES, priceFor,
 } from './library.js';
 import { createRng } from './rng.js';
 
@@ -51,12 +51,11 @@ describe('build library', () => {
     }
   });
 
-  it('football and soccer are 11 three-cell players, football with seven linemen', () => {
+  it('football and soccer are 11 three-cell players each', () => {
     for (const b of BASE_BUILDS.filter((x) => ['football', 'soccer'].includes(x.sport))) {
-      const players = b.players.filter((p) => p.role !== 'BN');
+      const players = b.players.filter((p) => p.role !== 'RS');
       expect(players, b.id).toHaveLength(11);
       for (const p of players) expect(SHAPES[p.shape], `${b.id} ${p.role}`).toHaveLength(3);
-      if (b.sport === 'football') expect(players.filter((p) => p.shape === 'bar'), b.id).toHaveLength(7);
     }
   });
 
@@ -74,6 +73,7 @@ describe('build library', () => {
       expect(r.status, b.id).toBe('stable');
       expect(r.ticks, b.id).toBeLessThanOrEqual(4);
       expect(r.score.blue, b.id).toBe(expected);
+      expect(expected, b.id).toBe(TARGET_TILES);
     }
   });
 });

@@ -37,3 +37,9 @@ export const SHAPES = {
   acorn: [[1, 0], [3, 1], [0, 2], [1, 2], [4, 2], [5, 2], [6, 2]],
   rpent: [[1, 0], [2, 0], [0, 1], [1, 1], [1, 2]],
 };
+
+// Tiles each shape claims when left alone (all phases of its cycle).
+export const UNIT_TILES = {
+  bar: 5, dart: 5, ell: 4, block: 4, tub: 4, boat: 5, hive: 6, loaf: 7,
+  toad: 10, toadv: 10, beacon: 8,
+};

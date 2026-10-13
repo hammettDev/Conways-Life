@@ -9,10 +9,19 @@ export const spread = (n, span) => {
 
 export const build = (id, name, sport, players) => ({ id, name, sport, players });
 
-// Bench: spare blinker walls along the rear edge. They never reach the fight
-// but add tiles to the final count, which is how weak builds are levelled up.
-export const BENCH_DEPTH = 27;
-export const BENCH_MAX = 5;
-const BENCH_LANES = [0, -6, 6, -12, 12];
-export const benchUnits = (n) =>
-  BENCH_LANES.slice(0, Math.min(n, BENCH_MAX)).map((lat) => P('BN', 'bar', BENCH_DEPTH, lat));
+// Reserves: still-life units on the rear row, sized to top a build up to an
+// exact tile total. They never reach the fight, so every free build claims
+// the same number of tiles and only the clash decides a match.
+export const RESERVE_DEPTH = 25;
+const RESERVE_LANES = [-18, -12, -6, 0, 6, 12];
+const RESERVE_SHAPE = { 4: 'block', 5: 'boat', 6: 'hive', 7: 'loaf' };
+
+export function reserveUnits(deficit) {
+  if (deficit <= 0) return [];
+  if (deficit < 4) throw new Error(`cannot reserve ${deficit} tiles`);
+  let parts;
+  if (deficit <= 7) parts = [deficit];
+  else if (deficit <= 14) parts = [Math.ceil(deficit / 2), Math.floor(deficit / 2)];
+  else throw new Error(`reserve of ${deficit} tiles is too large`);
+  return parts.map((t, i) => P('RS', RESERVE_SHAPE[t], RESERVE_DEPTH, RESERVE_LANES[i]));
+}

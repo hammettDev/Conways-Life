@@ -1,105 +1,77 @@
-// Round-robin balance sweep. Usage: node scripts/balance.mjs [--write] [--frozen]
-// Every free build plays every other free build (as Blue and as Red); each
-// arsenal build plays the whole free pool. Win rate counts a push as half.
+// Round-robin balance sweep.
+//   node scripts/balance.mjs [--frozen] [--seeds N] [--roster file.json] [--json out.json]
+// Free builds play every other free build; premium and arsenal builds play the
+// whole free pool (as Blue and as Red). A push counts as half a win.
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { BASE_BUILDS } from '../src/engine/library.js';
+import { CANDIDATES } from '../src/engine/library.js';
+import { ROSTER } from '../src/engine/roster.js';
 import { placeFormation } from '../src/engine/formations.js';
 import { createEngine } from '../src/engine/engine.js';
 import { BLUE, RED } from '../src/engine/constants.js';
 
 const ME = fileURLToPath(import.meta.url);
-const frozen = process.argv.includes('--frozen');
+const argv = process.argv.slice(2);
+const flag = (n) => argv.includes(n);
+const opt = (n, d) => (argv.includes(n) ? argv[argv.indexOf(n) + 1] : d);
+const frozen = flag('--frozen');
+const seedsPer = Number(opt('--seeds', 1));
 
 if (!isMainThread) {
-  const { tasks } = workerData;
-  const byId = new Map(BASE_BUILDS.map((b) => [b.id, b]));
+  const byId = new Map(CANDIDATES.map((b) => [b.id, b]));
   const out = [];
-  for (const [blueId, redId, seed] of tasks) {
+  for (const [blueId, redId, seed] of workerData.tasks) {
     const e = createEngine({ seed, freezeUnderworld: frozen });
-    e.loadTeams([
-      ...placeFormation(byId.get(blueId), BLUE),
-      ...placeFormation(byId.get(redId), RED),
-    ]);
+    e.loadTeams([...placeFormation(byId.get(blueId), BLUE), ...placeFormation(byId.get(redId), RED)]);
     const r = e.runToEnd();
-    out.push([blueId, redId, r.outcome, r.ticks, r.status, r.score.blue, r.score.red]);
+    out.push([blueId, redId, r.outcome, r.ticks, r.status]);
   }
   parentPort.postMessage(out);
 } else {
-  const free = BASE_BUILDS.filter((b) => b.sport !== 'arsenal');
-  const arsenal = BASE_BUILDS.filter((b) => b.sport === 'arsenal');
+  const roster = opt('--roster') ? JSON.parse(readFileSync(opt('--roster'), 'utf8')) : ROSTER;
+  const free = roster.free;
+  const rated = [...roster.premium, ...roster.arsenal];
   const tasks = [];
   let seed = 1;
-  for (const a of free) for (const b of free) if (a !== b) tasks.push([a.id, b.id, seed++]);
-  for (const w of arsenal) for (const b of free) {
-    tasks.push([w.id, b.id, seed++]);
-    tasks.push([b.id, w.id, seed++]);
-  }
+  const add = (a, b) => { for (let k = 0; k < seedsPer; k++) tasks.push([a, b, seed++]); };
+  for (const a of free) for (const b of free) if (a !== b) add(a, b);
+  for (const w of rated) for (const b of free) { add(w, b); add(b, w); }
+
   const n = Math.min(os.cpus().length, 8);
   const slices = Array.from({ length: n }, () => []);
   tasks.forEach((t, i) => slices[i % n].push(t));
-  console.log(`${BASE_BUILDS.length} builds, ${tasks.length} matches on ${n} workers${frozen ? ' (frozen underworld)' : ''}`);
-
   const t0 = Date.now();
   const results = (await Promise.all(slices.map((s) => new Promise((res, rej) => {
-    const w = new Worker(ME, { workerData: { tasks: s }, argv: process.argv.slice(2) });
+    const w = new Worker(ME, { workerData: { tasks: s }, argv });
     w.on('message', res);
     w.on('error', rej);
   })))).flat();
-  console.log(`done in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 
-  const stat = new Map(BASE_BUILDS.map((b) => [b.id, { pts: 0, games: 0, ticks: 0, caps: 0 }]));
+  const stat = new Map([...free, ...rated].map((id) => [id, { pts: 0, games: 0, ticks: 0, caps: 0 }]));
   const give = (id, pts, ticks, status) => {
     const s = stat.get(id);
     s.pts += pts; s.games++; s.ticks += ticks; if (status === 'cap') s.caps++;
   };
   for (const [blueId, redId, outcome, ticks, status] of results) {
     const bp = outcome === 'win' ? 1 : outcome === 'push' ? 0.5 : 0;
-    // Arsenal is rated only against the free pool, and free builds only
-    // against other free builds, so each side counts only its own games.
     give(blueId, bp, ticks, status);
     give(redId, 1 - bp, ticks, status);
   }
-  const rated = BASE_BUILDS.map((b) => {
-    const s = stat.get(b.id);
-    return { id: b.id, sport: b.sport, rate: s.pts / s.games, ticks: s.ticks / s.games, caps: s.caps / s.games };
-  });
+  const rows = [...stat].map(([id, s]) => ({
+    id, rate: s.pts / s.games, ticks: s.ticks / s.games, caps: s.caps / s.games, games: s.games,
+  }));
+  rows.sort((a, b) => b.rate - a.rate);
 
-  // Free builds are rated against other free builds only (arsenal games
-  // against them are excluded so weapons do not skew the baseline).
-  const arsenalIds = new Set(arsenal.map((b) => b.id));
-  const freeStat = new Map(free.map((b) => [b.id, { pts: 0, games: 0 }]));
-  for (const [blueId, redId, outcome] of results) {
-    if (arsenalIds.has(blueId) || arsenalIds.has(redId)) continue;
-    const bp = outcome === 'win' ? 1 : outcome === 'push' ? 0.5 : 0;
-    freeStat.get(blueId).pts += bp; freeStat.get(blueId).games++;
-    freeStat.get(redId).pts += 1 - bp; freeStat.get(redId).games++;
+  if (opt('--json')) {
+    writeFileSync(opt('--json'), JSON.stringify(Object.fromEntries(rows.map((r) => [r.id, r.rate]))));
   }
-  for (const r of rated) {
-    if (freeStat.has(r.id)) r.rate = freeStat.get(r.id).pts / freeStat.get(r.id).games;
-  }
-
-  rated.sort((a, b) => b.rate - a.rate);
-  for (const r of rated) {
-    console.log(`${(r.rate * 100).toFixed(1).padStart(5)}%  ${r.sport.padEnd(10)} ${r.id.padEnd(22)} avgTicks ${r.ticks.toFixed(0).padStart(3)} caps ${(r.caps * 100).toFixed(0)}%`);
-  }
-  const sports = {};
-  for (const r of rated.filter((x) => x.sport !== 'arsenal')) (sports[r.sport] ||= []).push(r.rate);
-  console.log('\nper-sport average win rate (free pool):');
-  for (const [s, v] of Object.entries(sports)) console.log(' ', s.padEnd(10), (100 * v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) + '%', `(${v.length} builds)`);
-
-  const jsonAt = process.argv.indexOf('--json');
-  if (jsonAt > 0) {
-    writeFileSync(process.argv[jsonAt + 1], JSON.stringify(Object.fromEntries(rated.map((r) => [r.id, r.rate]))));
-  }
-
-  if (process.argv.includes('--write')) {
-    const body = rated.sort((a, b) => a.id.localeCompare(b.id))
-      .map((r) => `  '${r.id}': ${r.rate.toFixed(3)},`).join('\n');
-    writeFileSync(new URL('../src/engine/ratings.js', import.meta.url),
-      `// Generated by scripts/balance.mjs - do not edit by hand.\nexport const RATINGS = {\n${body}\n};\n`);
-    console.log('wrote src/engine/ratings.js');
+  if (!flag('--quiet')) {
+    console.log(`${tasks.length} matches, ${((Date.now() - t0) / 1000).toFixed(0)}s${frozen ? ' (frozen underworld)' : ''}`);
+    const sport = new Map(CANDIDATES.map((b) => [b.id, b.sport]));
+    for (const r of rows) {
+      console.log(`${(r.rate * 100).toFixed(1).padStart(5)}%  ${sport.get(r.id).padEnd(10)} ${r.id.padEnd(22)} ticks ${r.ticks.toFixed(0).padStart(3)} caps ${(r.caps * 100).toFixed(0)}%`);
+    }
   }
 }
