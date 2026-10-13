@@ -31,6 +31,8 @@ if (!isMainThread) {
   const VARIANTS = Number(process.argv[3] || 8);
   const SAMPLE = Number(process.argv[4] || 30);
   const BAND = 0.06;
+  const SEEDS = Number(process.env.SEEDS || 1);
+  const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
   const nWorkers = Math.min(os.cpus().length, 8);
 
   const evaluate = async (tasks) => {
@@ -65,7 +67,9 @@ if (!isMainThread) {
 
     // 1. Score every build against the whole pool (both colours).
     const tasks1 = [];
-    for (const a of ids) for (const b of ids) if (a !== b) tasks1.push([[a, b], current.get(a), current.get(b), tasks1.length + 1]);
+    for (const a of ids) for (const b of ids) if (a !== b) {
+      for (let k = 0; k < SEEDS; k++) tasks1.push([[a, b], current.get(a), current.get(b), tasks1.length + 1]);
+    }
     const res1 = await evaluate(tasks1);
     const pts = new Map(ids.map((id) => [id, { p: 0, n: 0 }]));
     for (const [[a, b], v] of res1) {
@@ -73,7 +77,7 @@ if (!isMainThread) {
       pts.get(b).p += 1 - v; pts.get(b).n++;
     }
     const rate = new Map(ids.map((id) => [id, pts.get(id).p / pts.get(id).n]));
-    const out = ids.filter((id) => Math.abs(rate.get(id) - 0.5) > BAND);
+    const out = ids.filter((id) => Math.abs(rate.get(id) - 0.5) > BAND && (!ONLY || ONLY.includes(id)));
     const inBand = ids.length - out.length;
     console.log(`round ${round}: ${inBand}/${ids.length} in band (+/-${BAND * 100}%), tuning ${out.length}`);
     if (!out.length) break;
@@ -104,8 +108,10 @@ if (!isMainThread) {
     jobs.forEach((job, ji) => {
       const opp = ids.filter((x) => x !== job.id).sort(() => rng() - 0.5).slice(0, SAMPLE);
       for (const o of opp) {
-        tasks2.push([ji, job.build, current.get(o), tasks2.length + 1]);
-        tasks2.push([ji, current.get(o), job.build, tasks2.length + 1]);
+        for (let k = 0; k < SEEDS; k++) {
+          tasks2.push([ji, job.build, current.get(o), tasks2.length + 1]);
+          tasks2.push([ji, current.get(o), job.build, tasks2.length + 1]);
+        }
       }
     });
     const res2 = await evaluate(tasks2);
