@@ -236,100 +236,135 @@ describe('underworld seeding', () => {
   });
 });
 
-describe('fortune layer (tower crashes and the Hot Spot board)', () => {
-  const block = (team, x, y) => [[x, y, team], [x + 1, y, team], [x, y + 1, team], [x + 1, y + 1, team]];
-  const BLOCK_HEAT = [[20, 30], [21, 30], [20, 31], [21, 31]];
-  const FORT = { threshold: 2, cooldown: 5, maxCrashes: 4, chipCap: 2, fence: true, unit: 5 };
-  // `heatAt`: Board 1 Hot Zones under the block, so its towers grow +2 a tick.
-  const make = (cells, fortune, heatAt = [], hot2At = null) => {
+describe('fortune layer (stacks, coloured fences, Board 2 spill)', () => {
+  const FORT = { threshold: 5, cooldown: 4, maxCrashes: 6, chipsPerBlock: 1, chipCap: 2, unit: 5 };
+  // A bare engine: no live cells, so every tower is an injected stack.
+  const make = (fortune, { hot2At = [] } = {}) => {
     const e = createEngine({ seed: 1, freezeUnderworld: true, fortune });
     e.hot.fill(0);
-    for (const [x, y] of heatAt) e.hot[at(x, y)] = 1;
-    if (e.hot2 && hot2At) { e.hot2.fill(0); for (const [x, y] of hot2At) e.hot2[at(x, y)] = 1; }
-    e.loadTeams(cells.map(([x, y, team]) => ({ x, y, team })));
+    if (e.hot2) { e.hot2.fill(0); for (const [x, y] of hot2At) e.hot2[at(x, y)] = 1; }
+    e.loadTeams([]);
     return e;
   };
+  const total = (e, team) => e.chips[team].reduce((a, v) => a + v, 0);
 
-  it('is off by default and changes nothing about the old rules', () => {
-    const e = make(block(BLUE, 20, 30), null);
-    expect(e.runToEnd().status).toBe('stable');
-    expect(e.fortune.crashes.blue).toBe(0);
+  it('is off by default', () => {
+    const e = createEngine({ seed: 1, freezeUnderworld: true });
+    e.loadTeams([{ x: 20, y: 30, team: BLUE }]);
+    expect(e.stacks).toBeNull();
+    expect(e.fortune.crashes.total).toBe(0);
   });
 
-  it('a tall tower crashes: it resets and a fence topples toward the enemy', () => {
-    const e = make(block(BLUE, 20, 30), FORT, BLOCK_HEAT);
-    e.tick(); // hot towers reach 2 in one tick
-    expect(e.fortune.crashes.blue).toBe(1);
-    expect(BLOCK_HEAT.some(([x, y]) => e.blueTower[at(x, y)] === 0)).toBe(true);
-    let reachesEdge = false;
-    for (let y = 30; y <= 31; y++) for (let x = COLS - 5; x < COLS; x++) if (e.teams[at(x, y)] === BLUE) reachesEdge = true;
-    expect(reachesEdge).toBe(true);
+  it('stacks record chips in order, coloured by whose cell added them', () => {
+    const e = createEngine({ seed: 1, freezeUnderworld: true, fortune: { ...FORT, threshold: 999 } });
+    e.hot.fill(0);
+    e.hot[at(20, 30)] = 1; // a Hot Zone adds two chips a tick
+    e.loadTeams([20, 21].flatMap((x) => [30, 31].map((y) => ({ x, y, team: BLUE }))));
+    e.tick(); // a still life settles after one tick, so one tick of growth
+    expect(e.stacks[at(20, 30)]).toEqual([[BLUE, 2]]); // on the Hot Zone
+    expect(e.stacks[at(21, 30)]).toEqual([[BLUE, 1]]);
   });
 
-  it('only the single tallest tower crashes, and Red topples the other way', () => {
-    const e = make(block(RED, 50, 30), FORT, [[50, 30], [51, 30], [50, 31], [51, 31]]);
+  it('a crash lays a fence in the stack\'s own colours, bottom nearest the tower', () => {
+    const e = make(FORT);
+    e.setStack(20, 30, [[BLUE, 2], [RED, 2], [BLUE, 1]]); // 5 chips, blue majority
+    e.tick();
+    expect(e.fortune.crashes.total).toBe(1);
+    // blocks every 4 tiles from x = 22; colours follow the stack bottom to top
+    expect([22, 26, 30, 34, 38].map((x) => e.teams[at(x, 30)])).toEqual([BLUE, BLUE, RED, RED, BLUE]);
+    expect(e.blueTower[at(20, 30)] + e.redTower[at(20, 30)]).toBe(0); // the tile is cleared
+    expect(e.stacks[at(20, 30)]).toBeNull();
+  });
+
+  it('topples toward the enemy of its majority colour', () => {
+    const e = make(FORT);
+    e.setStack(60, 30, [[RED, 4], [BLUE, 1]]);
+    e.tick();
+    expect(e.teams[at(58, 30)]).toBe(RED);   // left, toward Blue
+    expect(e.teams[at(62, 30)]).toBe(DEAD);  // not the other way
+  });
+
+  it('a fence block crushes cells of the other colour and spares its own', () => {
+    const e = make(FORT);
+    e.loadTeams([{ x: 30, y: 30, team: RED }, { x: 31, y: 30, team: RED }, { x: 34, y: 30, team: BLUE }, { x: 35, y: 30, team: BLUE }]);
+    e.setStack(20, 30, [[BLUE, 5]]);
+    e.tick();
+    // blocks at 22, 26, 30, 34, 38; the blue block at 30 crushed the red cells
+    expect(e.teams[at(30, 30)]).toBe(BLUE);
+    expect(e.teams[at(34, 30)]).toBe(BLUE);
+  });
+
+  it('what does not fit before the edge spills into Board 2 as a cluster, in its own colours', () => {
+    const e = make(FORT);
+    e.setStack(70, 30, [[BLUE, 3], [RED, 3]]); // tie -> top chip (red) decides: topples left
     e.tick();
     expect(e.fortune.crashes.red).toBe(1);
-    let reachesEdge = false;
-    for (let y = 30; y <= 31; y++) for (let x = 0; x < 5; x++) if (e.teams[at(x, y)] === RED) reachesEdge = true;
-    expect(reachesEdge).toBe(true);
+    // left fence from x=70: blocks at 66, 62, ... all 6 fit before the edge, nothing spills
+    expect(total(e, BLUE) + total(e, RED)).toBe(0);
+
+    const f = make(FORT);
+    f.setStack(70, 30, [[BLUE, 3], [BLUE, 3]]); // 6 chips, blue majority, topples right
+    f.tick();
+    // right of x=70: blocks at 72 and 76 fit (2 chips); the other 4 spill
+    expect(total(f, BLUE)).toBe(4);
+    for (let i = 0; i < f.chips[BLUE].length; i++) if (f.chips[BLUE][i]) {
+      const x = i % COLS;
+      expect(x).toBeGreaterThanOrEqual(10);
+      expect(x).toBeLessThanOrEqual(14); // clustered at the entry side
+    }
   });
 
-  it('the fence crushes enemy cells but never the team\'s own', () => {
-    const cells = [...block(BLUE, 20, 30), ...block(RED, 40, 30), ...block(BLUE, 30, 30)];
-    const e = make(cells, FORT, BLOCK_HEAT);
+  it('spilled chips keep their colours and score for them', () => {
+    const e = make({ ...FORT, fence: false }, { hot2At: [[10, 30]] });
+    e.setStack(40, 30, [[BLUE, 3], [RED, 1], [BLUE, 2]]); // 6 chips, blue majority, no fence
     e.tick();
-    expect([at(39, 30), at(40, 30), at(41, 30), at(42, 30), at(43, 30)].some((i) => e.teams[i] === BLUE)).toBe(true);
-    expect(e.teams[at(30, 30)]).toBe(BLUE);
+    expect(total(e, BLUE)).toBe(5);
+    expect(total(e, RED)).toBe(1);
+    // chipCap 2: bottom two chips (blue) sit on the Hot Spot at the entry tile (x5 each)
+    expect(e.chips[BLUE][at(10, 30)]).toBe(2);
+    expect(e.fortune.blue).toBe(2 * 5 + 2 * 1 + 1 * 1); // 2 on the hot tile, 3 on plain tiles
+    expect(e.fortune.red).toBe(1);
   });
 
-  it('a chip rolls in from its side and lands on the first Hot Spot for x5', () => {
-    const e = make(block(BLUE, 20, 30), FORT, BLOCK_HEAT, [[10, 30], [10, 31], [60, 30], [60, 31]]);
+  it('Board 2 is only the 60x40 playable area, and Red\'s spill enters from the far side', () => {
+    const e = make({ ...FORT, fence: false });
+    e.setStack(40, 30, [[RED, 6]]);
     e.tick();
-    expect(e.fortune.blue).toBe(5);
-    expect(e.chips[BLUE][at(10, 30)] + e.chips[BLUE][at(10, 31)]).toBe(1); // nearest to the left edge, not x=60
-  });
-
-  it('a Red chip enters from the opposite (right) side', () => {
-    const e = make(block(RED, 50, 30), FORT, [[50, 30], [51, 30], [50, 31], [51, 31]], [[10, 30], [10, 31], [70, 30], [70, 31]]);
-    e.tick();
-    expect(e.fortune.red).toBe(5);
-    expect(e.chips[RED][at(70, 30)] + e.chips[RED][at(70, 31)]).toBe(1);
-  });
-
-  it('with no Hot Spot in its row a chip comes to rest at the far end for x1', () => {
-    const e = make(block(BLUE, 20, 30), FORT, BLOCK_HEAT, []);
-    e.tick();
-    expect(e.fortune.blue).toBe(1);
+    for (let i = 0; i < e.chips[RED].length; i++) if (e.chips[RED][i]) {
+      const x = i % COLS;
+      const y = (i / COLS) | 0;
+      expect(x).toBeLessThanOrEqual(69);
+      expect(x).toBeGreaterThanOrEqual(65);
+      expect(y).toBeGreaterThanOrEqual(10);
+      expect(y).toBeLessThan(50);
+    }
+    expect(total(e, RED)).toBe(6);
   });
 
   it('tiles hold at most chipCap chips, so Board 2 stays bounded', () => {
-    const e = make(block(BLUE, 20, 30), { ...FORT, cooldown: 1, chipCap: 1 }, BLOCK_HEAT, [[10, 30], [10, 31]]);
-    for (let i = 0; i < 12; i++) e.tick();
+    const e = make({ ...FORT, fence: false, cooldown: 1, chipCap: 1 });
+    for (let k = 0; k < 4; k++) { e.setStack(40, 30 + k, [[BLUE, 6]]); e.tick(); }
     expect(Math.max(...e.chips[BLUE])).toBeLessThanOrEqual(1);
   });
 
-  it('each team has a limited number of crashes per match', () => {
-    const e = make(block(BLUE, 20, 30), { ...FORT, cooldown: 1, maxCrashes: 2 }, BLOCK_HEAT);
-    for (let i = 0; i < 30; i++) e.tick();
-    expect(e.fortune.crashes.blue).toBeLessThanOrEqual(2);
+  it('crashes are spaced by the cooldown and limited per match', () => {
+    const e = make({ ...FORT, cooldown: 3, maxCrashes: 2 });
+    // an R-pentomino keeps Board 1 busy so the match does not settle early
+    e.loadTeams([[61, 45], [62, 45], [60, 46], [61, 46], [61, 47]].map(([x, y]) => ({ x, y, team: RED })));
+    for (let k = 0; k < 4; k++) e.setStack(20, 20 + k * 4, [[BLUE, 6]]);
+    for (let i = 0; i < 20; i++) e.tick();
+    expect(e.fortune.crashes.total).toBe(2);
   });
 
-  it('the fortune lead becomes bonus plots for the leader', () => {
-    // Blue's chip finds a Hot Spot in its row (5); Red's row has none (1).
-    const e = make([...block(BLUE, 20, 30), ...block(RED, 55, 40)], { ...FORT, unit: 2, maxCrashes: 1 }, BLOCK_HEAT, [[10, 30], [10, 31]]);
-    e.runToEnd();
-    expect(e.fortune.blue).toBe(5);
-    expect(e.fortune.red).toBe(1);
+  it('the chip-score lead becomes bonus plots for the leader', () => {
+    const e = make({ ...FORT, fence: false, unit: 2 }, { hot2At: [[10, 30]] });
+    e.loadTeams([]);
+    e.setStack(40, 30, [[BLUE, 5]]); // 5 chips: two on the hot entry tile, three on plain ones
+    e.tick();
+    expect(e.fortune.blue).toBe(2 * 5 + 3 * 1);
     const withBonus = e.getScore();
     const tilesOnly = e.getScore(false);
-    expect(withBonus.blue - tilesOnly.blue).toBe(2); // floor((5 - 1) / 2)
+    expect(withBonus.blue - tilesOnly.blue).toBe(6); // floor(13 / 2)
     expect(withBonus.red).toBe(tilesOnly.red);
-  });
-
-  it('tileOutcome records what Board 1 alone decided', () => {
-    const e = make([...block(BLUE, 20, 30), ...block(RED, 55, 30)], { ...FORT, threshold: 9999 });
-    const r = e.runToEnd();
-    expect(r.tileOutcome).toBe(r.outcome); // no crashes, no bonus
   });
 });
