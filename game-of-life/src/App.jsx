@@ -3,7 +3,7 @@ import Arena from './components/Arena.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import SaveDialog from './components/SaveDialog.jsx';
 import { createEngine } from './engine/engine.js';
-import { FREE_BUILDS } from './engine/library.js';
+import { FREE_BUILDS, TUTORIAL_BUILDS } from './engine/library.js';
 import {
   OBJECTS, getObject, placeObject, cellsWithObject, dropAt, placementOk,
 } from './engine/objects.js';
@@ -11,13 +11,14 @@ import { placeFormation, pickBotSetup } from './engine/formations.js';
 import { DEFAULT_FORTUNE_RULES } from './engine/fortuneRules.js';
 import { createRng } from './engine/rng.js';
 import { createSfx } from './audio/sfx.js';
-import { BLUE, RED, COLS, ROWS, WAGER, AUDIBLE_PRICE } from './engine/constants.js';
+import { BLUE, RED, COLS, ROWS, WAGER, AUDIBLE_PRICE, TUTORIAL_STAKE } from './engine/constants.js';
 import { tableSize } from './render/drawBoard.js';
 import { createPitDisplay, pitLead } from './render/pitDisplay.js';
 import { loadSave, persistSave, exportCode, importCode } from './game/saveStore.js';
 import {
-  placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout,
+  placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout, finishTutorial,
 } from './game/wallet.js';
+import { STEPS, stepFor } from './game/tutorial.js';
 import { botAnswers, counterFor } from './game/audible.js';
 
 const TICKS_PER_SECOND = 6; // at 1x
@@ -73,15 +74,20 @@ export default function App() {
 
   const selected = findBuild(selectedId);
   const obj = objectId ? getObject(objectId) : null;
-  const cost = WAGER + (obj ? obj.price : 0);
+  const tutorial = !save.tutorialDone;           // the guided first match: fixed stake, free pieces and audible
+  const [tStep, setTStep] = useState('pick');
+  const wager = tutorial ? TUTORIAL_STAKE : WAGER;
+  const cost = wager + (obj && !tutorial ? obj.price : 0);
+  const audiblePrice = tutorial ? 0 : AUDIBLE_PRICE;
 
   // Everything the per-frame callbacks and window listeners need, kept current.
   const live = useRef({});
-  live.current = { phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
+  live.current = { tutorial, wager, phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
   const engineRef = useRef(newEngine(1)); // an empty board, so the Hot Zones show while drafting
   const spillsRef = useRef([]);
   const lastCrashId = useRef(0);
   const escrowRef = useRef(0);
+  const wagerRef = useRef(WAGER);
   const seedRef = useRef(1);
   const botRef = useRef(null);
   const botPendingRef = useRef(null);
@@ -176,10 +182,11 @@ export default function App() {
     sfx.play('lockIn');
     setSave(held);
     escrowRef.current = cost;
+    wagerRef.current = wager;
     settledRef.current = false;
     const seed = randomSeed();
     seedRef.current = seed;
-    const bot = pickBotSetup(createRng(seed), FREE_BUILDS);
+    const bot = pickBotSetup(createRng(seed), tutorial && TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS);
     botRef.current = bot;
     botPendingRef.current = null;
     startEngine(blueCells(selected, obj, drop), bot.cells, seed);
@@ -203,7 +210,7 @@ export default function App() {
 
   const confirmAudible = () => {
     const next = findBuild(audibleChoice);
-    const paid = spend(save, AUDIBLE_PRICE);
+    const paid = spend(save, audiblePrice);
     if (!next || !paid) return;
     setSave(paid);
     setAudibleUsed(true);
@@ -213,7 +220,7 @@ export default function App() {
     const rng = createRng(seed ^ 0x9e3779b9);
     let bot = botRef.current;
     botPendingRef.current = null;
-    if (botAnswers(rng)) {
+    if (!tutorial && botAnswers(rng)) {
       const c = counterFor(next.id, FREE_BUILDS, rng);
       const flip = rng() < 0.5;
       bot = { formation: c, flip, cells: placeFormation(c, RED, { flip }) };
@@ -243,6 +250,19 @@ export default function App() {
     setArmed(false);
     setNotice('');
   };
+
+  // Keep the lesson in step with what the player has done.
+  useEffect(() => {
+    if (tutorial) setTStep((c) => stepFor(c, { phase, hasSelection: Boolean(selectedId) }));
+  }, [tutorial, phase, selectedId]);
+  const endTutorial = () => {
+    setSave((s) => finishTutorial(s));
+    newMatch();
+    setSelectedId(null);
+    setTStep('pick');
+  };
+  const nextStep = () => setTStep((c) => ({ hot: 'shop', shop: 'lock' }[c] || c));
+  const lesson = tutorial ? STEPS[tStep] : null;
 
   const takeBail = () => {
     const r = takeBailout(save);
@@ -289,7 +309,9 @@ export default function App() {
           setPhase('done');
           if (!settledRef.current) {
             settledRef.current = true;
-            setSave((s) => settle(s, r.outcome, WAGER));
+            const w = wagerRef.current;
+            // the tutorial bet is insured: it pays as a win whatever the board said
+            setSave((s) => settle(s, live.current.tutorial ? 'win' : r.outcome, w));
           }
         }
       }
@@ -308,22 +330,22 @@ export default function App() {
       : !afford ? 'Not enough cash for this bet.' : '';
   const lockLabel = drafting ? `Lock In · ${money(cost)}` : 'Locked in';
   const audibleBuild = findBuild(audibleChoice);
-  const canAudible = Boolean(audibleBuild) && audibleBuild.id !== selectedId && canAfford(save, AUDIBLE_PRICE);
+  const canAudible = Boolean(audibleBuild) && audibleBuild.id !== selectedId && canAfford(save, audiblePrice);
 
   const live2 = hud || { tick: 0, blue: 0, red: 0, crashes: 0, pitBlue: 0, pitRed: 0 };
   const TABLE = tableSize(madden);
-  const verdict = result && { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome];
-  const net = result && (result.outcome === 'win' ? `+${money(WAGER)}` : result.outcome === 'lose' ? `−${money(WAGER)}` : 'bet returned');
+  const verdict = result && (tutorial ? 'Insured win' : { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome]);
+  const net = result && (tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(WAGER)}` : result.outcome === 'lose' ? `−${money(WAGER)}` : 'bet returned');
 
   return (
-    <div className="app">
+    <div className={tutorial ? "app tutorial" : "app"}>
       <header className="top">
         <h1>Gridiron <span>Cellular Warfare</span></h1>
         <p>Pick a formation, lock it in, and watch the board decide.</p>
         <div className="toggles">
           <div className="wallet" title={`${save.stats.wins} wins · ${save.stats.losses} losses · best streak ${save.stats.bestStreak}`}>
             <span className="cash">{money(save.balance)}</span>
-            {drafting && bailoutAvailable(save) && (
+            {drafting && !tutorial && bailoutAvailable(save) && (
               <button className="ghost small" onClick={takeBail}>Bailout +{money(bailoutAmount(save))}</button>
             )}
           </div>
@@ -333,9 +355,23 @@ export default function App() {
         </div>
       </header>
 
+      {lesson && (
+        <aside className="coach" role="status" aria-live="polite">
+          <div>
+            <b>{lesson.title}</b>
+            <p>{lesson.text}</p>
+          </div>
+          <div className="coachact">
+            {lesson.next && <button className="go small" onClick={tStep === 'wrap' ? endTutorial : nextStep}>{lesson.next}</button>}
+            {lesson.wait && <span className="waiting">{lesson.wait}</span>}
+            {tStep !== 'wrap' && <button className="ghost small" onClick={() => { if (phase === 'locked') cancelMatch(); setSave((s) => finishTutorial(s)); }}>Skip tutorial</button>}
+          </div>
+        </aside>
+      )}
+
       <div className="layout">
         <main className="stage">
-          <div className="table" style={{ width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
+          <div className="table" style={{ width: `min(100%, calc((100vh - ${tutorial ? 270 : 180}px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
             <section className="scorebar">
               <div className="side blue"><span className="num">{phase === 'done' && result ? result.score.blue : live2.blue}</span><i>you</i></div>
               <div className="mid">
@@ -345,8 +381,8 @@ export default function App() {
                     <p><b>{selected && selected.name}</b> vs <b className="red">{botName}</b></p>
                     <div className="row">
                       <button className="go small" onClick={snap}>Snap</button>
-                      <button className="ghost small" onClick={callAudible} disabled={audibleUsed || !canAfford(save, AUDIBLE_PRICE)} title="Switch your formation after seeing the bot's">
-                        Audible {money(AUDIBLE_PRICE)}
+                      <button className="ghost small" onClick={callAudible} disabled={audibleUsed || !canAfford(save, audiblePrice)} title="Switch your formation after seeing the bot's">
+                        Audible {tutorial ? 'free' : money(AUDIBLE_PRICE)}
                       </button>
                       <button className="ghost small" onClick={cancelMatch}>Cancel</button>
                     </div>
@@ -370,7 +406,7 @@ export default function App() {
                 {phase === 'done' && result && (
                   <>
                     <div className="line">
-                      <span className={`verdict ${result.outcome}`}>{verdict}</span>
+                      <span className={`verdict ${tutorial ? 'win' : result.outcome}`}>{verdict}</span>
                       <button className="go small" onClick={newMatch}>New match</button>
                     </div>
                     <p className="note">
@@ -391,7 +427,7 @@ export default function App() {
         </main>
 
         <Sidebar
-          builds={FREE_BUILDS} objects={OBJECTS} balance={save.balance} wager={WAGER} phase={phase}
+          builds={FREE_BUILDS} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} phase={phase}
           selectedId={selectedId}
           onSelect={(id) => (phase === 'audible' ? setAudibleChoice(id) : setSelectedId(id))}
           objectId={objectId}
@@ -401,7 +437,7 @@ export default function App() {
           onClearPlace={() => { setDrop(null); setArmed(false); }}
           lockLabel={lockLabel} lockHint={lockHint} canLock={canLock} onLockIn={lockIn}
           audibleChoiceId={audibleChoice} canAudible={canAudible}
-          audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${money(AUDIBLE_PRICE)}` : 'Pick a formation'}
+          audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${tutorial ? 'free' : money(AUDIBLE_PRICE)}` : 'Pick a formation'}
           onAudibleConfirm={confirmAudible}
         />
       </div>

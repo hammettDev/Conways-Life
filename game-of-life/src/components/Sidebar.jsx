@@ -9,7 +9,7 @@ const money = (n) => `$${n.toLocaleString()}`;
 // In the shop each piece shows a looping demo of what it does, and can be dragged
 // from that card onto your half of the board (or placed with a click).
 export default function Sidebar({
-  builds, objects, balance, wager, phase,
+  builds, objects, balance, wager, phase, free,
   selectedId, onSelect,
   objectId, onObject, placed, armed, onArm, onDragStart, onClearPlace,
   lockLabel, lockHint, canLock, onLockIn,
@@ -88,7 +88,7 @@ export default function Sidebar({
                 <MiniPreview objectId={chosen.id} />
                 <span className="draghint">{placed ? 'Placed on your half' : armed ? 'Click a spot on your half' : 'Drag me onto the board'}</span>
               </div>
-              <div className="cardrow"><b>{chosen.name}</b><span className="price">{money(chosen.price)}</span></div>
+              <div className="cardrow"><b>{chosen.name}</b><span className="price">{free ? 'free' : money(chosen.price)}</span></div>
               <p className="note">{DEMOS[chosen.id]?.note || chosen.blurb} <span>{chosen.cells} cells.</span></p>
               <div className="row">
                 <button className="ghost" onClick={onArm} disabled={!shopOpen}>{placed ? 'Move' : 'Place'}</button>
@@ -99,7 +99,7 @@ export default function Sidebar({
 
           <ul className="list">
             {objects.map((o) => {
-              const afford = balance >= o.price + wager;
+              const afford = free || balance >= o.price + wager;
               return (
                 <li key={o.id}>
                   <button
@@ -108,7 +108,7 @@ export default function Sidebar({
                   >
                     <Thumb shape={o.shape} />
                     <span className="name">{o.name}</span>
-                    <span className="meta">{afford ? money(o.price) : `need ${money(o.price + wager - balance)} more`}</span>
+                    <span className="meta">{free ? 'free' : afford ? money(o.price) : `need ${money(o.price + wager - balance)} more`}</span>
                   </button>
                 </li>
               );

@@ -1,4 +1,4 @@
-import { newSave, SAVE_VERSION } from './wallet.js';
+import { newSave, newPlayerSave, SAVE_VERSION } from './wallet.js';
 
 const KEY = 'gcw.save';
 const PREFIX = 'GCW1';
@@ -25,12 +25,14 @@ export function sanitize(raw) {
   const fresh = newSave();
   const num = (x, d) => (Number.isFinite(x) && x >= 0 ? Math.floor(x) : d);
   const st = raw.stats && typeof raw.stats === 'object' ? raw.stats : {};
+  const played = num(st.played, 0);
   return {
     v: SAVE_VERSION,
+    tutorialDone: raw.tutorialDone === true || played > 0, // older saves predate the tutorial
     balance: num(raw.balance, fresh.balance),
     bailouts: num(raw.bailouts, 0),
     stats: {
-      played: num(st.played, 0), wins: num(st.wins, 0), losses: num(st.losses, 0),
+      played, wins: num(st.wins, 0), losses: num(st.losses, 0),
       pushes: num(st.pushes, 0), streak: num(st.streak, 0), bestStreak: num(st.bestStreak, 0),
     },
   };
@@ -55,9 +57,9 @@ export function importCode(code) {
 export function loadSave(storage = globalThis.localStorage) {
   try {
     const raw = storage && storage.getItem(KEY);
-    return (raw && sanitize(JSON.parse(raw))) || newSave();
+    return (raw && sanitize(JSON.parse(raw))) || newPlayerSave();
   } catch {
-    return newSave();
+    return newPlayerSave();
   }
 }
 

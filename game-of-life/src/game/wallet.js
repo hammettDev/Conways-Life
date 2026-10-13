@@ -1,5 +1,5 @@
 import {
-  WAGER, STARTING_WALLET, BAILOUT_START, BAILOUT_STEP, BAILOUT_MIN,
+  WAGER, STARTING_WALLET, TUTORIAL_BANKROLL, BAILOUT_START, BAILOUT_STEP, BAILOUT_MIN,
 } from '../engine/constants.js';
 
 // The player's save: wallet, bailout count and a few stats. All functions are
@@ -9,9 +9,18 @@ export const SAVE_VERSION = 1;
 export const newSave = () => ({
   v: SAVE_VERSION,
   balance: STARTING_WALLET,
+  tutorialDone: true,
   bailouts: 0,
   stats: { played: 0, wins: 0, losses: 0, pushes: 0, streak: 0, bestStreak: 0 },
 });
+
+// A brand-new player starts with the tutorial bankroll; finishing (or skipping)
+// the tutorial tops them up to STARTING_WALLET.
+export const newPlayerSave = () => ({ ...newSave(), balance: TUTORIAL_BANKROLL, tutorialDone: false });
+
+export function finishTutorial(save) {
+  return { ...save, tutorialDone: true, balance: Math.max(save.balance, STARTING_WALLET) };
+}
 
 export const canAfford = (save, cost) => save.balance >= cost;
 

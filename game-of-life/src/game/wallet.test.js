@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { WAGER, STARTING_WALLET } from '../engine/constants.js';
 import {
-  newSave, placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout,
+  newSave, newPlayerSave, placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout,
 } from './wallet.js';
 import { exportCode, importCode, loadSave, persistSave, sanitize, checksum } from './saveStore.js';
 
@@ -72,12 +72,12 @@ describe('save store', () => {
   });
 
   it('falls back to a fresh save for missing, corrupt or blocked storage', () => {
-    expect(loadSave(fakeStorage())).toEqual(newSave());
+    expect(loadSave(fakeStorage())).toEqual(newPlayerSave());
     const bad = fakeStorage(); bad.setItem('gcw.save', '{not json');
-    expect(loadSave(bad)).toEqual(newSave());
+    expect(loadSave(bad)).toEqual(newPlayerSave());
     const wrong = fakeStorage(); wrong.setItem('gcw.save', JSON.stringify({ v: 99, balance: 1e9 }));
-    expect(loadSave(wrong)).toEqual(newSave());
-    expect(loadSave({ getItem() { throw new Error('blocked'); } })).toEqual(newSave());
+    expect(loadSave(wrong)).toEqual(newPlayerSave());
+    expect(loadSave({ getItem() { throw new Error('blocked'); } })).toEqual(newPlayerSave());
     expect(persistSave(newSave(), { setItem() { throw new Error('full'); } })).toBe(false);
   });
 

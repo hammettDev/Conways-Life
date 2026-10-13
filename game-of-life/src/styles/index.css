@@ -161,3 +161,12 @@ body {
 .dialog h2 { margin: 0; font-size: 1rem; }
 .dialog textarea { width: 100%; padding: 8px; border-radius: 10px; border: 1px solid var(--edge); background: #06110a; color: var(--text); font-family: ui-monospace, monospace; font-size: 0.8rem; resize: vertical; }
 .toggles { flex-wrap: wrap; justify-content: flex-end; max-width: 70%; }
+
+/* tutorial coach */
+.coach { display: flex; gap: 16px; align-items: center; justify-content: space-between; margin: 0 0 8px; padding: 8px 14px; border: 1px solid var(--accent, #ffb02e); border-radius: 10px; background: rgba(255, 176, 46, 0.1); }
+.coach b { color: var(--accent, #ffb02e); font-size: 0.9rem; }
+.coach p { margin: 2px 0 0; font-size: 0.82rem; line-height: 1.35; max-width: 70ch; }
+.coachact { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex: none; }
+.coachact .waiting { font-size: 0.75rem; color: var(--dim); }
+@media (max-width: 700px) { .coach { flex-direction: column; align-items: stretch; } .coachact { flex-direction: row; align-items: center; } }
+.app.tutorial .sidebar { max-height: calc(100vh - 200px); }
