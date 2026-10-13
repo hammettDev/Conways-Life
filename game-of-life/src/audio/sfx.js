@@ -29,8 +29,13 @@ export const CUES = {
   },
 };
 
+// Recorded files are opt-in so a default build makes no failed requests: set
+// VITE_SFX_FILES=true (e.g. in .env.local) after adding files to public/sounds.
+const FILES_ENABLED = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SFX_FILES === 'true';
+
 export function createSfx({
   AudioContextImpl = globalThis.AudioContext || globalThis.webkitAudioContext,
+  useFiles = FILES_ENABLED,
   fetchImpl = globalThis.fetch,
   baseUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.BASE_URL) || './',
 } = {}) {
@@ -40,7 +45,7 @@ export function createSfx({
 
   async function load(name) {
     const cue = CUES[name];
-    if (!ctx || !cue || !cue.file || !fetchImpl || buffers.has(name) || unavailable.has(name)) return false;
+    if (!ctx || !useFiles || !cue || !cue.file || !fetchImpl || buffers.has(name) || unavailable.has(name)) return false;
     try {
       const res = await fetchImpl(baseUrl + cue.file);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

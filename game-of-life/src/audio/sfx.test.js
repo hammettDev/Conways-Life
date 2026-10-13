@@ -18,20 +18,28 @@ describe('sfx', () => {
   });
 
   it('ignores unknown cues', () => {
-    expect(createSfx({ AudioContextImpl: FakeCtx, fetchImpl: missingFetch }).play('nope')).toBe('unknown');
+    expect(createSfx({ AudioContextImpl: FakeCtx, useFiles: true, fetchImpl: missingFetch }).play('nope')).toBe('unknown');
   });
 
   it('plays the synthesized lock-in when no recording exists', async () => {
-    const sfx = createSfx({ AudioContextImpl: FakeCtx, fetchImpl: missingFetch });
+    const sfx = createSfx({ AudioContextImpl: FakeCtx, useFiles: true, fetchImpl: missingFetch });
     expect(sfx.play('lockIn')).toBe('synth');
     await sfx.load('lockIn');
     expect(sfx.play('lockIn')).toBe('synth'); // still synth: the file 404s
   });
 
   it('switches to the recording once it has loaded', async () => {
-    const sfx = createSfx({ AudioContextImpl: FakeCtx, fetchImpl: okFetch });
+    const sfx = createSfx({ AudioContextImpl: FakeCtx, useFiles: true, fetchImpl: okFetch });
     expect(sfx.play('lockIn')).toBe('synth'); // first press: file still loading
     await sfx.load('lockIn');
     expect(sfx.play('lockIn')).toBe('file');
+  });
+
+  it('does not request any file unless recordings are enabled', async () => {
+    let requests = 0;
+    const sfx = createSfx({ AudioContextImpl: FakeCtx, fetchImpl: async () => { requests++; return okFetch(); } });
+    expect(sfx.play('lockIn')).toBe('synth');
+    await sfx.load('lockIn');
+    expect(requests).toBe(0);
   });
 });
