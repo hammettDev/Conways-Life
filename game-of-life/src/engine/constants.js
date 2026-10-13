@@ -10,6 +10,11 @@ export const FIELD_Y1 = FIELD_Y0 + FIELD_ROWS;
 export const WAGER = 100;
 export const MAX_DRAFT = 50;
 
+// Tutorial lesson 5: the first (forced, insured) bet. Starting from $50 and
+// winning an even-money $50 stake lands the player on the normal $100 stack.
+export const TUTORIAL_BANKROLL = 50;
+export const TUTORIAL_STAKE = 50;
+
 // Beating a boss pays this many times the wager (losing still costs one wager).
 export const BOSS_PAYOUT = 5;
 
