@@ -33,7 +33,7 @@ function settle(g, drive, secs, spotOverride = null) {
     notes.push(`${poss === 'you' ? 'Your' : 'Their'} drive: ${driveNote(d)}${pts ? ` (+${pts})` : ''}.`);
     if (pts > 0) cheer = { side: poss, pts, kind: d.over === 'td' ? 'td' : 'fg' };
     const scored = d.over === 'td' || d.over === 'fg';
-    const spot = scored ? DRIVE.startSpot : Math.max(20, Math.min(80, DRIVE.goal - d.spot));
+    const spot = scored ? DRIVE.startSpot : d.over === 'punt' ? d.puntTo : Math.max(20, Math.min(80, DRIVE.goal - d.spot));
     poss = other(poss);
     d = freshAt(spotOverride || spot);
     classes = [];

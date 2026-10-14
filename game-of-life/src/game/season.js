@@ -48,7 +48,7 @@ export const nextTeam = (s) => TEAMS[Math.min(s.week, TEAMS.length - 1)];
 
 // Points a finished drive is worth.
 export const drivePoints = (d) => (d.over === 'td' ? 7 : d.over === 'fg' ? 3 : 0);
-export const driveNote = (d) => (d.over === 'td' ? 'Touchdown' : d.over === 'fg' ? 'Field goal' : d.over === 'miss' ? 'Missed field goal' : d.over === 'int' ? 'Intercepted' : 'Turned it over on downs');
+export const driveNote = (d) => (d.over === 'td' ? 'Touchdown' : d.over === 'fg' ? 'Field goal' : d.over === 'miss' ? 'Missed field goal' : d.over === 'punt' ? 'Punted away' : d.over === 'int' ? 'Intercepted' : 'Turned it over on downs');
 
 // The opponent's drive against the defence you called. Each team has a favourite kind of play (its style); a defence
 // that is weak to that style gives up more, a strong one less, and a defence you keep repeating gets read better.

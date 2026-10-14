@@ -200,10 +200,20 @@ export const inFgRange = (spot) => spot >= FG_SPOT;
 // Chance the kick is good: near-certain from short range, a coin flip from the edge of range.
 export const fgChance = (spot) => Math.max(0.3, Math.min(0.97, 1 - (fgDistance(spot) - 18) * 0.0165));
 
+// ---- punts ------------------------------------------------------------------------
+export const PUNT_MIN = 36;
+export const PUNT_MAX = 49;
+// How far a punt goes (yards), from a draw in [0, 1).
+export const puntDistance = (r) => PUNT_MIN + Math.floor(r * (PUNT_MAX - PUNT_MIN + 1));
+// Where the other team takes over (yards from their own goal) after a punt from `spot` that travels `dist`: into the
+// end zone is a touchback at their 20.
+export const puntLanding = (spot, dist) => (spot + dist >= DRIVE.goal ? 20 : Math.max(1, DRIVE.goal - (spot + dist)));
+
 // ---- the drive ----------------------------------------------------------------
 export const newDrive = () => ({ down: 1, toGo: DRIVE.firstDown, spot: DRIVE.startSpot, plays: 0, over: null, log: [] });
 
 export function advance(state, outcome) {
+  if (outcome.kind === 'punt') return { ...state, plays: state.plays + 1, log: [...state.log, outcome], over: 'punt', puntTo: puntLanding(state.spot, outcome.dist) };
   if (outcome.kind === 'kick') return { ...state, plays: state.plays + 1, log: [...state.log, outcome], over: outcome.made ? 'fg' : 'miss' };
   const spot = Math.max(0, state.spot + outcome.yards);
   const s = { ...state, spot, plays: state.plays + 1, log: [...state.log, outcome] };

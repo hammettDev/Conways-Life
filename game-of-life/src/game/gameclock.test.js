@@ -42,6 +42,17 @@ describe('game clock', () => {
     expect(g.you).toBe(0);
   });
 
+  it('a punt flips the ball and puts them where it lands, with no score', () => {
+    let g = { ...begun(), drive: { ...begun().drive, spot: 35, down: 4 } };
+    g = afterPlay(g, { kind: 'punt', dist: 40, yards: 0 });
+    expect(g.poss).toBe('them');
+    expect(g.drive.spot).toBe(25);   // landed on their 25
+    expect(g.you).toBe(0);
+    expect(g.note).toMatch(/Punted/);
+    let t = { ...begun(), drive: { ...begun().drive, spot: 70, down: 4 } };
+    expect(afterPlay(t, { kind: 'punt', dist: 40, yards: 0 }).drive.spot).toBe(20); // touchback
+  });
+
   it('the ball switches at the half: the team that received first kicks off the second half', () => {
     let g = begun('you');
     g = { ...g, q: 2, clock: PLAY_SECONDS };

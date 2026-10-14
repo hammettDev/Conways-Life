@@ -83,7 +83,7 @@ function sanitizeBoss(b) {
 function sanitizeDrive(d) {
   if (!d || typeof d !== 'object') return null;
   const n = (v, lo, hi, def) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.floor(v))) : def);
-  const overs = ['td', 'fg', 'miss', 'int', 'downs', 'clock'];
+  const overs = ['td', 'fg', 'miss', 'punt', 'int', 'downs', 'clock'];
   return { down: n(d.down, 1, 4, 1), toGo: n(d.toGo, 1, 100, 20), spot: n(d.spot, 0, 100, 30), plays: n(d.plays, 0, 99, 0), over: overs.includes(d.over) ? d.over : null, log: [] };
 }
 

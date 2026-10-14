@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  fgChance, fgDistance, inFgRange, FG_SPOT,
+  fgChance, fgDistance, inFgRange, FG_SPOT, puntDistance, puntLanding, PUNT_MIN, PUNT_MAX,
   OFFENCES, DEFENCES, DRIVE, receiversOf, resolvePlay, newDrive, advance, chooseDefence, callClass, COUNTER, defenceById,
 } from './football.js';
 import { createRng } from './rng.js';
@@ -63,6 +63,18 @@ describe('football drive', () => {
     it('a sack loses yards but never goes behind your own goal line', () => {
       const s = advance({ ...newDrive(), spot: 2 }, { kind: 'sack', yards: -8, note: '' });
       expect(s.spot).toBe(0);
+    });
+  });
+
+  describe('punts', () => {
+    it('go 36 to 49 yards and the other team takes over where the ball lands', () => {
+      expect(puntDistance(0)).toBe(PUNT_MIN);
+      expect(puntDistance(0.999)).toBe(PUNT_MAX);
+      expect(puntLanding(30, 40)).toBe(30);       // lands on their 30: they start at their own 30
+      expect(puntLanding(70, 45)).toBe(20);       // into the end zone: a touchback at their 20
+      const s = advance(newDrive(), { kind: 'punt', dist: 40, yards: 0 });
+      expect(s.over).toBe('punt');
+      expect(s.puntTo).toBe(puntLanding(DRIVE.startSpot, 40));
     });
   });
 

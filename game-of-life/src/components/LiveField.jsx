@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createLivePlay, LIVE_OFFENCES, liveOffenceById, RUN_PLAYS } from '../engine/footballLive.js';
 import { drawField, driveLines, canvasSize, TICK_MS } from './fieldDraw.js';
-import { inFgRange, fgDistance, fgChance } from '../engine/football.js';
+import { inFgRange, fgDistance, fgChance, PUNT_MIN, PUNT_MAX } from '../engine/football.js';
 import { createRng } from '../engine/rng.js';
 
 const EMPTY_DEF = { id: 'none', name: 'unknown', players: [] };
@@ -10,7 +10,7 @@ const EMPTY_DEF = { id: 'none', name: 'unknown', players: [] };
 // audible (a limited number a game) to change your call: a good opponent may answer with a counter. Then snap, and on
 // a pass fire the ball with a key or a tap.
 // Keys: Space = lock in / snap / throw / next, 1-4 pick a receiver, Left/Right cycle receivers, P / R switch pass / run.
-export default function LiveField({ team, defFor, counterFor, audibles, onAudible, seed, onPlay, drive, rotate, onKick }) {
+export default function LiveField({ team, defFor, counterFor, audibles, onAudible, seed, onPlay, drive, rotate, onKick, onPunt }) {
   const [offId, setOffId] = useState(LIVE_OFFENCES[0].id);
   const [kind, setKind] = useState('pass');
   const [lane, setLane] = useState(2);
@@ -140,6 +140,9 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
               ? <p className="note">{kind === 'pass' ? 'Receivers are light spaceships; the ball is a glider you fire from the quarterback. After the snap pick a receiver (1-4) and press Space when the dashed line turns green.' : 'The back is a glider; pick the hole: outside or inside, left or right, or the dive up the middle.'}</p>
               : <p className="note drivemsg">Audible: change your call. A sharp team may see it coming.</p>}
             <button className="lock" onClick={phase === 'call' ? lockIn : confirmAudible}>{phase === 'call' ? 'Lock in call · Space' : 'Confirm audible · Space'}</button>
+            {phase === 'call' && drive && drive.down === 4 && (
+              <button className="ghost" onClick={onPunt}>Punt · about {Math.round((PUNT_MIN + PUNT_MAX) / 2)} yds</button>
+            )}
             {phase === 'call' && drive && inFgRange(drive.spot) && (
               <button className="ghost" onClick={onKick}>Kick field goal · {fgDistance(drive.spot)} yds · {Math.round(fgChance(drive.spot) * 100)}%</button>
             )}

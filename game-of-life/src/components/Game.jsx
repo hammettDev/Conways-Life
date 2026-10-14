@@ -3,7 +3,7 @@ import LiveField from './LiveField.jsx';
 import DefendField from './DefendField.jsx';
 import Cheer from './Cheer.jsx';
 import { botCall } from '../game/botOffence.js';
-import { defenceById, DRIVE, fgChance, inFgRange } from '../engine/football.js';
+import { defenceById, DRIVE, fgChance, inFgRange, puntDistance } from '../engine/football.js';
 import {
   TEAMS, SEASON_GAMES, PLAYOFF_WINS, newSeason, seasonOver, record, champion, nextTeam, botDrive, teamDefence, bestDefenceFor, scoreText,
 } from '../game/season.js';
@@ -59,15 +59,17 @@ export default function Game({ season, onSeason, onExit, sfx }) {
   const onFoePlay = (result) => {
     setG((s) => {
       let n = afterPlay(s, { kind: result.kind, yards: result.yards, note: result.note }, startSpot());
-      // a team in range on 4th down kicks
-      if (n.poss === 'them' && n.drive.down === 4 && inFgRange(n.drive.spot) && n.phase === 'play') {
+      // on 4th down a team in range kicks, a team out of range with a long way to go punts
+      if (n.poss === 'them' && n.drive.down === 4 && n.phase === 'play') {
         const r = createRng((s.seed ^ Math.imul(s.plays + 7, 0x85ebca6b)) >>> 0);
-        n = afterPlay(n, { kind: 'kick', made: r() < fgChance(n.drive.spot), yards: 0 }, startSpot());
+        if (inFgRange(n.drive.spot)) n = afterPlay(n, { kind: 'kick', made: r() < fgChance(n.drive.spot), yards: 0 }, startSpot());
+        else if (n.drive.toGo > 5) n = afterPlay(n, { kind: 'punt', dist: puntDistance(r()), yards: 0 }, startSpot());
       }
       return n;
     });
   };
   const kickFg = () => setG((s) => (inFgRange(s.drive.spot) ? afterPlay(s, { kind: 'kick', made: createRng((s.seed ^ Math.imul(s.plays + 3, 0x27d4eb2f)) >>> 0)() < fgChance(s.drive.spot), yards: 0 }, startSpot()) : s));
+  const punt = () => setG((s) => (s.drive.down === 4 ? afterPlay(s, { kind: 'punt', dist: puntDistance(createRng((s.seed ^ Math.imul(s.plays + 13, 0x2c1b3c6d)) >>> 0)()), yards: 0 }, startSpot()) : s));
   const simFoe = (defId) => setG((s) => {
     const r = createRng((s.seed ^ Math.imul(s.plays + 11, 0x165667b1)) >>> 0);
     const d = botDrive((s.seed ^ Math.imul(s.plays + 5, 0x9e3779b1)) >>> 0, team, defId, 0);
@@ -184,7 +186,7 @@ export default function Game({ season, onSeason, onExit, sfx }) {
           seed={(g.seed + g.plays * 977) >>> 0} onPlay={onFoePlay} onSim={simFoe} />
       )}
       {inGame && g.phase === 'play' && !g.pending && g.poss === 'you' && (
-        <LiveField key={`o${g.plays}`} drive={g.drive} rotate={madden} onKick={kickFg} team={team} defFor={defFor} counterFor={counterFor} audibles={g.aud} onAudible={useAudible}
+        <LiveField key={`o${g.plays}`} drive={g.drive} rotate={madden} onKick={kickFg} onPunt={punt} team={team} defFor={defFor} counterFor={counterFor} audibles={g.aud} onAudible={useAudible}
           seed={(g.seed + g.plays * 131) >>> 0} onPlay={onPlay} />
       )}
       {inGame && g.phase === 'final' && (
