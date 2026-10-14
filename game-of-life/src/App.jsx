@@ -106,7 +106,11 @@ export default function App() {
     : ''));
   const [showSave, setShowSave] = useState(false);
   const [madden, setMadden] = useState(() => {
-    try { return localStorage.getItem('view') !== 'side'; } catch { return true; } // Madden is the default
+    try {
+      const saved = localStorage.getItem('view');
+      if (saved) return saved !== 'side';
+      return window.innerWidth >= 640; // Madden is the default; on a phone the sideways board is wider and fits better
+    } catch { return true; }
   });
   const [sound, setSound] = useState(() => {
     try { return localStorage.getItem('sound') !== 'off'; } catch { return true; } // on by default
@@ -135,6 +139,13 @@ export default function App() {
   const playerBuilds = useMemo(() => [...customBuilds, ...FREE_BUILDS], [customBuilds]);
   const findBuild = (id) => playerBuilds.find((b) => b.id === id) || null;
   const [designer, setDesigner] = useState(null); // the formation being designed, or null
+  const [sheet, setSheet] = useState(null);         // phone only: which menu is open above the bottom bar
+  const [sideTab, setSideTab] = useState('formations');
+  const openSheet = (name) => {
+    try { window.scrollTo({ top: 0 }); } catch { /* no window */ } // the pinned board is at the top: keep it in view
+    if (name === 'shop' || name === 'formations') setSideTab(name);
+    setSheet((cur) => (cur === name ? null : name));
+  };
   const selected = findBuild(selectedId);
   const candidate = getTable(save.table);
   const table = tableOpen(save, candidate) ? candidate : TABLES[0]; // a table you no longer qualify for falls back to Rookie
@@ -410,6 +421,9 @@ export default function App() {
     setNotice('');
   };
 
+  // A menu sheet closes itself once a match is under way.
+  useEffect(() => { if (phase !== 'draft') setSheet(null); }, [phase]);
+
   // On a phone the board is above the controls: bring it back into view when a match starts or ends.
   useEffect(() => {
     try {
@@ -575,7 +589,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="layout">
+      <div className="layout" data-sheet={sheet || 'none'}>
         <Tables
           save={save} tableId={table.id} drafting={drafting && !auto.on} tutorial={tutorial} scout={scoutP} repeat={repeatShare(save)}
           onPick={(id) => commit((s) => ({ ...s, table: id }))}
@@ -583,7 +597,7 @@ export default function App() {
         />
 
         <main className="stage">
-          <div className={`table${lesson && CENTER_STEPS.includes(tStep) ? ' dimmed' : ''}${encounter ? ' boss' : ''}`} style={{ width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
+          <div className={`table${lesson && CENTER_STEPS.includes(tStep) ? ' dimmed' : ''}${encounter ? ' boss' : ''}`} style={{ '--aspect': TABLE.cols / TABLE.rows, width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
             <section className="scorebar">
               <div className="side blue"><span className="num">{shown.blue}</span><i>you</i></div>
               {four && <div className="side red"><span className="num">{shown.red}</span><i>red</i></div>}
@@ -668,6 +682,7 @@ export default function App() {
           onAudibleConfirm={confirmAudible}
           onNewMatch={newMatch} onReplay={watchReplay} onAutoStart={startAuto} onAutoStop={() => stopAuto('')}
           auto={tutorial ? null : { on: auto.on, n: auto.n, net: save.balance - auto.start, piece: autoPiece, onPiece: setAutoPiece, hasPiece: Boolean(obj && drop) }} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
+          sheet={sheet} onSheet={openSheet} tab={sideTab} onTab={setSideTab}
           audibleDisabled={audibleUsed || four || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(audiblePrice)}
           custom={tutorial ? null : {

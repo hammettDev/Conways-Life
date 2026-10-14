@@ -281,3 +281,68 @@ body {
   .actions .autopiece { font-size: 0.72rem; }
   .actions .betbox { gap: 2px; }
 }
+
+.panelbody { display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; min-height: 0; }
+/* the sidebar keeps one fixed height: the list scrolls and Lock In / Auto-play stay pinned to the bottom */
+.sidebar > .actions { flex: none; margin-top: auto; }
+.panelbody .list { flex: 1 1 0; min-height: 0; }
+.sidebar .actions { max-height: 55%; overflow-y: auto; }
+
+/* ---- foldables and small tablets (640-1099px): all three sections side by side, compact ---- */
+.mobnav { display: none; }
+@media (min-width: 640px) and (max-width: 1099px) {
+  .layout { grid-template-columns: 148px minmax(0, 1fr) 250px; gap: 8px; }
+  .lobby { grid-column: auto; order: 0; }
+  .lobby .tableitem .meta + .meta { display: none; }
+  .lobby .note, .lobby .list.soon { display: none; }
+  .stage { order: 0; }
+  .sidebar { order: 0; position: sticky; top: 8px; height: calc(100vh - 150px); max-height: none; }
+  .sidebar .list { max-height: none; flex: 1; }
+  .actions { position: static; box-shadow: none; padding: 0; background: none; max-height: none; border-top: 0; }
+  .app { padding-bottom: 16px; }
+  .table { width: min(100%, calc((100vh - 200px) * var(--aspect))) !important; margin: 0 auto; }
+}
+
+/* ---- phones (under 640px): the board stays pinned on top; menus open as sheets above a compact bottom bar ---- */
+@media (max-width: 639px) {
+  :root { --dock: 176px; }
+  .layout { display: block; }
+  .stage { position: sticky; top: 0; z-index: 20; background: var(--bg); padding: 4px 0 6px; }
+  .table { --boardvh: 54vh; width: min(100%, calc((var(--boardvh) - 84px) * var(--aspect))) !important; }
+  .layout:not([data-sheet='none']) .table { --boardvh: 38vh; }
+  .sidebar { display: contents; }
+  .panelbody { display: none; }
+  .layout[data-sheet='formations'] .panelbody, .layout[data-sheet='shop'] .panelbody {
+    display: flex; flex-direction: column; gap: 8px; position: fixed; left: 0; right: 0; bottom: var(--dock); height: 40vh;
+    overflow-y: auto; z-index: 25; background: var(--panel); border-top: 1px solid var(--edge); padding: 10px 12px;
+  }
+  .lobby { display: none; }
+  .layout[data-sheet='tables'] .lobby {
+    display: flex; position: fixed; left: 0; right: 0; bottom: var(--dock); height: 40vh; overflow-y: auto; z-index: 25;
+    background: var(--panel); border-top: 1px solid var(--edge); padding: 10px 12px; grid-column: auto;
+  }
+  .app { padding-bottom: calc(var(--dock) + 12px); }
+  .actions { flex-direction: row; flex-wrap: wrap; align-items: center; min-height: var(--dock); max-height: none; gap: 6px 8px; }
+  .actions .mobnav { display: flex; width: 100%; gap: 6px; }
+  .mobnav button { flex: 1; padding: 8px 4px; border-radius: 10px; border: 1px solid var(--edge); background: transparent; color: var(--text); font-size: 0.8rem; }
+  .mobnav button.on { background: var(--accent, #45e08a); color: #04100a; font-weight: 700; }
+  .actions .betbox { width: 100%; flex-direction: row; align-items: center; gap: 10px; }
+  .actions .betbox .betrow { flex: 0 0 auto; gap: 8px; }
+  .actions .betbox .betslider { flex: 1; min-width: 0; }
+  .actions .lock { flex: 1 1 55%; }
+  .actions > .ghost.small { flex: 0 0 auto; }
+  .actions .hint, .actions .autopiece { display: none; }
+  .scorebar { height: 64px; }
+  .coach.dock { top: 76px; }
+}
+
+@media (max-width: 639px) {
+  /* a slim header so the pinned board gets the room */
+  .top p { display: none; }
+  .top h1 { font-size: 1rem; }
+  .toggles { flex-wrap: nowrap; overflow-x: auto; margin: 0 0 4px; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
+  .toggles > * { flex: none; }
+  .scorebar .mid p { font-size: 0.7rem; line-height: 1.15; }
+  .scorebar .mid { min-height: 0; }
+  .panelbody .list { min-height: 0; flex: 1 1 auto; max-height: none; }
+}

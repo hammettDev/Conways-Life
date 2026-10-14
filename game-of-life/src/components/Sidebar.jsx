@@ -9,15 +9,19 @@ const money = (n) => `$${n.toLocaleString()}`;
 // Formations and the shop. Selecting previews on the board; Lock In commits.
 // In the shop each piece shows a looping demo of what it does, and can be dragged
 // from that card onto your half of the board (or placed with a click).
-export default function Sidebar({
+export default function Sidebar(props) {
+  const {
   builds, objects, balance, wager, phase, free, bet, minBet, maxBet, betStep = 10, onBet, styles,
   selectedId, onSelect,
   objectId, onObject, placed, armed, onArm, onDragStart, onClearPlace,
   lockLabel, lockHint, canLock, onLockIn,
   audibleChoiceId, onAudibleConfirm, audibleLabel, canAudible,
-  onSnap, onSkip, onReplay, onAutoStart, onAutoStop, auto, cancelFee, custom, onNewMatch, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
-}) {
-  const [tab, setTab] = useState('formations');
+  sheet, onSheet, onSnap, onSkip, onReplay, onAutoStart, onAutoStop, auto, cancelFee, custom, onNewMatch, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
+} = props;
+  const [innerTab, setInnerTab] = useState('formations');
+  // the tab can be driven from outside (the phone's bottom bar opens the shop directly)
+  const tab = props.tab ?? innerTab;
+  const setTab = props.onTab ?? setInnerTab;
   const [shopMode, setShopMode] = useState('pieces');
   // Hold the Lock In button to auto-play: it keeps firing the same bet until you let go.
   const held = useRef(false);
@@ -58,6 +62,7 @@ export default function Sidebar({
 
   return (
     <aside className="sidebar">
+      <div className="panelbody">
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={activeTab === 'formations'} onClick={() => setTab('formations')}>Formations</button>
         <button role="tab" aria-selected={activeTab === 'shop'} onClick={() => setTab('shop')} disabled={picking}>
@@ -86,6 +91,7 @@ export default function Sidebar({
             className="search" type="search" placeholder="Search formations" value={query}
             onChange={(e) => setQuery(e.target.value)} aria-label="Search formations"
           />
+          {sports.length > 1 && (
           <div className="chips">
             <button className={sport === 'all' ? 'chip on' : 'chip'} onClick={() => setSport('all')}>All {builds.length}</button>
             {sports.map(([s, n]) => (
@@ -94,6 +100,7 @@ export default function Sidebar({
               </button>
             ))}
           </div>
+          )}
           <ul className="list">
             {shown.map((b) => (
               <li key={b.id} className={b.sport === 'custom' ? 'customrow' : undefined}>
@@ -102,7 +109,7 @@ export default function Sidebar({
                   onClick={() => onSelect(b.id)} disabled={!(drafting || picking) || (picking && b.id === selectedId)}
                 >
                   <span className="name">{b.name}</span>
-                  <span className="meta">{picking && b.id === selectedId ? 'current' : SPORT_LABEL[b.sport] || b.sport}</span>
+                  <span className="meta">{picking && b.id === selectedId ? 'current' : b.sport === 'football' ? '' : SPORT_LABEL[b.sport] || b.sport}</span>
                 </button>
                 {b.sport === 'custom' && custom && (
                   <>
@@ -190,7 +197,15 @@ export default function Sidebar({
         </>
       )}
 
+      </div>
       <div className="actions">
+        {onSheet && (
+          <div className="mobnav" role="toolbar" aria-label="Menus">
+            <button className={sheet === 'formations' ? 'on' : ''} onClick={() => onSheet('formations')}>Formations</button>
+            <button className={sheet === 'shop' ? 'on' : ''} onClick={() => onSheet('shop')}>Shop</button>
+            <button className={sheet === 'tables' ? 'on' : ''} onClick={() => onSheet('tables')}>Tables</button>
+          </div>
+        )}
       {auto && auto.on ? (
         <>
           <button className="lock" onClick={onAutoStop}>Stop auto-play</button>
