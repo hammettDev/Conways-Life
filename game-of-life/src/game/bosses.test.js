@@ -5,6 +5,7 @@ import {
 import { newSave, noteResult, noteFormation, settle, placeBet } from './wallet.js';
 import { importCode, exportCode } from './saveStore.js';
 import { createRng } from '../engine/rng.js';
+import { COUNTERS } from '../engine/counters.js';
 import { BOSS_UNLOCK_WINS, BOSS_MULTIPLIERS, WAGER } from '../engine/constants.js';
 
 describe('boss progress', () => {
@@ -38,7 +39,7 @@ describe('boss fights', () => {
   it('the Scout counters your last formation when it knows it', () => {
     const picks = new Set();
     for (let seed = 1; seed <= 20; seed++) picks.add(pickBossSetup(getBoss('scout'), createRng(seed), 'fb-dime').formation.id);
-    for (const id of picks) expect(['fb-46-bear', 'fb-cover-3', 'fb-tampa-2']).toContain(id);
+    for (const id of picks) expect(COUNTERS['fb-dime']).toContain(id);
   });
   it('every boss can build a lineup, with or without history', () => {
     for (const b of BOSSES) {

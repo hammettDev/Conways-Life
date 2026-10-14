@@ -5,7 +5,7 @@ import { CANDIDATES } from '../src/engine/library.js';
 const args = process.argv.slice(2);
 const jsonAt = args.indexOf('--json');
 const jsonOut = jsonAt >= 0 ? args[jsonAt + 1] : null;
-const only = args.filter((a, i) => !a.startsWith('--') && i !== jsonAt + 1); // optional sports to include
+const only = args.filter((a, i) => !a.startsWith("--") && (jsonAt < 0 || i !== jsonAt + 1)); // optional sports to include
 const ids = CANDIDATES.filter((b) => !only.length || only.includes(b.sport)).map((b) => `'${b.id}'`);
 if (jsonOut) {
   writeFileSync(jsonOut, JSON.stringify({ free: ids.map((i) => i.replace(/'/g, '')), tutorial: [], boss: [] }));

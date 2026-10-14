@@ -29,15 +29,16 @@ for (const [name, cells] of Object.entries(SHAPES)) {
 }
 
 describe('build library', () => {
-  it('is mostly football, with a few builds from other sports', () => {
+  it('is football-led: the balanced pool is football, other sports stay as candidates', () => {
     const football = FREE_BUILDS.filter((b) => b.sport === 'football');
-    expect(FREE_BUILDS.length).toBeGreaterThanOrEqual(25);
-    expect(football.length).toBeGreaterThanOrEqual(FREE_BUILDS.length * 0.4);
+    expect(FREE_BUILDS.length).toBeGreaterThanOrEqual(14);
+    expect(football.length).toBeGreaterThanOrEqual(FREE_BUILDS.length * 0.9);
+    expect(new Set(CANDIDATES.map((b) => b.sport)).size).toBeGreaterThanOrEqual(4);
     expect(new Set(BASE_BUILDS.map((b) => b.id)).size).toBe(BASE_BUILDS.length);
   });
 
   it('includes the named football looks', () => {
-    const ids = BASE_BUILDS.map((b) => b.id);
+    const ids = CANDIDATES.map((b) => b.id);
     for (const id of ['fb-full-house', 'fb-weak-i', 'fb-strong-i', 'fb-pistol', 'fb-shotgun', 'fb-i-form']) {
       expect(ids).toContain(id);
     }
@@ -90,7 +91,7 @@ describe('free formations never contain paid-object behaviour', () => {
   });
 
   it('the balanced pool stays within 40-60% against itself', () => {
-    expect(FREE_BUILDS.length).toBeGreaterThanOrEqual(25);
+    expect(FREE_BUILDS.length).toBeGreaterThanOrEqual(14);
     for (const b of FREE_BUILDS) {
       expect(b.winRate, b.id).toBeGreaterThanOrEqual(0.4);
       expect(b.winRate, b.id).toBeLessThanOrEqual(0.6);
@@ -205,8 +206,8 @@ describe('bot setup', () => {
 
   it('draws from across the whole free pool', () => {
     const rng = createRng(2);
-    const sports = new Set();
-    for (let i = 0; i < 300; i++) sports.add(pickBotSetup(rng, FREE_BUILDS).formation.sport);
-    expect(sports.size).toBeGreaterThanOrEqual(2);
+    const seen = new Set();
+    for (let i = 0; i < 400; i++) seen.add(pickBotSetup(rng, FREE_BUILDS).formation.id);
+    expect(seen.size).toBe(FREE_BUILDS.length);
   });
 });
