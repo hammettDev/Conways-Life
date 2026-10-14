@@ -26,6 +26,7 @@ import { STEPS, stepFor } from './game/tutorial.js';
 import BossReveal from './components/BossReveal.jsx';
 import { botAnswers, counterFor } from './game/audible.js';
 
+const CENTER_STEPS = ['pick', 'hot', 'shop', 'wrap']; // lessons that sit mid-board; the rest dock at the top so the action stays visible
 const TICKS_PER_SECOND = 6; // at 1x
 const SPEEDS = [0.5, 1, 2, 4];
 const PIT = DEFAULT_FORTUNE_RULES.pitSize;
@@ -352,7 +353,7 @@ export default function App() {
             const w = wagerRef.current;
             // the tutorial bet is insured: it pays as a win whatever the board said
             const boss = bossRef.current;
-            const mult = boss && r.outcome === 'win' ? rollMultiplier(Math.random) : 1;
+            const mult = boss && r.outcome === 'win' ? rollMultiplier(Math.random, boss.rolls) : 1;
             if (boss && r.outcome === 'win') setBossMult(mult);
             setSave((s) => (live.current.tutorial
               ? (live.current.practice ? s : settle(s, 'win', w))
@@ -384,7 +385,7 @@ export default function App() {
   const net = result && (practice ? 'practice run, no money moved' : tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(wagerRef.current * (bossMult || 1))}` : result.outcome === 'lose' ? `−${money(wagerRef.current)}` : 'bet returned');
 
   return (
-    <div className={tutorial ? "app tutorial" : "app"}>
+    <div className="app">
       <header className="top">
         <h1>Gridiron <span>Cellular Warfare</span></h1>
         <p>Pick a formation, lock it in, and watch the board decide.</p>
@@ -402,23 +403,9 @@ export default function App() {
         </div>
       </header>
 
-      {lesson && (
-        <aside className="coach" role="status" aria-live="polite">
-          <div>
-            <b>{lesson.title}</b>
-            <p>{lesson.text}</p>
-          </div>
-          <div className="coachact">
-            {lesson.next && <button className="go small" onClick={tStep === 'wrap' ? endTutorial : nextStep}>{lesson.next}</button>}
-            {lesson.wait && <span className="waiting">{lesson.wait}</span>}
-            {tStep !== 'wrap' && <button className="ghost small" onClick={() => { if (phase === 'locked') cancelMatch(); leaveTutorial(); }}>{practice ? 'Leave tutorial' : 'Skip tutorial'}</button>}
-          </div>
-        </aside>
-      )}
-
       <div className="layout">
         <main className="stage">
-          <div className="table" style={{ width: `min(100%, calc((100vh - ${tutorial ? 270 : 180}px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
+          <div className={lesson && CENTER_STEPS.includes(tStep) ? "table dimmed" : "table"} style={{ width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
             <section className="scorebar">
               <div className="side blue"><span className="num">{phase === 'done' && result ? result.score.blue : live2.blue}</span><i>you</i></div>
               <div className="mid">
@@ -456,6 +443,17 @@ export default function App() {
               </div>
               <div className="side red"><span className="num">{phase === 'done' && result ? result.score.red : live2.red}</span><i>bot</i></div>
             </section>
+            {lesson && (
+              <aside className={`coach ${CENTER_STEPS.includes(tStep) ? 'center' : 'dock'}`} role="status" aria-live="polite">
+                <b>{lesson.title}</b>
+                <p>{lesson.text}</p>
+                <div className="coachact">
+                  {lesson.next && <button className="go" onClick={tStep === 'wrap' ? endTutorial : nextStep}>{lesson.next}</button>}
+                  {lesson.wait && <span className="waiting">{lesson.wait}</span>}
+                  {tStep !== 'wrap' && <button className="ghost small" onClick={() => { if (phase === 'locked') cancelMatch(); leaveTutorial(); }}>{practice ? 'Leave tutorial' : 'Skip tutorial'}</button>}
+                </div>
+              </aside>
+            )}
             <Arena
               ref={arenaRef} getView={getView} rotate={madden}
               onHover={(t) => { hoverRef.current = t; }}

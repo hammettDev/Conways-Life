@@ -23,8 +23,9 @@ describe('boss progress', () => {
     expect(unlockedBosses(s).map((b) => b.id)).toEqual(['scout']);
     s = noteResult(s, 'win', 'scout');
     expect(unlockedBosses(s).map((b) => b.id)).toEqual(['scout', 'coach']);
-    s = noteResult(noteResult(s, 'win', 'coach'), 'win', 'champion');
+    for (const b of BOSSES) s = noteResult(s, 'win', b.id);
     expect(unlockedBosses(s)).toHaveLength(BOSSES.length);
+    expect(BOSSES.length).toBeGreaterThanOrEqual(6);
   });
   it('survives an export code', () => {
     let s = noteFormation(noteResult(noteResult(newSave(), 'win'), 'win', 'scout'), 'fb-dime');
@@ -45,6 +46,15 @@ describe('boss fights', () => {
         const setup = pickBossSetup(b, createRng(3), last);
         expect(setup.cells.length).toBeGreaterThan(20);
       }
+    }
+  });
+  it('the Mirror fields your last formation; the Blitzer stays aggressive; the Fortress stays tight', () => {
+    for (let seed = 1; seed <= 15; seed++) {
+      expect(pickBossSetup(getBoss('mirror'), createRng(seed), 'fb-i-form').formation.id).toBe('fb-i-form');
+      expect(['fb-46-bear', 'fb-cover-0', 'fb-dime', 'fb-goal-line-d', 'fb-4-3-over', 'sc-2-3-5'])
+        .toContain(pickBossSetup(getBoss('blitzer'), createRng(seed), 'fb-i-form').formation.id);
+      expect(['fb-goal-line-d', 'fb-goal-line', 'fb-prevent', 'fb-bunch', 'fb-46-bear', 'fb-4-3-under', 'fb-full-house'])
+        .toContain(pickBossSetup(getBoss('fortress'), createRng(seed), 'fb-i-form').formation.id);
     }
   });
   it('the Scout always answers an audible; the others sometimes', () => {
@@ -81,6 +91,11 @@ describe('hidden multiplier', () => {
     for (let i = 0; i < 4000; i++) { const m = rollMultiplier(rng); expect(values).toContain(m); counts[m] = (counts[m] || 0) + 1; }
     expect(counts[2]).toBeGreaterThan(counts[20] * 5);
     expect(Math.max(...Object.keys(counts).map(Number))).toBe(20);
+  });
+  it('more rolls pay better on average, and never below the table', () => {
+    const mean = (rolls) => { const rng = createRng(7); let n = 0; for (let i = 0; i < 4000; i++) n += rollMultiplier(rng, rolls); return n / 4000; };
+    expect(mean(2)).toBeGreaterThan(mean(1));
+    expect(mean(3)).toBeGreaterThan(mean(2));
   });
   it('a boss win pays the stake back plus the wager times the multiplier', () => {
     const held = placeBet(newSave(), WAGER);

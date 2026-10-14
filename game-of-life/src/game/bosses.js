@@ -10,19 +10,39 @@ import { counterFor } from './audible.js';
 // after BOSS_UNLOCK_WINS ordinary wins.
 export const BOSSES = [
   {
-    id: 'scout', name: 'The Scout', audible: SCOUT_BOSS_AUDIBLE_CHANCE,
+    id: 'scout', name: 'The Scout', audible: SCOUT_BOSS_AUDIBLE_CHANCE, rolls: 1,
     items: ['glider', 'rpent'],
     blurb: 'Studies your last formation and picks the counter. Answers every audible, so out-vary it instead. Brings a cheap piece.',
   },
   {
-    id: 'coach', name: 'The Coach', audible: 0.3,
+    id: 'coach', name: 'The Coach', audible: 0.3, rolls: 1,
     items: ['lwss', 'mwss', 'rpent'],
     blurb: 'Runs a strong playbook the regular bots never use, and brings a spaceship.',
   },
   {
-    id: 'champion', name: 'The Champion', audible: 0.5,
+    id: 'champion', name: 'The Champion', audible: 0.5, rolls: 2,
     items: ['mwss', 'hwss', 'acorn'],
-    blurb: 'Counter-picks your last formation from the strong playbook too, with the heaviest pieces.',
+    blurb: 'Counter-picks your last formation from the strong playbook too, with the heaviest pieces. Pays the better of two rolls.',
+  },
+  {
+    id: 'blitzer', name: 'The Blitzer', audible: 0.4, rolls: 2,
+    items: ['lwss', 'mwss', 'rpent'],
+    blurb: 'Only ever lines up in an aggressive front and charges with a spaceship. Pays the better of two rolls.',
+  },
+  {
+    id: 'fortress', name: 'The Fortress', audible: 0.3, rolls: 2,
+    items: ['block', 'toad', 'acorn'],
+    blurb: 'Counter-picks your last formation, but only from its tightest, most defensive looks. Hard to crack. Pays the better of two rolls.',
+  },
+  {
+    id: 'mirror', name: 'The Mirror', audible: 0.5, rolls: 2,
+    items: ['glider', 'mwss', 'hwss'],
+    blurb: 'Fields the same formation you used last match, flipped, with a piece of its own. Pays the better of two rolls.',
+  },
+  {
+    id: 'dealer', name: 'The Dealer', audible: 1, rolls: 3,
+    items: ['hwss', 'acorn', 'rpent'],
+    blurb: 'Counter-picks from everything it owns, answers every audible and deals the heaviest pieces. Pays the best of three rolls.',
   },
 ];
 
@@ -44,10 +64,21 @@ const asSetup = (formation, rng) => {
 };
 
 // The boss's formation for this match. `lastId` is the formation you used last match.
+const AGGRESSIVE = ['fb-46-bear', 'fb-cover-0', 'fb-dime', 'fb-goal-line-d', 'fb-4-3-over', 'sc-2-3-5'];
+const TIGHT = ['fb-goal-line-d', 'fb-goal-line', 'fb-prevent', 'fb-bunch', 'fb-46-bear', 'fb-4-3-under', 'fb-full-house'];
+
 export function pickBossSetup(boss, rng, lastId) {
   const strong = BOSS_BUILDS.length ? BOSS_BUILDS : FREE_BUILDS;
+  const everything = [...strong, ...FREE_BUILDS];
+  const only = (ids, pool) => { const f = pool.filter((b) => ids.includes(b.id)); return f.length ? f : pool; };
   if (boss.id === 'coach') return pickBotSetup(rng, strong);
-  const pool = boss.id === 'champion' ? [...strong, ...FREE_BUILDS] : FREE_BUILDS;
+  if (boss.id === 'blitzer') return pickBotSetup(rng, only(AGGRESSIVE, everything));
+  if (boss.id === 'mirror') {
+    const same = lastId && everything.find((b) => b.id === lastId);
+    return same ? asSetup(same, rng) : pickBotSetup(rng, FREE_BUILDS);
+  }
+  const pool = boss.id === 'champion' || boss.id === 'dealer' ? everything
+    : boss.id === 'fortress' ? only(TIGHT, everything) : FREE_BUILDS;
   if (!lastId) return pickBotSetup(rng, pool);
   return asSetup(counterFor(lastId, pool, rng), rng);
 }
@@ -75,9 +106,15 @@ export function withItem(boss, setup, rng) {
 }
 
 // The hidden payout multiplier, from the weighted table.
-export function rollMultiplier(rng) {
+// Tougher bosses roll more times and pay the best roll.
+export function rollMultiplier(rng, rolls = 1) {
   const total = BOSS_MULTIPLIERS.reduce((n, [, w]) => n + w, 0);
-  let r = rng() * total;
-  for (const [m, w] of BOSS_MULTIPLIERS) { r -= w; if (r < 0) return m; }
-  return BOSS_MULTIPLIERS[0][0];
+  const once = () => {
+    let r = rng() * total;
+    for (const [m, w] of BOSS_MULTIPLIERS) { r -= w; if (r < 0) return m; }
+    return BOSS_MULTIPLIERS[0][0];
+  };
+  let best = once();
+  for (let i = 1; i < rolls; i++) best = Math.max(best, once());
+  return best;
 }
