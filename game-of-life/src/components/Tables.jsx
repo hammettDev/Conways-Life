@@ -23,7 +23,7 @@ export default function Tables({ save, tableId, onPick, drafting, tutorial }) {
                 <span className="name">{t.name}</span>
                 <span className="meta">
                   {open
-                    ? `Bets ${money(t.min)} to ${money(t.max)}${t.fee ? ` · ${Math.round(t.fee * 100)}% fee` : ''}`
+                    ? `Bets ${money(t.min)} to ${money(t.max)}${t.fee ? ` · ${Math.round(t.fee * 100)}% fee` : ''} · pieces ×${t.itemMult}`
                     : `Locked: reach ${money(t.unlock)}`}
                 </span>
                 {open && <span className="meta">{t.blurb}</span>}

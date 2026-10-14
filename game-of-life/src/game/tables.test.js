@@ -18,6 +18,10 @@ describe('stakes tables', () => {
     expect(TABLES[0].unlock).toBe(0);
     expect(maxBetFor(TABLES[0], 5e8, 0)).toBe(1000); // $500M in the bank still only bets $1,000 at Rookie
   });
+  it('pieces cost more at every step up, in proportion to the stakes', () => {
+    expect(TABLES[0].itemMult).toBe(1);
+    for (let i = 1; i < TABLES.length; i++) expect(TABLES[i].itemMult).toBeGreaterThan(TABLES[i - 1].itemMult * 2);
+  });
   it('open by the most cash you have ever held, not by what you hold now', () => {
     const s = { ...newSave(), balance: 100, peak: 60000 };
     expect(tableOpen(s, getTable('high'))).toBe(true);

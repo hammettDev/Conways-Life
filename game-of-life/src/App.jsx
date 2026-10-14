@@ -115,7 +115,11 @@ export default function App() {
   const findBuild = (id) => playerBuilds.find((b) => b.id === id) || null;
   const [designer, setDesigner] = useState(null); // the formation being designed, or null
   const selected = findBuild(selectedId);
-  const obj = objectId ? getObject(objectId) : null;
+  const candidate = getTable(save.table);
+  const table = tableOpen(save, candidate) ? candidate : TABLES[0]; // a table you no longer qualify for falls back to Rookie
+  // Pieces cost more the higher you play: the same piece is worth far more on a bigger bet.
+  const shopObjects = useMemo(() => OBJECTS.map((o) => ({ ...o, price: o.price * table.itemMult })), [table.itemMult]);
+  const obj = objectId ? shopObjects.find((o) => o.id === objectId) || null : null;
   const [practice, setPractice] = useState(false); // replaying the tutorial: nothing is paid or won
   const tutorial = !save.tutorialDone || practice; // the guided match: fixed stake, free pieces and audible
   const [tStep, setTStep] = useState('pick');
@@ -123,8 +127,6 @@ export default function App() {
   const [bossMult, setBossMult] = useState(null);   // the hidden payout, revealed after a win
   const [betPref, setBetPref] = useState(WAGER);
   const pieceCost = obj && !tutorial ? obj.price : 0;
-  const candidate = getTable(save.table);
-  const table = tableOpen(save, candidate) ? candidate : TABLES[0]; // a table you no longer qualify for falls back to Rookie
   const maxBet = Math.max(table.min, maxBetFor(table, save.balance, pieceCost)); // the table's ceiling, or what you can cover with the fee and any piece
   const wager = tutorial ? (practice ? 0 : TUTORIAL_STAKE) : Math.min(Math.max(betPref, table.min), maxBet);
   const tableFee = tutorial ? 0 : feeFor(table, wager);
@@ -576,7 +578,7 @@ export default function App() {
         </main>
 
         <Sidebar
-          builds={playerBuilds} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} bet={tutorial ? null : wager} minBet={table.min} maxBet={maxBet} betStep={betStep(table)} onBet={setBet}
+          builds={playerBuilds} objects={shopObjects} balance={save.balance} wager={wager} free={tutorial} bet={tutorial ? null : wager} minBet={table.min} maxBet={maxBet} betStep={betStep(table)} onBet={setBet}
           styles={tutorial ? null : { owned: save.style.owned, equipped: save.style.equipped, onBuy: (id) => { const n = buyStyle(save, id); if (n) commit(() => n); }, onEquip: (id) => { const n = equipStyle(save, id); if (n) commit(() => n); } }} phase={phase}
           selectedId={selectedId}
           onSelect={(id) => (phase === 'audible' ? setAudibleChoice(id) : setSelectedId(id))}
