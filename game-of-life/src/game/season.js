@@ -19,17 +19,21 @@ export const TEAMS = [
   { id: 'kings', style: 'mid', name: 'Grid Kings', level: 2, scout: 0.9, def: ['fb-dime', 'fb-prevent', 'fb-cover-2', 'fb-tampa-2'] },
 ];
 
-// Which kinds of play each defence is weakest to, best first (measured by scripts/football-sim.mjs).
-export const WEAK = {
-  'fb-4-3-over': ['deep', 'mid', 'run', 'short'],
-  'fb-4-3-under': ['mid', 'deep', 'run', 'short'],
-  'fb-3-4': ['deep', 'mid', 'run', 'short'],
-  'fb-dime': ['deep', 'mid', 'run', 'short'],
-  'fb-cover-2': ['mid', 'run', 'deep', 'short'],
-  'fb-cover-3': ['deep', 'mid', 'run', 'short'],
-  'fb-tampa-2': ['mid', 'deep', 'run', 'short'],
-  'fb-prevent': ['short', 'run', 'mid', 'deep'],
+// What each defence gives up in the live physics: yards per run and per pass against the bot's offence
+// (measured by scripts/football-def-matrix.mjs).
+export const LIVE_DEF = {
+  'fb-4-3-over': { run: 2.7, pass: 2.8 },
+  'fb-4-3-under': { run: 6.0, pass: 3.6 },
+  'fb-3-4': { run: 7.3, pass: 5.4 },
+  'fb-dime': { run: 4.7, pass: 1.8 },
+  'fb-cover-2': { run: 3.0, pass: 1.8 },
+  'fb-cover-3': { run: 4.7, pass: 1.8 },
+  'fb-tampa-2': { run: 6.3, pass: 1.6 },
+  'fb-prevent': { run: 5.0, pass: 8.2 },
 };
+const grade = (y) => (y <= 3 ? 'well' : y <= 5 ? 'so-so' : 'poorly');
+export const defenceHint = (id) => `stops the run ${grade(LIVE_DEF[id].run)}, stops the pass ${grade(LIVE_DEF[id].pass)}`;
+export const yardsAgainst = (id, style) => (LIVE_DEF[id] || LIVE_DEF['fb-cover-3'])[style === 'run' ? 'run' : 'pass'];
 
 export const newSeason = (seed = 1) => ({ seed: seed >>> 0, week: 0, results: [] });
 export const seasonOver = (s) => s.week >= SEASON_GAMES;
@@ -46,8 +50,7 @@ export const driveNote = (d) => (d.over === 'td' ? 'Touchdown' : drivePoints(d) 
 // (Calibrated so a level-0 team scores about 4 a game, level 1 about 7 and level 2 about 10.)
 export function botDrive(seed, team, defId, repeats = 0) {
   const rng = createRng(seed);
-  const order = WEAK[defId] || WEAK['fb-cover-3'];
-  const fit = [1.35, 1.0, 0.75, 0.55][Math.max(0, order.indexOf(team.style))];
+  const fit = Math.max(0.5, Math.min(1.6, 0.6 + (yardsAgainst(defId, team.style) - 1.5) * 0.13));
   const td = Math.min(0.7, [0.1, 0.17, 0.25][team.level] * fit * (1 + 0.15 * repeats));
   const fg = Math.min(0.3, td * 0.8);
   const r = rng();

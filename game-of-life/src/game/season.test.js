@@ -28,8 +28,8 @@ describe('football season', () => {
   it('better teams score more, and a defence weak to their style gives up more', () => {
     const rate = (team, def) => { let p = 0; for (let i = 0; i < 400; i++) p += drivePoints(botDrive(i, team, def)); return p / 400; };
     expect(rate(TEAMS[7], 'fb-cover-3')).toBeGreaterThan(rate(TEAMS[0], 'fb-cover-3'));
-    const t = { ...TEAMS[2], style: 'deep' };
-    expect(rate(t, 'fb-4-3-over')).toBeGreaterThan(rate(t, 'fb-prevent')); // 4-3 Over is weak to deep, Prevent is strong
+    const t = { ...TEAMS[2], style: 'mid' };
+    expect(rate(t, 'fb-prevent')).toBeGreaterThan(rate(t, 'fb-dime')); // Prevent gives up the pass, Dime stops it
   });
   it('the opponent reads a repeated defence', () => {
     const a = rate0(0); const b = rate0(4);

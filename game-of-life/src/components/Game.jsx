@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import LiveField from './LiveField.jsx';
-import { DEFENCES, defenceById, newDrive, advance, DRIVE } from '../engine/football.js';
+import DefendField from './DefendField.jsx';
+import { botCall } from '../game/botOffence.js';
+import { defenceById, newDrive, advance, DRIVE } from '../engine/football.js';
 import {
-  TEAMS, GAME_DRIVES, SEASON_GAMES, PLAYOFF_WINS, WEAK, newSeason, seasonOver, record, champion, nextTeam,
+  TEAMS, GAME_DRIVES, SEASON_GAMES, PLAYOFF_WINS, newSeason, seasonOver, record, champion, nextTeam,
   drivePoints, driveNote, botDrive, teamDefence, scoreText,
 } from '../game/season.js';
 import { createRng } from '../engine/rng.js';
@@ -11,15 +13,12 @@ const ordinal = (n) => ['', '1st', '2nd', '3rd', '4th'][n];
 const spotText = (s) => (s >= DRIVE.goal ? 'Goal' : s <= 50 ? `Own ${s}` : `Opp ${DRIVE.goal - s}`);
 const classOf = (r) => (r.kind === 'run' ? 'run' : r.yards > 14 ? 'deep' : r.yards > 7 ? 'mid' : 'short');
 const STYLE_TEXT = { run: 'run the ball', short: 'throw short', mid: 'throw over the middle', deep: 'go deep' };
-const strongVs = (id) => WEAK[id][WEAK[id].length - 1];
-const weakVs = (id) => WEAK[id][0];
 
 // The football game: a season of 8 games. Each game is 6 drives each; you play yours by hand, the opponent's are simulated
 // against the defence you call.
 export default function Game({ season, onSeason, onExit }) {
-  const [stage, setStage] = useState('hub');         // hub -> plan -> game -> final
+  const [stage, setStage] = useState('hub');         // hub -> game
   const [g, setG] = useState(null);
-  const [plan, setPlan] = useState('fb-cover-3');
   const [leaving, setLeaving] = useState(false);
   const cur = season || null;
   const team = cur ? nextTeam(cur) : null;
@@ -29,26 +28,39 @@ export default function Game({ season, onSeason, onExit }) {
   const startGame = () => {
     const seed = (cur.seed + cur.week * 7919) >>> 0;
     const rng = createRng(seed);
-    setG({ seed, rng, you: 0, them: 0, driveIdx: 0, drive: newDrive(), classes: [], plays: 0, defId: teamDefence(rng, team, []), between: null, planRepeats: 0, lastPlan: plan });
+    setG({ seed, rng, you: 0, them: 0, driveIdx: 0, drive: newDrive(), classes: [], plays: 0, defId: teamDefence(rng, team, []), between: null, mode: 'off', foe: null, foePlays: 0, foeCall: null, mine: 0, mineNote: '' });
     setStage('game');
   };
 
-  const onPlay = (result, call) => {
+  const startFoe = (s, mine, mineNote) => ({
+    ...s, mode: 'def', mine, mineNote, you: s.you + mine, foe: newDrive(), foePlays: 0, foeCall: botCall(s.rng, team),
+  });
+  const onPlay = (result) => {
     setG((s) => {
       const outcome = { kind: result.kind, yards: result.yards, note: result.note };
       const drive = advance(s.drive, outcome);
       const classes = [...s.classes, classOf(result)];
       const plays = s.plays + 1;
       if (!drive.over) return { ...s, drive, classes, plays, defId: teamDefence(s.rng, team, classes) };
-      // your drive is over: score it, then the opponent runs theirs against your plan
-      const mine = drivePoints(drive);
-      const repeats = plan === s.lastPlan ? s.planRepeats + 1 : 0;
-      const theirs = botDrive((s.seed ^ Math.imul(s.driveIdx + 1, 0x9e3779b1)) >>> 0, team, plan, repeats);
-      const tp = drivePoints(theirs);
-      return {
-        ...s, drive, classes, plays, you: s.you + mine, them: s.them + tp, planRepeats: repeats, lastPlan: plan,
-        between: { yours: driveNote(drive), mine, theirs: driveNote(theirs), tp },
-      };
+      return startFoe({ ...s, drive, classes, plays }, drivePoints(drive), driveNote(drive));
+    });
+  };
+  // one play of their drive, with the defence you picked
+  const endFoe = (s, foe) => {
+    const tp = drivePoints(foe);
+    return { ...s, foe, mode: 'off', them: s.them + tp, between: { yours: s.mineNote, mine: s.mine, theirs: driveNote(foe), tp } };
+  };
+  const onFoePlay = (result) => {
+    setG((s) => {
+      const foe = advance(s.foe, { kind: result.kind, yards: result.yards, note: result.note });
+      if (foe.over) return endFoe(s, foe);
+      return { ...s, foe, foePlays: s.foePlays + 1, foeCall: botCall(s.rng, team) };
+    });
+  };
+  const simFoe = (defId) => {
+    setG((s) => {
+      const d = botDrive((s.seed ^ Math.imul(s.driveIdx + 1, 0x9e3779b1)) >>> 0, team, defId, 0);
+      return endFoe(s, d);
     });
   };
 
@@ -56,7 +68,7 @@ export default function Game({ season, onSeason, onExit }) {
     setG((s) => {
       const idx = s.driveIdx + 1;
       if (idx >= GAME_DRIVES) return { ...s, driveIdx: idx, between: null, finished: true };
-      return { ...s, driveIdx: idx, drive: newDrive(), classes: [], between: null, defId: teamDefence(s.rng, team, []) };
+      return { ...s, driveIdx: idx, drive: newDrive(), classes: [], between: null, mode: 'off', defId: teamDefence(s.rng, team, []) };
     });
   };
   const finishGame = () => {
@@ -74,8 +86,8 @@ export default function Game({ season, onSeason, onExit }) {
         <div className="driveinfo">
           {stage === 'game' && g ? (
             <>
-              <b>{g.finished ? 'Final' : g.between ? 'Drive over' : `${ordinal(g.drive.down)} & ${g.drive.toGo}`}</b>
-              <span>{g.finished || g.between ? `Drive ${Math.min(g.driveIdx + 1, GAME_DRIVES)} of ${GAME_DRIVES}` : `${spotText(g.drive.spot)} · drive ${g.driveIdx + 1}/${GAME_DRIVES}`}</span>
+              <b>{g.finished ? 'Final' : g.between ? 'Drive over' : g.mode === 'def' ? `Their ${ordinal(g.foe.down)} & ${g.foe.toGo}` : `${ordinal(g.drive.down)} & ${g.drive.toGo}`}</b>
+              <span>{g.finished || g.between ? `Drive ${Math.min(g.driveIdx + 1, GAME_DRIVES)} of ${GAME_DRIVES}` : (g.mode === 'def' ? `Ball on ${g.foe.spot <= 50 ? `their ${g.foe.spot}` : `your ${DRIVE.goal - g.foe.spot}`} · you defend` : `${spotText(g.drive.spot)} · drive ${g.driveIdx + 1}/${GAME_DRIVES}`)}</span>
             </>
           ) : <><b>Football season</b><span>{cur ? `Week ${Math.min(cur.week + 1, SEASON_GAMES)} of ${SEASON_GAMES}` : 'New'}</span></>}
         </div>
@@ -110,8 +122,8 @@ export default function Game({ season, onSeason, onExit }) {
           ) : (
             <>
               <h3>Week {cur.week + 1}: {team.name}</h3>
-              <p className="note">Record {rec.wins}-{rec.losses}{rec.ties ? `-${rec.ties}` : ''}. {team.level === 0 ? 'A friendly start.' : team.level === 1 ? 'A real test.' : 'The best in the league.'} They love to {STYLE_TEXT[team.style]}, and they usually line up in {team.def.map((id) => defenceById(id).name).join(', ')}.</p>
-              <button className="lock" onClick={() => setStage('plan')}>Play week {cur.week + 1}</button>
+              <p className="note">Record {rec.wins}-{rec.losses}{rec.ties ? `-${rec.ties}` : ''}. {team.level === 0 ? 'A friendly start.' : team.level === 1 ? 'A real test.' : 'The best in the league.'} They love to {STYLE_TEXT[team.style]}, and they usually line up in {team.def.map((id) => defenceById(id).name).join(', ')}. You also defend their six drives: you see their formation and pick your defence play by play.</p>
+              <button className="lock" onClick={startGame}>Play week {cur.week + 1}</button>
             </>
           )}
           {cur && cur.results.length > 0 && (
@@ -126,29 +138,16 @@ export default function Game({ season, onSeason, onExit }) {
         </section>
       )}
 
-      {stage === 'plan' && (
-        <section className="hub">
-          <h3>Your defence</h3>
-          <p className="note">Pick the formation your defence will line up in against {team.name}. Each is strong against one kind of play and weak to another, and the opponent reads a formation you keep repeating.</p>
-          <div className="drivepick">
-            {DEFENCES.map((d) => <button key={d.id} className={plan === d.id ? 'chip on' : 'chip'} onClick={() => setPlan(d.id)}>{d.name}</button>)}
-          </div>
-          <p className="note">{defenceById(plan).name}: strong against the <b>{strongVs(plan)}</b>, weak to the <b>{weakVs(plan)}</b>.</p>
-          <button className="lock" onClick={startGame}>Kick off</button>
-        </section>
+      {stage === 'game' && g && !g.finished && !g.between && g.mode === 'def' && (
+        <DefendField key={`d${g.driveIdx}-${g.foePlays}`} call={g.foeCall} team={team} seed={(g.seed + g.foePlays * 977 + g.driveIdx * 31) >>> 0} onPlay={onFoePlay} onSim={simFoe} />
       )}
-
-      {stage === 'game' && g && !g.finished && !g.between && def && (
+      {stage === 'game' && g && !g.finished && !g.between && g.mode === 'off' && def && (
         <LiveField key={`${g.driveIdx}-${g.plays}`} def={def} seed={(g.seed + g.plays * 131 + g.driveIdx * 17) >>> 0} onPlay={onPlay} />
       )}
       {stage === 'game' && g && g.between && (
         <section className="hub">
           <h3>Drive over</h3>
           <p className="note">Your drive: <b>{g.between.yours}</b>{g.between.mine ? ` (+${g.between.mine})` : ''}. Their drive: <b>{g.between.theirs}</b>{g.between.tp ? ` (+${g.between.tp})` : ''}.</p>
-          <p className="note">Change your defence for their next drive if you like.</p>
-          <div className="drivepick">
-            {DEFENCES.map((d) => <button key={d.id} className={plan === d.id ? 'chip on' : 'chip'} onClick={() => setPlan(d.id)}>{d.name}</button>)}
-          </div>
           <button className="lock" onClick={nextDrive}>{g.driveIdx + 1 >= GAME_DRIVES ? 'Final score' : 'Next drive'}</button>
         </section>
       )}
