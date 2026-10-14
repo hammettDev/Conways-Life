@@ -22,7 +22,7 @@ npm test             # Vitest (the engine regression tests take about half a min
 4. Cells follow Life's rules; towers of chips topple into the pit. The side with more ground plus the pit bonus wins.
 
 Modes: **Classic 1v1** (even money) and the **4-player arena** (a board twice the size, three bots, winner takes all, a win pays x3).
-**Football drive**: call pass and run plays against a bot defence (4 downs per 10 yards from your own 25); a touchdown pays x1.5. Receivers pass through the defensive line, the defence's coverage players evolve under Life's rules until the ball arrives, and the formation it shows decides whether the catch is covered. Repeat a call and the defence adjusts. Balanced with `node scripts/football-sim.mjs`.
+**Football season** (no betting): eight games, six drives each. You play your drives live: receivers are light spaceships that run at the defence, the ball is a glider you fire from the quarterback (pick a receiver with 1-4 or the arrows, press Space when the dashed line turns green; taps work too), and a run sends a glider through the line. Coverage players, spaceships and the ball all fight under Life's rules, so a defender the glider touches ends the throw. The opponent's drives are simulated against the defence you pick. Physics checks: `node scripts/football-live-sim.mjs`, `node scripts/football-live-drives.mjs`.
 
 Tables run from Rookie to Mogul with bigger bets, fees, sharper bots and bosses that turn up at random.
 
@@ -30,7 +30,7 @@ Tables run from Rookie to Mogul with bigger bets, fees, sharper bots and bosses 
 
 | Path | What lives there |
 | --- | --- |
-| `src/engine/` | Deterministic Life engine (`engine.js` 2 teams, `engineN.js` any number), geometry, formations, rating, `football.js` (the drive rules) |
+| `src/engine/` | Deterministic Life engine (`engine.js` 2 teams, `engineN.js` any number), geometry, formations, rating, `footballLive.js` (live football physics), `football.js` (drive rules) |
 | `src/game/` | Wallet and saves, tables, bosses, anti-save-scum, tutorial |
 | `src/render/` | Canvas drawing of the board, pit and chips |
 | `src/components/` | Sidebar (formations, shop), tables, arena canvas, formation designer |

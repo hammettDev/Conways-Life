@@ -1,7 +1,7 @@
 // Football season: 8 games against stronger and stronger teams. In each game you run 6 offensive drives by hand
 // (live Life physics, see engine/footballLive.js) and the opponent runs 6 simulated drives against the defence you
 // pick. A touchdown is 7, and a drive that stalls inside the opponent's 40 kicks a field goal for 3.
-import { DEFENCES, DRIVE, RUN_LANES, resolvePlay, newDrive, advance, receiversOf, OFFENCES, DEPTHS } from '../engine/football.js';
+import { DEFENCES, DRIVE } from '../engine/football.js';
 import { createRng } from '../engine/rng.js';
 
 export const GAME_DRIVES = 6;
@@ -9,14 +9,14 @@ export const SEASON_GAMES = 8;
 export const PLAYOFF_WINS = 6; // wins needed to be champions
 
 export const TEAMS = [
-  { id: 'rookies', name: 'Sandlot Rookies', level: 0, scout: 0.2, def: ['fb-4-3-over', 'fb-3-4'] },
-  { id: 'mudhens', name: 'Mudflat Mudhens', level: 0, scout: 0.3, def: ['fb-cover-3', 'fb-4-3-over'] },
-  { id: 'gators', name: 'Bayou Gators', level: 1, scout: 0.4, def: ['fb-cover-2', 'fb-4-3-under', 'fb-tampa-2'] },
-  { id: 'foxes', name: 'Ridge Foxes', level: 1, scout: 0.5, def: ['fb-dime', 'fb-cover-3', 'fb-3-4'] },
-  { id: 'titans', name: 'Iron Titans', level: 1, scout: 0.6, def: ['fb-4-3-under', 'fb-cover-2', 'fb-prevent'] },
-  { id: 'vipers', name: 'Neon Vipers', level: 2, scout: 0.7, def: ['fb-dime', 'fb-tampa-2', 'fb-cover-3'] },
-  { id: 'wolves', name: 'Blackout Wolves', level: 2, scout: 0.8, def: ['fb-prevent', 'fb-dime', 'fb-4-3-under'] },
-  { id: 'kings', name: 'Grid Kings', level: 2, scout: 0.9, def: ['fb-dime', 'fb-prevent', 'fb-cover-2', 'fb-tampa-2'] },
+  { id: 'rookies', style: 'run', name: 'Sandlot Rookies', level: 0, scout: 0.2, def: ['fb-4-3-over', 'fb-3-4'] },
+  { id: 'mudhens', style: 'short', name: 'Mudflat Mudhens', level: 0, scout: 0.3, def: ['fb-cover-3', 'fb-4-3-over'] },
+  { id: 'gators', style: 'mid', name: 'Bayou Gators', level: 1, scout: 0.4, def: ['fb-cover-2', 'fb-4-3-under', 'fb-tampa-2'] },
+  { id: 'foxes', style: 'deep', name: 'Ridge Foxes', level: 1, scout: 0.5, def: ['fb-dime', 'fb-cover-3', 'fb-3-4'] },
+  { id: 'titans', style: 'run', name: 'Iron Titans', level: 1, scout: 0.6, def: ['fb-4-3-under', 'fb-cover-2', 'fb-prevent'] },
+  { id: 'vipers', style: 'mid', name: 'Neon Vipers', level: 2, scout: 0.7, def: ['fb-dime', 'fb-tampa-2', 'fb-cover-3'] },
+  { id: 'wolves', style: 'deep', name: 'Blackout Wolves', level: 2, scout: 0.8, def: ['fb-prevent', 'fb-dime', 'fb-4-3-under'] },
+  { id: 'kings', style: 'mid', name: 'Grid Kings', level: 2, scout: 0.9, def: ['fb-dime', 'fb-prevent', 'fb-cover-2', 'fb-tampa-2'] },
 ];
 
 // Which kinds of play each defence is weakest to, best first (measured by scripts/football-sim.mjs).
@@ -41,24 +41,19 @@ export const nextTeam = (s) => TEAMS[Math.min(s.week, TEAMS.length - 1)];
 export const drivePoints = (d) => (d.over === 'td' ? 7 : (d.over === 'downs' || d.over === 'clock') && d.spot >= 60 ? 3 : 0);
 export const driveNote = (d) => (d.over === 'td' ? 'Touchdown' : drivePoints(d) === 3 ? 'Field goal' : d.over === 'int' ? 'Intercepted' : 'Turned it over on downs');
 
-// The opponent's drive against the defence you called. A better team reads your defence's weak spot more often,
-// and a defence you keep repeating is read better still.
+// The opponent's drive against the defence you called. Each team has a favourite kind of play (its style); a defence
+// that is weak to that style gives up more, a strong one less, and a defence you keep repeating gets read better.
+// (Calibrated so a level-0 team scores about 4 a game, level 1 about 7 and level 2 about 10.)
 export function botDrive(seed, team, defId, repeats = 0) {
   const rng = createRng(seed);
-  const def = DEFENCES.find((d) => d.id === defId) || DEFENCES[0];
-  const sharp = Math.min(0.95, [0.05, 0.45, 0.7][team.level] + 0.12 * repeats);
-  let s = newDrive();
-  const pick = (a) => a[Math.floor(rng() * a.length)];
-  while (!s.over) {
-    const order = WEAK[def.id];
-    const cls = rng() < sharp ? (rng() < 0.75 ? order[0] : order[1]) : pick(['run', 'short', 'mid', 'deep']);
-    const off = pick(OFFENCES);
-    let call;
-    if (cls === 'run') call = { off: off.id, kind: 'run', lane: Math.floor(rng() * RUN_LANES.length) };
-    else { const rs = receiversOf(off); call = { off: off.id, kind: 'pass', target: Math.floor(rng() * rs.length), depth: cls }; }
-    s = advance(s, resolvePlay(call, def, rng));
-  }
-  return s;
+  const order = WEAK[defId] || WEAK['fb-cover-3'];
+  const fit = [1.35, 1.0, 0.75, 0.55][Math.max(0, order.indexOf(team.style))];
+  const td = Math.min(0.7, [0.1, 0.17, 0.25][team.level] * fit * (1 + 0.15 * repeats));
+  const fg = Math.min(0.3, td * 0.8);
+  const r = rng();
+  if (r < td) return { over: 'td', spot: DRIVE.goal };
+  if (r < td + fg) return { over: 'downs', spot: 62 };
+  return { over: rng() < 0.3 ? 'int' : 'downs', spot: 40 };
 }
 
 // The defence the opponent shows against one of your plays: mostly its own favourites, and it dials up the counter

@@ -19,7 +19,7 @@ export const DRIVE = {
   goal: 100,
   firstDown: 10,
   downs: 4,
-  maxPlays: 16,
+  maxPlays: 10,
 };
 
 // Tunable feel (balanced by scripts/football-sim.mjs).

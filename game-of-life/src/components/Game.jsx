@@ -10,6 +10,7 @@ import { createRng } from '../engine/rng.js';
 const ordinal = (n) => ['', '1st', '2nd', '3rd', '4th'][n];
 const spotText = (s) => (s >= DRIVE.goal ? 'Goal' : s <= 50 ? `Own ${s}` : `Opp ${DRIVE.goal - s}`);
 const classOf = (r) => (r.kind === 'run' ? 'run' : r.yards > 14 ? 'deep' : r.yards > 7 ? 'mid' : 'short');
+const STYLE_TEXT = { run: 'run the ball', short: 'throw short', mid: 'throw over the middle', deep: 'go deep' };
 const strongVs = (id) => WEAK[id][WEAK[id].length - 1];
 const weakVs = (id) => WEAK[id][0];
 
@@ -109,7 +110,7 @@ export default function Game({ season, onSeason, onExit }) {
           ) : (
             <>
               <h3>Week {cur.week + 1}: {team.name}</h3>
-              <p className="note">Record {rec.wins}-{rec.losses}{rec.ties ? `-${rec.ties}` : ''}. {team.level === 0 ? 'A friendly start.' : team.level === 1 ? 'A real test.' : 'The best in the league.'} They usually line up in {team.def.map((id) => defenceById(id).name).join(', ')}.</p>
+              <p className="note">Record {rec.wins}-{rec.losses}{rec.ties ? `-${rec.ties}` : ''}. {team.level === 0 ? 'A friendly start.' : team.level === 1 ? 'A real test.' : 'The best in the league.'} They love to {STYLE_TEXT[team.style]}, and they usually line up in {team.def.map((id) => defenceById(id).name).join(', ')}.</p>
               <button className="lock" onClick={() => setStage('plan')}>Play week {cur.week + 1}</button>
             </>
           )}
