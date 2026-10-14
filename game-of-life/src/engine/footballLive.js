@@ -69,6 +69,8 @@ function stepGlider(cells, coverGrid) {
   return cellsOf(stepMulti(g), TEAM.BALL);
 }
 
+const inBounds0 = (cells) => cells.filter(([x, y]) => x >= 0 && y >= 0 && x < COLS && y < ROWS);
+
 export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tune = TUNE }) {
   const defPlayers = def.players.filter((p) => p.role !== 'RS');
   const front = placeFormation({ players: defPlayers.filter((p) => p.role === 'DL') }, 2);
@@ -84,8 +86,11 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
   let FG = new Uint8Array(SIZE); put(FG, line, 1); put(FG, front, 2);
   let W = new Uint8Array(SIZE); put(W, cover, TEAM.COVER);
   let glider = []; // the ball in the air, or the runner
-  const recv = kind === 'pass' ? off.receivers.map((r, i) => ({ i, id: RECV0 + i, ...r, alive: true, x: 0, y: 0 })) : [];
+  // every play lines up the same way: linemen, quarterback, the receivers and a back, so a run and a pass out of one
+  // formation look alike before the snap (the back is a decoy on a pass, the receivers are decoys on a run)
+  const recv = off.receivers.map((r, i) => ({ i, id: RECV0 + i, ...r, alive: true, x: 0, y: 0 }));
   recv.forEach((r) => put(W, placeObject(getObject('lwss'), 1, { depth: r.depth, lat: r.lat }), r.id));
+  let back = inBounds0(placeObject(getObject('glider'), 1, { depth: 5, lat: lane, flip: lane > 0 }).map((c) => [c.x, c.y]));
   const refresh = () => {
     for (const r of recv) {
       const cs = cellsOf(W, r.id);
@@ -99,6 +104,7 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
   p.grids = () => {
     const D = new Uint8Array(W);
     for (const [x, y] of glider) D[y * COLS + x] = TEAM.BALL;
+    for (const [x, y] of back) D[y * COLS + x] = TEAM.BALL;
     return { FG, W: D };
   };
   p.receivers = recv;
@@ -156,12 +162,13 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
           const bc = centroid(glider);
           // a ball that has left the field, settled into a still life against the edge, or flown too long is thrown away
           if (bc) { trail.push(bc); }
-          const stalled = trail.length > 14 && Math.hypot(bc[0] - trail[trail.length - 15][0], bc[1] - trail[trail.length - 15][1]) < 2;
+          const stalled = !!bc && trail.length > 14 && Math.hypot(bc[0] - trail[trail.length - 15][0], bc[1] - trail[trail.length - 15][1]) < 2;
           // a glider that hit something and is now a still life or a blob is dead: it is no longer flying
           if (!bc || glider.length < 4 || glider.length > 9 || stalled) { glider = []; ballDied = true; }
           else if (bc[0] > 68 || bc[1] < 9 || bc[1] > 51 || p.tick - ballFired > 110) { glider = []; ballDied = true; offField = true; }
         }
       }
+      back = inBounds(stepGlider(back, coverNow));
       W = stepMulti(W);
       refresh();
       if (ballDied && p.caught === null) {
@@ -183,7 +190,7 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
     };
   } else {
     // a run: the carrier is a glider behind the line; only the coverage (linebackers, corners, safeties) can stop it
-    glider = inBounds(placeObject(getObject('glider'), 1, { depth: 5, lat: lane, flip: lane > 0 }).map((c) => [c.x, c.y]));
+    glider = back; back = []; // the runner is the back; the receivers run decoy routes
     let best = Math.max(...glider.map(([x]) => x));
     p.step = () => {
       if (p.phase !== 'live') return;
@@ -191,6 +198,7 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
       FG = stepMulti(FG);
       glider = inBounds(stepGlider(glider, W));
       W = stepMulti(W);
+      refresh();
       if (glider.length >= 3) best = Math.max(best, ...glider.map(([x]) => x));
       p.progressX = best;
       p.live = Math.round(Math.max(0, Math.min(tune.runMax, best - BLUE_LOS_X)) * tune.yardsPerCell);

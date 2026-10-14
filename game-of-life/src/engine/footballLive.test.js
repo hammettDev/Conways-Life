@@ -109,3 +109,28 @@ describe('offensive formations', () => {
     }
   });
 });
+
+describe('a run and a pass look the same before the snap', () => {
+  it('every formation lines up identically for both', () => {
+    for (const o of LIVE_OFFENCES) {
+      for (const lane of [-12, 0, 12]) {
+        const a = createLivePlay({ off: o, def: DEFENCES[0], kind: 'pass', lane, rng: createRng(1) }).grids();
+        const b = createLivePlay({ off: o, def: DEFENCES[0], kind: 'run', lane, rng: createRng(1) }).grids();
+        expect(Array.from(b.FG), `${o.id} line`).toEqual(Array.from(a.FG));
+        expect(Array.from(b.W), `${o.id} field`).toEqual(Array.from(a.W));
+      }
+    }
+  });
+});
+
+describe('a ball killed by coverage on a long flight never crashes', () => {
+  it('throws at every receiver into a thick defence without an error', () => {
+    const thick = DEFENCES.find((d) => d.id === 'fb-dime');
+    for (const o of LIVE_OFFENCES) for (let r = 0; r < o.receivers.length; r++) {
+      const p = createLivePlay({ off: o, def: thick, kind: 'pass', rng: createRng(3) });
+      p.start(); let fired = false;
+      for (let i = 0; i < 300 && p.phase !== 'done'; i++) { if (!fired) { const a = p.aim(r); if (a.wait !== null && a.wait <= 0.5) fired = p.throwTo(r); } p.step(); }
+      expect(p.phase).toBe('done');
+    }
+  });
+});

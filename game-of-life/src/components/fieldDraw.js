@@ -100,13 +100,16 @@ export function drawField(ctx, view) {
     ctx.strokeStyle = '#4dff9a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
     label(`+${Math.round((play.progressX - BLUE_LOS_X) * CELL_YARDS)} yds`, px - 4, H - 10, '#4dff9a', 'bold 13px system-ui', 'right', 'middle');
   }
+  // the same picture for every play out of a formation: numbered receivers, the quarterback and the back
+  play.receivers.forEach((r, i) => {
+    if (!r.alive) return;
+    const u = (r.x - X0 + 0.5) * TILE; const v = (r.y - Y0 - 3.2) * TILE;
+    label(String(i + 1), u, v, i === sel ? '#ffffff' : 'rgba(255,255,255,0.65)', 'bold 14px system-ui');
+    if (i === sel && play.kind === 'pass') { ctx.strokeStyle = RECV_COLOR[i % RECV_COLOR.length]; ctx.lineWidth = 2; ctx.strokeRect((r.x - X0 - 3) * TILE, (r.y - Y0 - 2.5) * TILE, 8 * TILE, 6 * TILE); }
+  });
+  label('QB', (play.qb.x - X0 + 0.5) * TILE, (play.qb.y - Y0 + 3) * TILE, '#ffffff', 'bold 11px system-ui');
+  if (play.phase === 'snap') label('RB', (BLUE_LOS_X - 5 - X0 + 0.5) * TILE, (CENTER_Y + (play.lane || 0) - Y0 + 4.5) * TILE, 'rgba(255,255,255,0.75)', 'bold 11px system-ui');
   if (play.kind === 'pass') {
-    play.receivers.forEach((r, i) => {
-      if (!r.alive) return;
-      const u = (r.x - X0 + 0.5) * TILE; const v = (r.y - Y0 - 3.2) * TILE;
-      label(String(i + 1), u, v, i === sel ? '#ffffff' : 'rgba(255,255,255,0.65)', 'bold 14px system-ui');
-      if (i === sel) { ctx.strokeStyle = RECV_COLOR[i % RECV_COLOR.length]; ctx.lineWidth = 2; ctx.strokeRect((r.x - X0 - 3) * TILE, (r.y - Y0 - 2.5) * TILE, 8 * TILE, 6 * TILE); }
-    });
     const r = play.receivers[sel];
     if (r && r.alive && play.caught === null && play.phase !== 'done') {
       const a = play.aim(sel);
@@ -119,8 +122,5 @@ export function drawField(ctx, view) {
         ctx.beginPath(); ctx.moveTo((qx - X0 + 0.5) * TILE, (qy - Y0 + 0.5) * TILE); ctx.lineTo((qx + a.d - X0 + 0.5) * TILE, (qy + dir * a.d - Y0 + 0.5) * TILE); ctx.stroke(); ctx.setLineDash([]);
       }
     }
-    label('QB', (play.qb.x - X0 + 0.5) * TILE, (play.qb.y - Y0 + 3) * TILE, '#ffffff', 'bold 11px system-ui');
-  } else if (play.phase === 'snap') {
-    label('RUNNER', (play.qb.x - X0 + 0.5) * TILE, (play.qb.y - Y0 + 3) * TILE, '#ffffff', 'bold 11px system-ui');
   }
 }

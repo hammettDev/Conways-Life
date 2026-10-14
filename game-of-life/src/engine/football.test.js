@@ -43,15 +43,15 @@ describe('football drive', () => {
   });
 
   describe('the drive', () => {
-    it('starts at the 30, 1st and 10', () => {
+    it('starts at the 30, 1st and 20 (a first down is 20 yards)', () => {
       const s = newDrive();
-      expect([s.down, s.toGo, s.spot]).toEqual([1, 10, DRIVE.startSpot]);
+      expect([s.down, s.toGo, s.spot]).toEqual([1, DRIVE.firstDown, DRIVE.startSpot]);
     });
     it('a first down resets the downs; a short gain moves to the next down', () => {
       const s = advance(newDrive(), { kind: 'run', yards: 3, note: '' });
-      expect([s.down, s.toGo, s.spot]).toEqual([2, 7, DRIVE.startSpot + 3]);
-      const t = advance(s, { kind: 'complete', yards: 8, note: '' });
-      expect([t.down, t.toGo]).toEqual([1, 10]);
+      expect([s.down, s.toGo, s.spot]).toEqual([2, DRIVE.firstDown - 3, DRIVE.startSpot + 3]);
+      const t = advance(s, { kind: 'complete', yards: DRIVE.firstDown, note: '' });
+      expect([t.down, t.toGo]).toEqual([1, DRIVE.firstDown]);
     });
     it('ends on a touchdown, an interception or turnover on downs', () => {
       expect(advance({ ...newDrive(), spot: 90 }, { kind: 'complete', yards: 15, note: '' }).over).toBe('td');

@@ -17,9 +17,9 @@ const SIZE = COLS * ROWS;
 export const DRIVE = {
   startSpot: 30,      // yards from your own goal line
   goal: 100,
-  firstDown: 10,
+  firstDown: 20,
   downs: 4,
-  maxPlays: 12,
+  maxPlays: 14,
 };
 
 // Tunable feel (balanced by scripts/football-sim.mjs).
