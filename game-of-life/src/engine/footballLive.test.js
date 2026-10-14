@@ -62,3 +62,19 @@ describe('plays always end', () => {
     expect(p.phase).toBe('done');
   });
 });
+
+describe('a ball that stops flying ends the play quickly', () => {
+  it('a thrown ball into a wall of coverage finishes well inside the flight limit', () => {
+    const wall = { id: 'wall', name: 'Wall', players: [-12, -8, -4, 0, 4, 8, 12].map((lat) => ({ role: 'LB', shape: 'block', depth: -3, lat })) };
+    for (let r = 0; r < LIVE_OFFENCES[0].receivers.length; r++) {
+      const p = createLivePlay({ off: LIVE_OFFENCES[0], def: wall, kind: 'pass', rng: createRng(r + 1) });
+      p.start();
+      for (let i = 0; i < 3; i++) p.step();
+      p.throwTo(r);
+      let ticks = 0;
+      while (p.phase !== 'done' && ticks < 300) { p.step(); ticks++; }
+      expect(p.phase).toBe('done');
+      expect(ticks).toBeLessThan(120);
+    }
+  });
+});

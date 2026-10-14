@@ -115,6 +115,7 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
   if (kind === 'pass') {
     let maxCatch = -1;
     let ballFired = -1;
+    const trail = []; // where the ball has been, to spot one that has stopped moving
     p.ball = () => (glider.length ? centroid(glider) : null);
 
     // When must the quarterback fire at receiver i? Ticks from now (0 = fire now), and whether it can still connect.
@@ -132,7 +133,7 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
       if (p.phase !== 'live' || glider.length || p.caught !== null) return false;
       const r = recv[i]; if (!r || !r.alive) return false;
       glider = spawnGlider(r.y < qbC[1], Math.round(qbC[0]) + 2, Math.round(qbC[1]));
-      ballFired = p.tick; p.target = i; p.throwTick = p.tick;
+      ballFired = p.tick; p.target = i; p.throwTick = p.tick; trail.length = 0;
       return true;
     };
 
@@ -154,7 +155,10 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
           glider = inBounds(stepGlider(glider, coverNow));
           const bc = centroid(glider);
           // a ball that has left the field, settled into a still life against the edge, or flown too long is thrown away
-          if (!bc || glider.length < 4) { glider = []; ballDied = true; }
+          if (bc) { trail.push(bc); }
+          const stalled = trail.length > 14 && Math.hypot(bc[0] - trail[trail.length - 15][0], bc[1] - trail[trail.length - 15][1]) < 2;
+          // a glider that hit something and is now a still life or a blob is dead: it is no longer flying
+          if (!bc || glider.length < 4 || glider.length > 9 || stalled) { glider = []; ballDied = true; }
           else if (bc[0] > 68 || bc[1] < 9 || bc[1] > 51 || p.tick - ballFired > 110) { glider = []; ballDied = true; offField = true; }
         }
       }
