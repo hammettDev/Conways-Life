@@ -401,3 +401,5 @@ body {
   .placebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: rgba(9, 23, 15, 0.97); border-top: 1px solid var(--edge); display: flex; gap: 12px; align-items: center; }
   .placebar .armcancel { margin: 0; }
 }
+/* thumb reach: the nudge pad sits at the bottom right, Done / Re-place on the left */
+.placebar:has(.nudgepad) { flex-direction: row-reverse; justify-content: space-between; }

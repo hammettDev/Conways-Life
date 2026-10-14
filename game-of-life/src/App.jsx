@@ -261,7 +261,7 @@ export default function App() {
     const { selected: sel, obj: o, drop: d } = live.current;
     if (!sel || !o || !d) return;
     const dd = rotatedNow()
-      ? { depth: d.depth - sy, lat: d.lat + sx }
+      ? { depth: d.depth + sy, lat: d.lat + sx }
       : { depth: d.depth - sx, lat: d.lat + sy };
     if (placementOk(sel, o, dd)) { setDrop(dd); setNotice(''); } else setNotice('Not there: keep it on your half, off your formation.');
   };
