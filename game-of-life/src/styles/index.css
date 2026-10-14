@@ -367,11 +367,6 @@ body {
   .scorebar { padding-left: 30px; padding-right: 30px; }
   .scorebar:has(.side.green) { padding-left: 16px; padding-right: 16px; gap: 12px; }
 }
-/* the 4-player board is tall and narrow; its score bar breaks out to the full screen width so all four seats fit */
-@media (max-width: 1099px) {
-  .scorebar:has(.side.green) { width: min(100vw - 12px, 560px); position: relative; left: 50%; transform: translateX(-50%); box-sizing: border-box; }
-  .scorebar:has(.side.green) .mid { min-width: 0; }
-}
 
 /* placing a piece: the side panels fold away and the arena takes the room, so the drop is easy to aim */
 .armcancel { display: block; width: 100%; margin: 0 0 6px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--hot, #ffb02e); background: rgba(255, 176, 46, 0.14); color: var(--text); font-weight: 700; cursor: pointer; }
@@ -413,4 +408,22 @@ body {
 @media (min-width: 640px) and (max-width: 1099px) {
   body:has(.layout[data-armed]) .top, .layout[data-armed] .scorebar, .layout[data-armed] .coach { display: none; }
   .layout[data-armed] .table { width: min(100%, calc((100dvh - 190px) * var(--aspect))) !important; }
+}
+
+/* 4-player on small screens: the bar stays as wide as the arena; four seats in a row, the status line under them */
+@media (max-width: 1099px) {
+  .scorebar:has(.side.green) { grid-template-columns: repeat(4, 1fr); grid-template-rows: auto auto; align-content: center; row-gap: 4px; column-gap: 4px; height: 92px; padding: 6px 10px; }
+  .scorebar:has(.side.green) .side { min-width: 0; }
+  .scorebar:has(.side.green) .side.blue { grid-column: 1; grid-row: 1; }
+  .scorebar:has(.side.green) .side.red { grid-column: 2; grid-row: 1; }
+  .scorebar:has(.side.green) .side.green { grid-column: 3; grid-row: 1; }
+  .scorebar:has(.side.green) .side.violet { grid-column: 4; grid-row: 1; }
+  .scorebar:has(.side.green) .mid { grid-column: 1 / -1; grid-row: 2; min-height: 0; }
+  .scorebar:has(.side.green) .mid p { font-size: 0.7rem; line-height: 1.15; }
+  .scorebar:has(.side.green) i { font-size: 0.6rem; letter-spacing: 0.06em; }
+}
+@media (max-width: 639px) {
+  /* the tall 4-player board gets a usable width (the page scrolls to it instead of pinning it) */
+  .layout:has(.side.green) .stage { position: static; }
+  .layout:has(.side.green) .table { width: min(100%, 300px) !important; }
 }
