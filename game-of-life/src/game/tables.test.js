@@ -29,8 +29,9 @@ describe('stakes tables', () => {
   });
   it('charge a fee and cap what you can bet by what you can cover', () => {
     const t = getTable('regular');
-    expect(feeFor(t, 5000)).toBe(100);
-    expect(maxBetFor(t, 5100, 0)).toBe(5000);
+    expect(feeFor(t, 5000)).toBe(Math.round(5000 * t.fee));
+    expect(maxBetFor(t, 5050, 0)).toBe(5000); // $5,000 plus its 1% fee
+    expect(maxBetFor(t, 5049, 0)).toBeLessThan(5000);
     expect(maxBetFor(t, 1e9, 0)).toBe(t.max);
     expect(betStep(TABLES[0])).toBe(10);
     expect(betStep(TABLES[4])).toBe(100000);
