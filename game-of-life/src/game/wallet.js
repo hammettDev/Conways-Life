@@ -10,6 +10,7 @@ export const newSave = () => ({
   v: SAVE_VERSION,
   balance: STARTING_WALLET,
   tutorialDone: true,
+  boss: { wins: 0, beaten: [], last: null },
   bailouts: 0,
   stats: { played: 0, wins: 0, losses: 0, pushes: 0, streak: 0, bestStreak: 0 },
 });
@@ -20,6 +21,21 @@ export const newPlayerSave = () => ({ ...newSave(), balance: TUTORIAL_BANKROLL, 
 
 export function finishTutorial(save) {
   return { ...save, tutorialDone: true, balance: Math.max(save.balance, STARTING_WALLET) };
+}
+
+// Boss progress: wins since the last boss fight, the bosses beaten, and the
+// formation used last match (some bosses counter-pick it).
+export const noteFormation = (save, id) => ({ ...save, boss: { ...save.boss, last: id } });
+
+export function noteResult(save, outcome, bossId = null) {
+  const boss = { ...save.boss };
+  if (bossId) {
+    boss.wins = 0;
+    if (outcome === 'win' && !boss.beaten.includes(bossId)) boss.beaten = [...boss.beaten, bossId];
+  } else if (outcome === 'win') {
+    boss.wins = Math.min(boss.wins + 1, 99);
+  }
+  return { ...save, boss };
 }
 
 export const canAfford = (save, cost) => save.balance >= cost;

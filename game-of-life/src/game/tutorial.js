@@ -35,7 +35,7 @@ export const STEPS = {
   },
   wrap: {
     title: 'That is the game',
-    text: 'Your first bet paid out and your wallet is now $300. Pick formations that counter the bot, spend on pieces and audibles wisely, and keep your bankroll alive.',
+    text: 'Your first bet paid out and your wallet is now $300. Raise or lower your bet before each match, spend on pieces and audibles wisely, and win three matches to unlock a boss fight with a hidden x2 to x20 payout.',
     next: 'Start playing',
   },
 };

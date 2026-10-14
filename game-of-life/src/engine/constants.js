@@ -20,8 +20,12 @@ export const TUTORIAL_BANKROLL = 250;
 export const TUTORIAL_STAKE = 50;
 export const STARTING_WALLET = 300;
 
-// Beating a boss pays this many times the wager (losing still costs one wager).
+// Beating a boss pays the wager times a hidden multiplier rolled when you win
+// (losing still costs one wager). BOSS_PAYOUT is roughly the average of the table below.
 export const BOSS_PAYOUT = 5;
+export const BOSS_UNLOCK_WINS = 3; // wins since your last boss fight before the next challenge opens
+// [multiplier, weight]: mostly small, with a long tail. Mean is about 4.8.
+export const BOSS_MULTIPLIERS = [[2, 30], [3, 25], [5, 20], [7, 12], [10, 8], [15, 3], [20, 2]];
 
 export const DEAD = 0;
 export const BLUE = 1;

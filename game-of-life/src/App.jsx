@@ -17,8 +17,13 @@ import { createPitDisplay, pitLead } from './render/pitDisplay.js';
 import { loadSave, persistSave, exportCode, importCode } from './game/saveStore.js';
 import {
   placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout, finishTutorial,
+  noteFormation, noteResult,
 } from './game/wallet.js';
+import {
+  BOSSES, getBoss, unlockedBosses, bossReady, winsToBoss, pickBossSetup, rollMultiplier,
+} from './game/bosses.js';
 import { STEPS, stepFor } from './game/tutorial.js';
+import BossReveal from './components/BossReveal.jsx';
 import { botAnswers, counterFor } from './game/audible.js';
 
 const TICKS_PER_SECOND = 6; // at 1x
@@ -76,6 +81,8 @@ export default function App() {
   const obj = objectId ? getObject(objectId) : null;
   const tutorial = !save.tutorialDone;           // the guided first match: fixed stake, free pieces and audible
   const [tStep, setTStep] = useState('pick');
+  const [bossId, setBossId] = useState(null);       // the boss you are challenging this match
+  const [bossMult, setBossMult] = useState(null);   // the hidden payout, revealed after a win
   const [betPref, setBetPref] = useState(WAGER);
   const pieceCost = obj && !tutorial ? obj.price : 0;
   const maxBet = Math.max(MIN_BET, save.balance - pieceCost);   // up to everything left after the piece
@@ -92,6 +99,7 @@ export default function App() {
   const lastCrashId = useRef(0);
   const escrowRef = useRef(0);
   const wagerRef = useRef(WAGER);
+  const bossRef = useRef(null);
   const seedRef = useRef(1);
   const botRef = useRef(null);
   const botPendingRef = useRef(null);
@@ -185,13 +193,18 @@ export default function App() {
     const held = placeBet(save, cost);
     if (!held) return;
     sfx.play('lockIn');
-    setSave(held);
+    setSave(noteFormation(held, selected.id));
     escrowRef.current = cost;
     wagerRef.current = wager;
     settledRef.current = false;
     const seed = randomSeed();
     seedRef.current = seed;
-    const bot = pickBotSetup(createRng(seed), tutorial && TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS);
+    const boss = !tutorial && bossId ? getBoss(bossId) : null;
+    bossRef.current = boss;
+    setBossMult(null);
+    const bot = boss
+      ? pickBossSetup(boss, createRng(seed), save.boss.last)
+      : pickBotSetup(createRng(seed), tutorial && TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS);
     botRef.current = bot;
     botPendingRef.current = null;
     startEngine(blueCells(selected, obj, drop), bot.cells, seed);
@@ -217,7 +230,7 @@ export default function App() {
     const next = findBuild(audibleChoice);
     const paid = spend(save, audiblePrice);
     if (!next || !paid) return;
-    setSave(paid);
+    setSave(noteFormation(paid, next.id));
     setAudibleUsed(true);
     setSelectedId(next.id);
     // The bot may answer with its own audible, kept hidden until the snap.
@@ -225,7 +238,7 @@ export default function App() {
     const rng = createRng(seed ^ 0x9e3779b9);
     let bot = botRef.current;
     botPendingRef.current = null;
-    if (!tutorial && botAnswers(rng)) {
+    if (!tutorial && botAnswers(rng, bossRef.current ? bossRef.current.audible : undefined)) {
       const c = counterFor(next.id, FREE_BUILDS, rng);
       const flip = rng() < 0.5;
       bot = { formation: c, flip, cells: placeFormation(c, RED, { flip }) };
@@ -251,6 +264,7 @@ export default function App() {
     setResult(null);
     setHud(null);
     setObjectId(null);   // the piece was used up
+    setBossId(null);
     setDrop(null);
     setArmed(false);
     setNotice('');
@@ -316,7 +330,12 @@ export default function App() {
             settledRef.current = true;
             const w = wagerRef.current;
             // the tutorial bet is insured: it pays as a win whatever the board said
-            setSave((s) => settle(s, live.current.tutorial ? 'win' : r.outcome, w));
+            const boss = bossRef.current;
+            const mult = boss && r.outcome === 'win' ? rollMultiplier(Math.random) : 1;
+            if (boss && r.outcome === 'win') setBossMult(mult);
+            setSave((s) => (live.current.tutorial
+              ? settle(s, 'win', w)
+              : noteResult(settle(s, r.outcome, w, mult), r.outcome, boss ? boss.id : null)));
           }
         }
       }
@@ -333,14 +352,15 @@ export default function App() {
   const lockHint = !drafting ? '' : !selected ? 'Choose a formation.'
     : obj && !drop ? 'Place your piece on the board first.'
       : !afford ? 'Not enough cash for this bet.' : '';
-  const lockLabel = drafting ? `Lock In · ${money(cost)}` : 'Locked in';
+  const challenger = !tutorial && bossId ? getBoss(bossId) : null;
+  const lockLabel = drafting ? `${challenger ? `Challenge ${challenger.name}` : 'Lock In'} · ${money(cost)}` : 'Locked in';
   const audibleBuild = findBuild(audibleChoice);
   const canAudible = Boolean(audibleBuild) && audibleBuild.id !== selectedId && canAfford(save, audiblePrice);
 
   const live2 = hud || { tick: 0, blue: 0, red: 0, crashes: 0, pitBlue: 0, pitRed: 0 };
   const TABLE = tableSize(madden);
   const verdict = result && (tutorial ? 'Insured win' : { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome]);
-  const net = result && (tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(wagerRef.current)}` : result.outcome === 'lose' ? `−${money(wagerRef.current)}` : 'bet returned');
+  const net = result && (tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(wagerRef.current * (bossMult || 1))}` : result.outcome === 'lose' ? `−${money(wagerRef.current)}` : 'bet returned');
 
   return (
     <div className={tutorial ? "app tutorial" : "app"}>
@@ -380,7 +400,7 @@ export default function App() {
             <section className="scorebar">
               <div className="side blue"><span className="num">{phase === 'done' && result ? result.score.blue : live2.blue}</span><i>you</i></div>
               <div className="mid">
-                {drafting && <p>{notice || (selected ? <>Previewing <b>{selected.name}</b>. Lock In to bet {money(cost)}.</> : 'Choose a formation from the sidebar.')}</p>}
+                {drafting && <p>{notice || (selected ? <>Previewing <b>{selected.name}</b>. {challenger ? <>Boss fight: <b>{challenger.name}</b>, hidden payout. </> : null}Lock In to bet {money(cost)}.</> : 'Choose a formation from the sidebar.')}</p>}
                 {phase === 'locked' && (
                   <>
                     <p><b>{selected && selected.name}</b> vs <b className="red">{botName}</b></p>
@@ -406,7 +426,7 @@ export default function App() {
                       <span className={`verdict ${tutorial ? 'win' : result.outcome}`}>{verdict}</span>
                     </div>
                     <p className="note">
-                      {net} · pit {result.fortune.blue}–{result.fortune.red}
+                      {bossMult ? <><BossReveal value={bossMult} /> boss payout · </> : null}{net} · pit {result.fortune.blue}–{result.fortune.red}
                       {result.tileOutcome !== result.outcome && <b> · pit decided it</b>}
                     </p>
                   </>
@@ -435,6 +455,8 @@ export default function App() {
           audibleChoiceId={audibleChoice} canAudible={canAudible}
           audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${tutorial ? 'free' : money(AUDIBLE_PRICE)}` : 'Pick a formation'}
           onAudibleConfirm={confirmAudible}
+          bosses={tutorial ? null : { list: unlockedBosses(save), all: BOSSES, ready: bossReady(save), toGo: winsToBoss(save), beaten: save.boss.beaten, selected: bossId }}
+          onBoss={(id) => setBossId(id)}
           onNewMatch={newMatch} onSnap={snap} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(AUDIBLE_PRICE)}

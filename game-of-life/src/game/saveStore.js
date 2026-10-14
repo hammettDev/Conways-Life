@@ -19,6 +19,16 @@ const b64 = {
   dec: (s) => (typeof atob === 'function' ? atob(s) : Buffer.from(s, 'base64').toString('binary')),
 };
 
+function sanitizeBoss(b) {
+  const x = b && typeof b === 'object' ? b : {};
+  const beaten = Array.isArray(x.beaten) ? x.beaten.filter((id) => typeof id === 'string').slice(0, 20) : [];
+  return {
+    wins: Number.isFinite(x.wins) && x.wins >= 0 ? Math.min(99, Math.floor(x.wins)) : 0,
+    beaten,
+    last: typeof x.last === 'string' ? x.last : null,
+  };
+}
+
 // Anything that is not a sane save falls back to a fresh one.
 export function sanitize(raw) {
   if (!raw || typeof raw !== 'object' || raw.v !== SAVE_VERSION) return null;
@@ -29,6 +39,7 @@ export function sanitize(raw) {
   return {
     v: SAVE_VERSION,
     tutorialDone: raw.tutorialDone === true || played > 0, // older saves predate the tutorial
+    boss: sanitizeBoss(raw.boss),
     balance: num(raw.balance, fresh.balance),
     bailouts: num(raw.bailouts, 0),
     stats: {

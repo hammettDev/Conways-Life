@@ -174,3 +174,8 @@ body {
 .betrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .betrow span { font-size: 0.9rem; }
 .betrow b { color: var(--accent, #ffb02e); }
+
+.bossitem { flex-direction: column; align-items: flex-start; gap: 2px; }
+.bossitem .meta { white-space: normal; font-size: 0.75rem; }
+.reel { display: inline-block; min-width: 2.4em; font-weight: 800; color: var(--accent, #ffb02e); }
+.reel.landed { text-shadow: 0 0 10px var(--accent, #ffb02e); }
