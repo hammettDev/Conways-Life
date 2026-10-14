@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createLivePlay, LIVE_OFFENCES } from './footballLive.js';
+import { createLivePlay, LIVE_OFFENCES, RUN_PLAYS } from './footballLive.js';
 import { DEFENCES } from './football.js';
 import { createRng } from './rng.js';
 
@@ -43,7 +43,7 @@ describe('live football physics', () => {
   });
 
   it('a run finishes with a gain or a stuff, and is deterministic', () => {
-    const run = () => { const p = play('run', { lane: 12 }); p.start(); while (p.phase !== 'done') p.step(); return p.result; };
+    const run = () => { const p = play('run', { lane: 4 }); p.start(); while (p.phase !== 'done') p.step(); return p.result; };
     const a = run(); const b = run();
     expect(b).toEqual(a);
     expect(a.kind).toBe('run');
@@ -113,7 +113,7 @@ describe('offensive formations', () => {
 describe('a run and a pass look the same before the snap', () => {
   it('every formation lines up identically for both', () => {
     for (const o of LIVE_OFFENCES) {
-      for (const lane of [-12, 0, 12]) {
+      for (const lane of [0, 1, 2, 3, 4]) {
         const a = createLivePlay({ off: o, def: DEFENCES[0], kind: 'pass', lane, rng: createRng(1) }).grids();
         const b = createLivePlay({ off: o, def: DEFENCES[0], kind: 'run', lane, rng: createRng(1) }).grids();
         expect(Array.from(b.FG), `${o.id} line`).toEqual(Array.from(a.FG));
@@ -132,5 +132,64 @@ describe('a ball killed by coverage on a long flight never crashes', () => {
       for (let i = 0; i < 300 && p.phase !== 'done'; i++) { if (!fired) { const a = p.aim(r); if (a.wait !== null && a.wait <= 0.5) fired = p.throwTo(r); } p.step(); }
       expect(p.phase).toBe('done');
     }
+  });
+});
+
+describe('run plays', () => {
+  it('there are five: outside and inside, left and right, and the dive', () => {
+    expect(RUN_PLAYS.map((r) => r.label)).toEqual(['Outside Left', 'Inside Left', 'Middle Dive', 'Inside Right', 'Outside Right']);
+    // they line up left to right
+    for (let i = 1; i < RUN_PLAYS.length; i++) expect(RUN_PLAYS[i].lat).toBeGreaterThan(RUN_PLAYS[i - 1].lat);
+  });
+  it('the back lines up where the play says: left runs start left of centre, right runs right', () => {
+    const open = { id: 'open', name: 'Open', players: [] };
+    const startY = (lane) => { const g = createLivePlay({ off: LIVE_OFFENCES[0], def: open, kind: 'run', lane, rng: createRng(1) }).grids().W; let sy = 0; let n = 0; for (let k = 0; k < g.length; k++) if (g[k] === 9) { sy += Math.floor(k / 80); n++; } return sy / n; };
+    const ys = [0, 1, 2, 3, 4].map(startY);
+    for (let i = 1; i < ys.length; i++) expect(ys[i]).toBeGreaterThan(ys[i - 1]);
+    expect(ys[0]).toBeLessThan(25); expect(ys[4]).toBeGreaterThan(35);
+  });
+  it('the runner really goes the way the play says', () => {
+    const open = { id: 'open', name: 'Open', players: [] };
+    const drift = (lane) => {
+      const p = createLivePlay({ off: LIVE_OFFENCES[0], def: open, kind: 'run', lane, rng: createRng(1) });
+      const y0 = (() => { const g = p.grids().W; let sy = 0; let n = 0; for (let k = 0; k < g.length; k++) if (g[k] === 9) { sy += Math.floor(k / 80); n++; } return sy / n; })();
+      p.start();
+      for (let i = 0; i < 10; i++) p.step();
+      let sy = 0; let n = 0; const g = p.grids().W; for (let k = 0; k < g.length; k++) if (g[k] === 9) { sy += Math.floor(k / 80); n++; }
+      return n ? sy / n - y0 : 0;
+    };
+    expect(drift(0)).toBeLessThan(-1.5);  // outside left drifts left (towards smaller y)
+    expect(drift(1)).toBeLessThan(-1.5);
+    expect(drift(3)).toBeGreaterThan(1.5);
+    expect(drift(4)).toBeGreaterThan(1.5); // outside right drifts right
+  });
+});
+
+describe('blitzes', () => {
+  const blitz = (id) => DEFENCES.concat([]).find((d) => d.id === id) || null;
+  it('are defence formations with a spaceship that runs into the backfield', async () => {
+    const { BLITZ_DEFENCES, LIVE_DEFENCES, defenceById } = await import('./football.js');
+    expect(BLITZ_DEFENCES.length).toBeGreaterThanOrEqual(4);
+    for (const b of BLITZ_DEFENCES) {
+      expect(b.players.some((p) => p.role === 'BL')).toBe(true);
+      expect(defenceById(b.id)).toBe(b);
+    }
+    expect(LIVE_DEFENCES.length).toBe(DEFENCES.length + BLITZ_DEFENCES.length);
+  });
+  it('a middle blitz sacks a quarterback who holds the ball, long before the hold limit', async () => {
+    const { defenceById } = await import('./football.js');
+    const p = createLivePlay({ off: LIVE_OFFENCES[0], def: defenceById('fb-mike-blitz'), kind: 'pass', rng: createRng(1) });
+    p.start();
+    let ticks = 0;
+    while (p.phase !== 'done' && ticks < 200) { p.step(); ticks++; }
+    expect(p.result.kind).toBe('sack');
+    expect(p.result.note).toMatch(/blitz/i);
+    expect(ticks).toBeLessThan(40);
+  });
+  it('a blitzer can meet the back in the backfield: some run is stuffed that a normal defence gives up yards on', async () => {
+    const { defenceById } = await import('./football.js');
+    const avg = (lane, def) => { let v = 0; for (const o of LIVE_OFFENCES.slice(0, 4)) { const p = createLivePlay({ off: o, def, kind: 'run', lane, rng: createRng(1) }); p.start(); while (p.phase !== 'done') p.step(); v += p.result.yards; } return v / 4; };
+    expect(avg(1, defenceById('fb-mike-blitz'))).toBeLessThan(1);   // inside left meets the middle blitzer
+    expect(avg(1, defenceById('fb-cover-3'))).toBeGreaterThan(2);
   });
 });

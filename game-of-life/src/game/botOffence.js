@@ -1,7 +1,6 @@
 // The bot's offence for the plays you defend. It calls a formation and a pass or run, and on a pass it picks a receiver
 // and fires the glider; a better team picks a clearer lane and times it better.
-import { LIVE_OFFENCES } from '../engine/footballLive.js';
-import { RUN_LANES } from '../engine/football.js';
+import { LIVE_OFFENCES, RUN_PLAYS } from '../engine/footballLive.js';
 import { COLS, ROWS } from '../engine/constants.js';
 
 const RUN_SHARE = { run: 0.6, short: 0.2, mid: 0.25, deep: 0.2 };
@@ -9,7 +8,7 @@ const RUN_SHARE = { run: 0.6, short: 0.2, mid: 0.25, deep: 0.2 };
 export function botCall(rng, team) {
   const off = LIVE_OFFENCES[Math.floor(rng() * LIVE_OFFENCES.length)];
   const run = rng() < (RUN_SHARE[team.style] ?? 0.25);
-  return { off, kind: run ? 'run' : 'pass', lane: RUN_LANES[Math.floor(rng() * RUN_LANES.length)] };
+  return { off, kind: run ? 'run' : 'pass', lane: Math.floor(rng() * RUN_PLAYS.length) };
 }
 
 // How clear is the glider's path to receiver r? The smallest gap between the path and any coverage cell.

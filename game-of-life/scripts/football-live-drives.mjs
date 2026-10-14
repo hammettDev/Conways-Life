@@ -17,7 +17,7 @@ for (let n = 0; n < N; n++) {
   while (!s.over) {
     const off = pick(LIVE_OFFENCES); const def = defenceById(teamDefence(rng, team, classes));
     const run = policy === 'altmix' ? rng() < 0.25 : rng() < 0.2;
-    const play = createLivePlay({ off, def, kind: run ? 'run' : 'pass', lane: pick([-12, 0, 12]), rng });
+    const play = createLivePlay({ off, def, kind: run ? 'run' : 'pass', lane: Math.floor(rng() * 5), rng });
     play.start();
     let fired = false; let target = null;
     for (let i = 0; i < 200 && play.phase !== 'done'; i++) {

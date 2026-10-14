@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createLivePlay, LIVE_OFFENCES, liveOffenceById } from '../engine/footballLive.js';
-import { RUN_LANES } from '../engine/football.js';
-import { drawField, driveLines, canvasSize, TICK_MS, LANE_LABEL } from './fieldDraw.js';
+import { createLivePlay, LIVE_OFFENCES, liveOffenceById, RUN_PLAYS } from '../engine/footballLive.js';
+import { drawField, driveLines, canvasSize, TICK_MS } from './fieldDraw.js';
 import { inFgRange, fgDistance, fgChance } from '../engine/football.js';
 import { createRng } from '../engine/rng.js';
 
@@ -14,7 +13,7 @@ const EMPTY_DEF = { id: 'none', name: 'unknown', players: [] };
 export default function LiveField({ team, defFor, counterFor, audibles, onAudible, seed, onPlay, drive, rotate, onKick }) {
   const [offId, setOffId] = useState(LIVE_OFFENCES[0].id);
   const [kind, setKind] = useState('pass');
-  const [lane, setLane] = useState(1);
+  const [lane, setLane] = useState(2);
   const [sel, setSel] = useState(0);
   const [phase, setPhase] = useState('call'); // call -> revealed -> (audible -> revealed2) -> live -> result
   const [def, setDef] = useState(null);       // the defence, once it is revealed
@@ -31,12 +30,11 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
   const [, force] = useState(0);
 
   const off = liveOffenceById(offId);
-  const laneLat = RUN_LANES[lane];
   const editing = phase === 'call' || phase === 'audible';
   const shownDef = def || EMPTY_DEF;
 
   // a fresh, un-snapped play whenever the call changes: this is what the field shows before the snap
-  const preview = useMemo(() => createLivePlay({ off, def: shownDef, kind, lane: laneLat, rng: rngRef.current }), [off, shownDef, kind, laneLat]);
+  const preview = useMemo(() => createLivePlay({ off, def: shownDef, kind, lane: lane, rng: rngRef.current }), [off, shownDef, kind, lane]);
   useEffect(() => { if (phase !== 'live' && phase !== 'result') { playRef.current = preview; view.current = { play: preview, sel }; } }, [preview, phase, sel]);
   useEffect(() => { view.current = { play: playRef.current, sel }; }, [sel]);
   useEffect(() => { if (sel >= off.receivers.length) setSel(0); }, [off, sel]);
@@ -50,7 +48,7 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
   }, []);
   useEffect(() => () => clearInterval(timer.current), []);
 
-  const call = () => ({ off, kind, lane: laneLat });
+  const call = () => ({ off, kind, lane: lane });
   // lock in your call: the defence shows its hand
   const lockIn = () => { if (phase !== 'call') return; setDef(defFor(call())); setNote(''); setPhase('revealed'); };
   const callAudible = () => { if (phase !== 'revealed' || audibles <= 0) return; onAudible(); setPhase('audible'); };
@@ -62,7 +60,7 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
   };
   const snap = () => {
     if (phase !== 'revealed' && phase !== 'revealed2') return;
-    const play = createLivePlay({ off, def, kind, lane: laneLat, rng: rngRef.current });
+    const play = createLivePlay({ off, def, kind, lane: lane, rng: rngRef.current });
     playRef.current = play; view.current = { play, sel }; play.start(); setPhase('live');
     timer.current = setInterval(() => {
       play.step();
@@ -135,11 +133,11 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
             </div>
             {kind === 'run' && (
               <div className="driveseg" role="group" aria-label="Lane">
-                {RUN_LANES.map((_, i) => <button key={i} className={lane === i ? 'on' : ''} onClick={() => setLane(i)}>{LANE_LABEL[i]}</button>)}
+                {RUN_PLAYS.map((r, i) => <button key={r.id} className={lane === i ? 'on' : ''} onClick={() => setLane(i)}>{r.label}</button>)}
               </div>
             )}
             {phase === 'call'
-              ? <p className="note">{kind === 'pass' ? 'Receivers are light spaceships; the ball is a glider you fire from the quarterback. After the snap pick a receiver (1-4) and press Space when the dashed line turns green.' : 'The runner is a glider sent through the line.'}</p>
+              ? <p className="note">{kind === 'pass' ? 'Receivers are light spaceships; the ball is a glider you fire from the quarterback. After the snap pick a receiver (1-4) and press Space when the dashed line turns green.' : 'The back is a glider; pick the hole: outside or inside, left or right, or the dive up the middle.'}</p>
               : <p className="note drivemsg">Audible: change your call. A sharp team may see it coming.</p>}
             <button className="lock" onClick={phase === 'call' ? lockIn : confirmAudible}>{phase === 'call' ? 'Lock in call · Space' : 'Confirm audible · Space'}</button>
             {phase === 'call' && drive && inFgRange(drive.spot) && (

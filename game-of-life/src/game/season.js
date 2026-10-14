@@ -14,22 +14,27 @@ export const TEAMS = [
   { id: 'gators', style: 'mid', name: 'Bayou Gators', level: 1, scout: 0.4, def: ['fb-cover-2', 'fb-4-3-under', 'fb-tampa-2'] },
   { id: 'foxes', style: 'deep', name: 'Ridge Foxes', level: 1, scout: 0.5, def: ['fb-dime', 'fb-cover-3', 'fb-3-4'] },
   { id: 'titans', style: 'run', name: 'Iron Titans', level: 1, scout: 0.6, def: ['fb-4-3-under', 'fb-cover-2', 'fb-prevent'] },
-  { id: 'vipers', style: 'mid', name: 'Neon Vipers', level: 2, scout: 0.7, def: ['fb-dime', 'fb-tampa-2', 'fb-cover-3'] },
-  { id: 'wolves', style: 'deep', name: 'Blackout Wolves', level: 2, scout: 0.8, def: ['fb-prevent', 'fb-dime', 'fb-4-3-under'] },
-  { id: 'kings', style: 'mid', name: 'Grid Kings', level: 2, scout: 0.9, def: ['fb-dime', 'fb-prevent', 'fb-cover-2', 'fb-tampa-2'] },
+  { id: 'vipers', style: 'mid', name: 'Neon Vipers', level: 2, scout: 0.7, def: ['fb-dime', 'fb-tampa-2', 'fb-cover-3', 'fb-mike-blitz'] },
+  { id: 'wolves', style: 'deep', name: 'Blackout Wolves', level: 2, scout: 0.8, def: ['fb-prevent', 'fb-dime', 'fb-edge-blitz-l', 'fb-edge-blitz-r'] },
+  { id: 'kings', style: 'mid', name: 'Grid Kings', level: 2, scout: 0.9, def: ['fb-dime', 'fb-safety-blitz', 'fb-cover-2', 'fb-mike-blitz', 'fb-all-out'] },
 ];
 
 // What each defence gives up in the live physics: yards per run and per pass against the bot's offence
 // (measured by scripts/football-def-matrix.mjs).
 export const LIVE_DEF = {
-  'fb-4-3-over': { run: 2.7, pass: 2.8 },
-  'fb-4-3-under': { run: 6.0, pass: 3.6 },
-  'fb-3-4': { run: 7.3, pass: 5.4 },
-  'fb-dime': { run: 4.7, pass: 1.8 },
-  'fb-cover-2': { run: 3.0, pass: 1.8 },
-  'fb-cover-3': { run: 4.7, pass: 1.8 },
-  'fb-tampa-2': { run: 6.3, pass: 1.6 },
-  'fb-prevent': { run: 5.0, pass: 8.2 },
+  'fb-4-3-over': { run: 4.6, pass: 5.7 },
+  'fb-4-3-under': { run: 9.6, pass: 5.7 },
+  'fb-3-4': { run: 11.9, pass: 9.0 },
+  'fb-dime': { run: 2.6, pass: 4.1 },
+  'fb-cover-2': { run: 3.4, pass: 2.5 },
+  'fb-cover-3': { run: 2.6, pass: 4.1 },
+  'fb-tampa-2': { run: 5.5, pass: 4.0 },
+  'fb-prevent': { run: 2.6, pass: 4.1 },
+  'fb-mike-blitz': { run: 4.5, pass: 1.3 },
+  'fb-edge-blitz-l': { run: 3.8, pass: 1.9 },
+  'fb-edge-blitz-r': { run: 3.5, pass: 4.1 },
+  'fb-safety-blitz': { run: 3.2, pass: 0.0 },
+  'fb-all-out': { run: 9.9, pass: 1.6 },
 };
 const grade = (y) => (y <= 3 ? 'well' : y <= 5 ? 'so-so' : 'poorly');
 export const defenceHint = (id) => `stops the run ${grade(LIVE_DEF[id].run)}, stops the pass ${grade(LIVE_DEF[id].pass)}`;

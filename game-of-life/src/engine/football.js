@@ -41,8 +41,21 @@ export const RUN_LANES = [-12, 0, 12];
 
 export const OFFENCES = FREE_BUILDS.filter((b) => /^fb-(shotgun-trips|pistol|pistol-split|strong-i|flexbone|singleback|bunch|hail-mary)$/.test(b.id));
 export const DEFENCES = FREE_BUILDS.filter((b) => /^fb-(4-3-over|4-3-under|3-4|dime|cover-2|cover-3|tampa-2|prevent)$/.test(b.id));
+// Blitz packages: a base defence with a player (or two) sent into the backfield. The blitzer is a spaceship that runs
+// at your quarterback and your back, a real piece of Life that the line cannot stop.
+const baseDef = (id) => FREE_BUILDS.find((b) => b.id === id);
+const blitzOf = (id, name, baseId, drop, add) => ({ ...baseDef(baseId), id, name, players: [...baseDef(baseId).players.filter((p) => !drop(p)), ...add.map((a) => ({ role: 'BL', shape: 'lwss', ...a }))] });
+export const BLITZ_DEFENCES = [
+  blitzOf('fb-mike-blitz', 'Mike Blitz', 'fb-4-3-over', (p) => p.role === 'LB' && p.lat === 1, [{ depth: 3, lat: -3 }]),
+  blitzOf('fb-edge-blitz-l', 'Left Edge Blitz', 'fb-cover-3', (p) => p.role === 'CB' && p.lat < 0, [{ depth: 2, lat: -12 }]),
+  blitzOf('fb-edge-blitz-r', 'Right Edge Blitz', 'fb-cover-3', (p) => p.role === 'CB' && p.lat > 0, [{ depth: 2, lat: 9 }]),
+  blitzOf('fb-safety-blitz', 'Safety Blitz', 'fb-cover-2', (p) => p.role === 'S' && p.lat < 0, [{ depth: 5, lat: -7 }]),
+  blitzOf('fb-all-out', 'All-Out Blitz', 'fb-4-3-under', (p) => p.role === 'S', [{ depth: 4, lat: -8 }, { depth: 4, lat: 4 }]),
+];
+export const LIVE_DEFENCES = [...DEFENCES, ...BLITZ_DEFENCES];
+
 export const offenceById = (id) => OFFENCES.find((b) => b.id === id);
-export const defenceById = (id) => DEFENCES.find((b) => b.id === id);
+export const defenceById = (id) => LIVE_DEFENCES.find((b) => b.id === id);
 
 // The eligible receivers of a formation, left to right.
 export const receiversOf = (off) => off.players.filter((p) => p.role === 'WR' || p.role === 'TE').slice().sort((a, b) => a.lat - b.lat);

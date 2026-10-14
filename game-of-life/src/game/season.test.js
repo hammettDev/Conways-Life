@@ -31,7 +31,7 @@ describe('football season', () => {
     const rate = (team, def) => { let p = 0; for (let i = 0; i < 400; i++) p += drivePoints(botDrive(i, team, def)); return p / 400; };
     expect(rate(TEAMS[7], 'fb-cover-3')).toBeGreaterThan(rate(TEAMS[0], 'fb-cover-3'));
     const t = { ...TEAMS[2], style: 'mid' };
-    expect(rate(t, 'fb-prevent')).toBeGreaterThan(rate(t, 'fb-dime')); // Prevent gives up the pass, Dime stops it
+    expect(rate(t, 'fb-4-3-over')).toBeGreaterThan(rate(t, 'fb-safety-blitz')); // the 4-3 gives up the pass, the safety blitz shuts it down
   });
   it('the opponent reads a repeated defence', () => {
     const a = rate0(0); const b = rate0(4);

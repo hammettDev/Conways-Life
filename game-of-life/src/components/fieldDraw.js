@@ -7,7 +7,6 @@ export const Y0 = CENTER_Y - 25; export const VH = 50;
 export const TILE = 10;
 export const TICK_MS = (() => { try { const v = Number(new URLSearchParams(window.location.search).get('tick')); return v > 0 ? v : 90; } catch { return 90; } })(); // ?tick=10 for a fast test run
 export const RECV_COLOR = ['#ffd050', '#7dffb0', '#ff9be8', '#8fd0ff', '#ffb070', '#c8a0ff'];
-export const LANE_LABEL = ['Left', 'Middle', 'Right']; // from the runner's point of view (he faces the defence)
 
 // Where the lines sit on the board for a drive: first down, the field goal range and the goal line (board x of each).
 export function driveLines(drive) {
@@ -91,6 +90,7 @@ export function drawField(ctx, view) {
   for (let k = 0; k < WG.length; k++) {
     const t = WG[k]; if (!t) continue;
     if (t === 2) cell(k, '#ff8aa8');
+    else if (t === 10) cell(k, '#ff7a30');
     else if (t === 9) cell(k, '#ffffff', 0);
     else cell(k, RECV_COLOR[(t - 3) % RECV_COLOR.length]);
   }
@@ -108,7 +108,7 @@ export function drawField(ctx, view) {
     if (i === sel && play.kind === 'pass') { ctx.strokeStyle = RECV_COLOR[i % RECV_COLOR.length]; ctx.lineWidth = 2; ctx.strokeRect((r.x - X0 - 3) * TILE, (r.y - Y0 - 2.5) * TILE, 8 * TILE, 6 * TILE); }
   });
   label('QB', (play.qb.x - X0 + 0.5) * TILE, (play.qb.y - Y0 + 3) * TILE, '#ffffff', 'bold 11px system-ui');
-  if (play.phase === 'snap') label('RB', (BLUE_LOS_X - 5 - X0 + 0.5) * TILE, (CENTER_Y + (play.lane || 0) - Y0 + 4.5) * TILE, 'rgba(255,255,255,0.75)', 'bold 11px system-ui');
+  if (play.phase === 'snap') label('RB', (BLUE_LOS_X - play.rb.depth - X0 + 0.5) * TILE, (CENTER_Y + play.rb.lat - Y0 + 4.5) * TILE, 'rgba(255,255,255,0.75)', 'bold 11px system-ui');
   if (play.kind === 'pass') {
     const r = play.receivers[sel];
     if (r && r.alive && play.caught === null && play.phase !== 'done') {

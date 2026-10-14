@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createLivePlay, LIVE_OFFENCES } from '../engine/footballLive.js';
-import { DEFENCES, defenceById, RUN_LANES } from '../engine/football.js';
+import { createLivePlay, LIVE_OFFENCES, RUN_PLAYS } from '../engine/footballLive.js';
+import { LIVE_DEFENCES, defenceById } from '../engine/football.js';
 import { drawField, driveLines, canvasSize, TICK_MS } from './fieldDraw.js';
 import { botDriver } from '../game/botOffence.js';
 import { defenceHint, bestKindAgainst } from '../game/season.js';
@@ -53,7 +53,7 @@ export default function DefendField({ call: firstCall, team, audibles, onAudible
       const kind = bestKindAgainst(defId);
       const off = LIVE_OFFENCES[Math.floor(rng() * LIVE_OFFENCES.length)];
       const changed = kind !== call.kind || off.id !== call.off.id;
-      setCall({ off, kind, lane: RUN_LANES[Math.floor(rng() * RUN_LANES.length)] });
+      setCall({ off, kind, lane: Math.floor(rng() * RUN_PLAYS.length) });
       setNote(changed ? `They read it and switched to ${off.name}!` : 'They stayed put.');
     } else setNote('They stayed put.');
     setPhase('revealed2');
@@ -103,7 +103,7 @@ export default function DefendField({ call: firstCall, team, audibles, onAudible
         {editing && (
           <>
             <div className="drivepick" role="group" aria-label="Your defence">
-              {DEFENCES.map((d) => <button key={d.id} className={defId === d.id ? 'chip on' : 'chip'} onClick={() => setDefId(d.id)}>{d.name}</button>)}
+              {LIVE_DEFENCES.map((d) => <button key={d.id} className={defId === d.id ? 'chip on' : 'chip'} onClick={() => setDefId(d.id)}>{d.name}</button>)}
             </div>
             <p className="note">{def.name} {defenceHint(defId)}. {phase === 'call' ? 'You both lock in at the same time: they have not shown whether it is a pass or a run.' : 'Audible: change your defence. A sharp team may change its play.'}</p>
             <button className="lock" onClick={phase === 'call' ? lockIn : confirmAudible}>{phase === 'call' ? 'Lock in defence · Space' : 'Confirm audible · Space'}</button>

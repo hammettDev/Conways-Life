@@ -12,7 +12,7 @@ import { getObject, placeObject } from './objects.js';
 import { COLS, ROWS } from './constants.js';
 
 const SIZE = COLS * ROWS;
-export const TEAM = { O: 1, F: 2, COVER: 2, BALL: 9 }; // colour ids; receivers take 3..8
+export const TEAM = { O: 1, F: 2, COVER: 2, BALL: 9, BLITZ: 10 }; // colour ids; receivers take 3..8
 const RECV0 = 3;
 
 // Life on colour ids; a newborn takes the plurality colour of its parents (ties: the lower id).
@@ -64,17 +64,28 @@ export const TUNE = {
 // everything else on the field is a ghost to it.
 function stepGlider(cells, coverGrid) {
   const g = new Uint8Array(SIZE);
-  for (let k = 0; k < SIZE; k++) if (coverGrid[k] === TEAM.COVER) g[k] = TEAM.COVER;
+  for (let k = 0; k < SIZE; k++) if (coverGrid[k] === TEAM.COVER || coverGrid[k] === TEAM.BLITZ) g[k] = TEAM.COVER;
   for (const [x, y] of cells) g[y * COLS + x] = TEAM.BALL;
   return cellsOf(stepMulti(g), TEAM.BALL);
 }
 
 const inBounds0 = (cells) => cells.filter(([x, y]) => x >= 0 && y >= 0 && x < COLS && y < ROWS);
 
-export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tune = TUNE }) {
+// The five runs. The back lines up in the backfield (inside runs a step off centre, outside runs wide) and a glider
+// can only run on a diagonal, so each run drifts one way: inside and outside, left and right. The dive goes up the middle.
+export const RUN_PLAYS = [
+  { id: 'outside-left', label: 'Outside Left', lat: -11, flip: true, depth: 1 },
+  { id: 'inside-left', label: 'Inside Left', lat: -5, flip: true, depth: 2 },
+  { id: 'dive', label: 'Middle Dive', lat: 0, flip: false, depth: 3 },
+  { id: 'inside-right', label: 'Inside Right', lat: 5, flip: false, depth: 2 },
+  { id: 'outside-right', label: 'Outside Right', lat: 11, flip: false, depth: 1 },
+];
+
+export function createLivePlay({ off, def, kind, lane = 2, rng = Math.random, tune = TUNE }) {
   const defPlayers = def.players.filter((p) => p.role !== 'RS');
   const front = placeFormation({ players: defPlayers.filter((p) => p.role === 'DL') }, 2);
-  const cover = placeFormation({ players: defPlayers.filter((p) => p.role !== 'DL') }, 2);
+  const cover = placeFormation({ players: defPlayers.filter((p) => p.role !== 'DL' && p.role !== 'BL') }, 2);
+  const blitzers = placeFormation({ players: defPlayers.filter((p) => p.role === 'BL') }, 2);
   const line = placeFormation({ players: off.line }, 1);
   const qbSpec = off.line.find((p) => p.role === 'QB');
   const qb = qbSpec ? placeFormation({ players: [qbSpec] }, 1) : [];
@@ -84,13 +95,15 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
 
   // the line fight (your blockers against their linemen) and the field layer (coverage + receivers) are separate worlds
   let FG = new Uint8Array(SIZE); put(FG, line, 1); put(FG, front, 2);
-  let W = new Uint8Array(SIZE); put(W, cover, TEAM.COVER);
+  let W = new Uint8Array(SIZE); put(W, cover, TEAM.COVER); put(W, blitzers, TEAM.BLITZ);
   let glider = []; // the ball in the air, or the runner
   // every play lines up the same way: linemen, quarterback, the receivers and a back, so a run and a pass out of one
   // formation look alike before the snap (the back is a decoy on a pass, the receivers are decoys on a run)
   const recv = off.receivers.map((r, i) => ({ i, id: RECV0 + i, ...r, alive: true, x: 0, y: 0 }));
   recv.forEach((r) => put(W, placeObject(getObject('lwss'), 1, { depth: r.depth, lat: r.lat }), r.id));
-  let back = inBounds0(placeObject(getObject('glider'), 1, { depth: 5, lat: lane, flip: lane > 0 }).map((c) => [c.x, c.y]));
+  const rbSpec = RUN_PLAYS[lane] || RUN_PLAYS[2];
+  p.rb = { lat: rbSpec.lat, depth: rbSpec.depth };
+  let back = inBounds0(placeObject(getObject('glider'), 1, { depth: rbSpec.depth, lat: rbSpec.flip ? -rbSpec.lat : rbSpec.lat, flip: rbSpec.flip }).map((c) => [c.x, c.y]));
   const refresh = () => {
     for (const r of recv) {
       const cs = cellsOf(W, r.id);
@@ -149,6 +162,8 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
       FG = stepMulti(FG);
       // sack: a defender reaches the quarterback
       if (p.caught === null && !glider.length && gap(cellsOf(FG, 2), [[Math.round(qbC[0]), Math.round(qbC[1])]]) <= 1) { finish('sack', -tune.sackYards, 'Sacked'); return; }
+      // a blitzer who gets home sacks the quarterback before he throws
+      if (p.caught === null && !glider.length && gap(cellsOf(W, TEAM.BLITZ), [[Math.round(qbC[0]), Math.round(qbC[1])]]) <= 2) { finish('sack', -tune.sackYards, 'Sacked by the blitz!'); return; }
       // the ball against the coverage as it stands now (before the field layer moves on)
       const coverNow = W;
       let ballDied = false; let offField = false;
@@ -202,7 +217,9 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
       if (glider.length >= 3) best = Math.max(best, ...glider.map(([x]) => x));
       p.progressX = best;
       p.live = Math.round(Math.max(0, Math.min(tune.runMax, best - BLUE_LOS_X)) * tune.yardsPerCell);
-      if (glider.length < 3 || p.tick >= tune.runTicks || best >= 68) {
+      const rc = glider.length >= 3 ? centroid(glider) : null;
+      const outOfBounds = rc && (rc[1] < 10.5 || rc[1] > 49.5); // the sideline: the runner is out
+      if (glider.length < 3 || outOfBounds || p.tick >= tune.runTicks || best >= 68) {
         const yards = Math.round(Math.max(tune.runMin, Math.min(tune.runMax, (best - BLUE_LOS_X) * tune.runScale)) * tune.yardsPerCell);
         glider = [];
         finish('run', yards, yards <= 0 ? 'Stuffed at the line' : `Run for ${yards}`);
