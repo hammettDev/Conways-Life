@@ -12,6 +12,7 @@ import { TOSS_IDS, TOSS_BEATS, tossBuilds, playToss } from '../game/toss.js';
 import { createRng } from '../engine/rng.js';
 
 const startSpot = () => { try { const v = Number(new URLSearchParams(window.location.search).get('spot')); return v > 0 && v < 100 ? v : null; } catch { return null; } }; // ?spot=70 starts every drive there, for testing
+const previewCheer = () => { try { const v = new URLSearchParams(window.location.search).get('cheer'); return ['td', 'fg', 'win'].includes(v) ? v : null; } catch { return null; } }; // ?cheer=win previews a routine
 const ordinal = (n) => ['', '1st', '2nd', '3rd', '4th'][n];
 const spotText = (s) => (s >= DRIVE.goal ? 'Goal' : s <= 50 ? `Own ${s}` : `Opp ${DRIVE.goal - s}`);
 const classOf = (r) => (r.kind === 'run' ? 'run' : r.yards > 14 ? 'deep' : r.yards > 7 ? 'mid' : 'short');
@@ -20,7 +21,7 @@ const STYLE_TEXT = { run: 'run the ball', short: 'throw short', mid: 'throw over
 // Gridiron Cellular Warfare: a season of 8 games. A game is four 4-minute quarters with 15 seconds a play; a quick game of
 // Conway's Takeover decides who receives; you play offence live and defence play by play. The game and the season live in
 // the save, so you can put it down at any play and carry on later.
-export default function Game({ season, onSeason, onExit }) {
+export default function Game({ season, onSeason, onExit, sfx }) {
   const [madden, setMadden] = useState(() => { try { return localStorage.getItem('fbview') !== 'side'; } catch { return true; } });
   const toggleView = () => setMadden((m) => { try { localStorage.setItem('fbview', m ? 'side' : 'madden'); } catch { /* storage unavailable */ } return !m; });
   const cur = season || null;
@@ -29,6 +30,8 @@ export default function Game({ season, onSeason, onExit }) {
   const curRef = useRef(cur);
   curRef.current = cur;
   const saved = useRef(false);
+  const [preview, setPreview] = useState(previewCheer);
+  const [winShown, setWinShown] = useState(false); // the victory finale plays once per game
 
   // every change to the game goes to the save
   useEffect(() => {
@@ -38,7 +41,7 @@ export default function Game({ season, onSeason, onExit }) {
   }, [g]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startSeason = () => onSeason(newSeason((Math.random() * 2 ** 31) >>> 0));
-  const startGame = () => { saved.current = false; setG(newGame((cur.seed + cur.week * 7919) >>> 0, team.id)); };
+  const startGame = () => { saved.current = false; setWinShown(false); setG(newGame((cur.seed + cur.week * 7919) >>> 0, team.id)); };
   const rngFor = (tag) => createRng((g.seed ^ Math.imul(g.plays + 1, 0x9e3779b1) ^ tag) >>> 0);
 
   // ---- the coin toss: a quick game of Conway's Takeover ----------------------------------------------------------
@@ -141,7 +144,11 @@ export default function Game({ season, onSeason, onExit }) {
         </section>
       )}
 
-      {inGame && g.cheer && <Cheer side={g.cheer.side} pts={g.cheer.pts} kind={g.cheer.kind} teamName={team.name} onDone={cheerDone} />}
+      {preview && <Cheer side="you" kind={preview} pts={preview === 'fg' ? 3 : 7} subtitle="You beat the Rookies 24–10" teamName="Rookies" sfx={sfx} onDone={() => setPreview(null)} />}
+      {inGame && g.cheer && <Cheer side={g.cheer.side} pts={g.cheer.pts} kind={g.cheer.kind} teamName={team.name} sfx={sfx} onDone={cheerDone} />}
+      {inGame && g.phase === 'final' && !g.cheer && g.you > g.them && !winShown && (
+        <Cheer side="you" kind="win" pts={g.you} subtitle={`You beat ${team.name} ${g.you}–${g.them}`} teamName={team.name} sfx={sfx} onDone={() => setWinShown(true)} />
+      )}
 
       {inGame && g.phase === 'toss' && (
         <section className="hub">

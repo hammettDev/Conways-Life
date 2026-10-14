@@ -74,11 +74,11 @@ const inBounds0 = (cells) => cells.filter(([x, y]) => x >= 0 && y >= 0 && x < CO
 // The five runs. The back lines up in the backfield (inside runs a step off centre, outside runs wide) and a glider
 // can only run on a diagonal, so each run drifts one way: inside and outside, left and right. The dive goes up the middle.
 export const RUN_PLAYS = [
-  { id: 'outside-left', label: 'Outside Left', lat: -11, flip: true, depth: 1 },
+  { id: 'outside-left', label: 'Outside Left', lat: -15, flip: true, depth: 1 },
   { id: 'inside-left', label: 'Inside Left', lat: -5, flip: true, depth: 2 },
   { id: 'dive', label: 'Middle Dive', lat: 0, flip: false, depth: 3 },
   { id: 'inside-right', label: 'Inside Right', lat: 5, flip: false, depth: 2 },
-  { id: 'outside-right', label: 'Outside Right', lat: 11, flip: false, depth: 1 },
+  { id: 'outside-right', label: 'Outside Right', lat: 15, flip: false, depth: 1 },
 ];
 
 export function createLivePlay({ off, def, kind, lane = 2, rng = Math.random, tune = TUNE }) {

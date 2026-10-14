@@ -13,7 +13,7 @@ describe('the cheerleader routine', () => {
   });
 
   it('the routine runs to its end with something still alive, for both a touchdown and a field goal', () => {
-    for (const kind of ['td', 'fg']) {
+    for (const kind of ['td', 'fg', 'win']) {
       const c = createCheer(kind);
       for (let i = 0; i < CHEER_GENS[kind]; i++) c.step();
       expect(c.alive).toBeGreaterThan(0);
@@ -24,5 +24,13 @@ describe('the cheerleader routine', () => {
     const a = createCheer('td'); const b = createCheer('td');
     for (let i = 0; i < 40; i++) { a.step(); b.step(); }
     expect(Array.from(a.cells)).toEqual(Array.from(b.cells));
+  });
+
+  it('the victory routine is bigger and its four-strong squad stays in step', () => {
+    const c = createCheer('win');
+    expect(c.squad.length).toBe(4);
+    for (let i = 0; i < 60; i++) c.step();
+    expect(c.squadAlive()).toEqual([48, 48, 48, 48]);
+    expect(CHEER_GENS.win).toBeGreaterThan(CHEER_GENS.td);
   });
 });

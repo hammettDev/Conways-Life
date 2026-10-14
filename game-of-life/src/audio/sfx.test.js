@@ -51,4 +51,9 @@ describe('sfx', () => {
     await sfx.load('lockIn');
     expect(requests).toBe(0);
   });
+
+  it('has a cue for every score and for winning the game, and each plays', () => {
+    const sfx = createSfx({ AudioContextImpl: FakeCtx, useFiles: false });
+    for (const name of ['touchdown', 'fieldGoal', 'theirScore', 'victory']) expect(sfx.play(name)).toBe('synth');
+  });
 });

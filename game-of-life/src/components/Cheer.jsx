@@ -7,11 +7,16 @@ const COLOR = { you: { base: '#2f9bff', glow: 'rgba(47,155,255,0.55)', label: '#
 
 // The cheerleader routine: when somebody scores, a short piece of real Life dances over the field (see game/cheer.js).
 // Tap, click or press Space to skip it.
-export default function Cheer({ side, pts, kind, teamName, onDone }) {
+export default function Cheer({ side, pts, kind, teamName, subtitle, sfx, onDone }) {
   const canvas = useRef(null);
   const done = useRef(onDone);
   done.current = onDone;
   const col = COLOR[side] || COLOR.you;
+
+  // the sound that goes with it
+  useEffect(() => {
+    if (sfx) sfx.play(kind === 'win' ? 'victory' : side === 'them' ? 'theirScore' : kind === 'td' ? 'touchdown' : 'fieldGoal');
+  }, [kind, side, sfx]);
 
   useEffect(() => {
     const c = canvas.current; const ctx = c.getContext('2d');
@@ -51,8 +56,8 @@ export default function Cheer({ side, pts, kind, teamName, onDone }) {
       <div className="cheerbox">
         <canvas ref={canvas} width={CHEER_W * CELL} height={CHEER_H * CELL} className="cheercanvas" />
         <div className="cheertext" style={{ color: col.label }}>
-          <b>{kind === 'td' ? 'TOUCHDOWN!' : 'FIELD GOAL!'}</b>
-          <span>{mine ? 'You' : teamName} +{pts}</span>
+          <b>{kind === 'win' ? 'VICTORY!' : kind === 'td' ? 'TOUCHDOWN!' : 'FIELD GOAL!'}</b>
+          <span>{kind === 'win' ? subtitle : `${mine ? 'You' : teamName} +${pts}`}</span>
         </div>
         <small>Tap to skip</small>
       </div>

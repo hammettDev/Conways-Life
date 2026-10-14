@@ -614,6 +614,7 @@ export default function App() {
 
         {mode === 'drive' ? (
           <Game
+            sfx={sfx}
             season={save.season}
             onSeason={(se) => commit((cur) => ({ ...cur, season: se }))}
             onExit={() => setMode('2p')}
