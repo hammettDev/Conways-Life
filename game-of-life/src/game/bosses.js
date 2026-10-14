@@ -1,7 +1,7 @@
 import { FREE_BUILDS, BOSS_BUILDS } from '../engine/library.js';
 import { placeFormation, pickBotSetup, HALF_X } from '../engine/formations.js';
 import { getObject, cellsWithObject } from '../engine/objects.js';
-import { RED, FIELD_X1, FIELD_Y0, FIELD_Y1, BOSS_UNLOCK_WINS, BOSS_MULTIPLIERS, SCOUT_BOSS_AUDIBLE_CHANCE } from '../engine/constants.js';
+import { RED, FIELD_X1, FIELD_Y0, FIELD_Y1, BOSS_UNLOCK_WINS, BOSS_CHANCE_BASE, BOSS_CHANCE_STEP, BOSS_CHANCE_MAX, BOSS_MULTIPLIERS, SCOUT_BOSS_AUDIBLE_CHANCE } from '../engine/constants.js';
 import { counterFor } from './audible.js';
 
 // Boss fights are the regular match with a tougher bot and a hidden payout:
@@ -45,6 +45,25 @@ export const BOSSES = [
     blurb: 'Counter-picks from everything it owns, answers every audible and deals the heaviest pieces. Pays the best of three rolls.',
   },
 ];
+
+// Which bosses can turn up at each table: the higher you play, the more of them.
+const TIERS = {
+  rookie: ['scout', 'coach'],
+  regular: ['scout', 'coach', 'champion'],
+  high: ['scout', 'coach', 'champion', 'blitzer', 'fortress'],
+  whale: ['coach', 'champion', 'blitzer', 'fortress', 'mirror'],
+  mogul: ['champion', 'blitzer', 'fortress', 'mirror', 'dealer'],
+};
+
+export const encounterChance = (save) => Math.min(BOSS_CHANCE_MAX, BOSS_CHANCE_BASE + BOSS_CHANCE_STEP * (save.boss.since || 0));
+
+// Does a boss show up this match, and which? Seeded by the match, so cancelling and locking in again
+// (or reloading) meets the same one; it cannot be rerolled.
+export function rollEncounter(save, table, rng) {
+  if (rng() >= encounterChance(save)) return null;
+  const ids = TIERS[table.id] || TIERS.rookie;
+  return BOSSES.find((b) => b.id === ids[Math.floor(rng() * ids.length)]) || null;
+}
 
 export const getBoss = (id) => BOSSES.find((b) => b.id === id) || null;
 

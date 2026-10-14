@@ -13,7 +13,7 @@ export const newSave = () => ({
   rev: 0,          // goes up with every change, so an older save code can be told from a newer one
   sid: 0,          // per-save id that seeds the opponents, so cancelling or reloading cannot reroll them
   pending: null,   // a locked-in match that has not finished; it settles itself if the page is closed
-  boss: { wins: 0, beaten: [], last: null },
+  boss: { wins: 0, beaten: [], last: null, since: 0 }, // since: matches since a boss last showed up
   custom: { unlocked: false, list: [] }, // the formation designer and the formations you saved with it
   peak: STARTING_WALLET, // the most cash you have ever held: it opens the higher-stakes tables
   table: 'rookie',
@@ -36,6 +36,7 @@ export const noteFormation = (save, id) => ({ ...save, boss: { ...save.boss, las
 
 export function noteResult(save, outcome, bossId = null) {
   const boss = { ...save.boss };
+  boss.since = bossId ? 0 : Math.min((boss.since || 0) + 1, 999);
   if (bossId) {
     boss.wins = 0;
     if (outcome === 'win' && !boss.beaten.includes(bossId)) boss.beaten = [...boss.beaten, bossId];

@@ -36,9 +36,9 @@ export const STEPS = {
   },
   wrap: {
     title: 'That is the game',
-    text: 'Your first bet paid out and your wallet is now $300. Raise or lower your bet before each match, spend on pieces and audibles wisely, and win three matches to unlock a boss fight with a hidden x2 to x20 payout.',
+    text: 'Your first bet paid out and your wallet is now $300. Raise or lower your bet before each match, spend on pieces and audibles wisely, and watch out: a boss can show up at any time, the arena turns red, and beating one pays a hidden x2 to x20.',
     next: 'Start playing',
-    practice: 'That is the game. This was a practice run, so your wallet is unchanged. Win three matches to unlock a boss fight with a hidden x2 to x20 payout.',
+    practice: 'That is the game. This was a practice run, so your wallet is unchanged. A boss can show up at any time, the arena turns red, and beating one pays a hidden x2 to x20.',
   },
 };
 

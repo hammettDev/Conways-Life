@@ -69,6 +69,7 @@ function sanitizeBoss(b) {
     wins: Number.isFinite(x.wins) && x.wins >= 0 ? Math.min(99, Math.floor(x.wins)) : 0,
     beaten,
     last: typeof x.last === 'string' ? x.last : null,
+    since: Number.isFinite(x.since) && x.since >= 0 ? Math.min(999, Math.floor(x.since)) : 0,
   };
 }
 

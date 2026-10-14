@@ -33,6 +33,11 @@ export const STARTING_WALLET = 300;
 // Beating a boss pays the wager times a hidden multiplier rolled when you win
 // (losing still costs one wager). BOSS_PAYOUT is roughly the average of the table below.
 export const BOSS_PAYOUT = 5;
+// Bosses show up on their own: every match has a chance, which grows with each match without one
+// (so auto-play meets one every so often), and resets when one appears.
+export const BOSS_CHANCE_BASE = 0.03;
+export const BOSS_CHANCE_STEP = 0.003;
+export const BOSS_CHANCE_MAX = 0.12;
 export const BOSS_UNLOCK_WINS = 3; // wins since your last boss fight before the next challenge opens
 // [multiplier, weight]: mostly small, with a long tail. Mean is about 4.8.
 export const BOSS_MULTIPLIERS = [[2, 30], [3, 25], [5, 20], [7, 12], [10, 8], [15, 3], [20, 2]];

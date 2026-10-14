@@ -28,7 +28,7 @@ import {
   noteFormation, noteResult, matchSeed, setPending, clearPending, forfeit, buyCustom, saveCustom, deleteCustom,
 } from './game/wallet.js';
 import {
-  BOSSES, getBoss, unlockedBosses, bossReady, winsToBoss, pickBossSetup, withItem, rollMultiplier,
+  getBoss, pickBossSetup, withItem, rollEncounter,
 } from './game/bosses.js';
 import { STEPS, stepFor } from './game/tutorial.js';
 import BossReveal from './components/BossReveal.jsx';
@@ -123,7 +123,7 @@ export default function App() {
   const [practice, setPractice] = useState(false); // replaying the tutorial: nothing is paid or won
   const tutorial = !save.tutorialDone || practice; // the guided match: fixed stake, free pieces and audible
   const [tStep, setTStep] = useState('pick');
-  const [bossId, setBossId] = useState(null);       // the boss you are challenging this match
+  const [encounter, setEncounter] = useState(null); // the boss that showed up this match, if any
   const [bossMult, setBossMult] = useState(null);   // the hidden payout, revealed after a win
   const [betPref, setBetPref] = useState(WAGER);
   const pieceCost = obj && !tutorial ? obj.price : 0;
@@ -245,7 +245,8 @@ export default function App() {
     if (!held) return;
     sfx.play('lockIn');
     const seed = matchSeed(save); // fixed by the save, so cancelling and locking in again faces the same opponent
-    const boss = !tutorial && bossId ? getBoss(bossId) : null;
+    const boss = tutorial ? null : rollEncounter(save, table, createRng(seed ^ 0xb055)); // bosses turn up on their own
+    setEncounter(boss);
     const bot = boss
       ? withItem(boss, pickBossSetup(boss, createRng(seed), save.boss.last), createRng(seed ^ 0x51ed))
       : tutorial
@@ -285,6 +286,7 @@ export default function App() {
     });
     escrowRef.current = 0;
     settledRef.current = true;
+    setEncounter(null);
     emptyBoard();
     setPhase('draft');
     setNotice('');
@@ -356,7 +358,7 @@ export default function App() {
     setHud(null);
     // the piece was used up, unless auto-play is set to buy it again in the same spot
     if (!(autoOnRef.current && autoPieceRef.current)) { setObjectId(null); setDrop(null); }
-    setBossId(null);
+    setEncounter(null);
     setArmed(false);
     setNotice('');
   };
@@ -371,7 +373,7 @@ export default function App() {
   };
   const startTutorial = () => {
     emptyBoard();
-    setSelectedId(null); setObjectId(null); setDrop(null); setBossId(null); setNotice('');
+    setSelectedId(null); setObjectId(null); setDrop(null); setEncounter(null); setNotice('');
     setTStep('pick');
     setPractice(true);
   };
@@ -455,8 +457,7 @@ export default function App() {
   const lockHint = !drafting ? '' : !selected ? 'Choose a formation.'
     : obj && !drop ? 'Place your piece on the board first.'
       : !afford ? 'Not enough cash for this bet.' : '';
-  const challenger = !tutorial && bossId ? getBoss(bossId) : null;
-  const lockLabel = drafting ? `${challenger ? `Challenge ${challenger.name}` : 'Lock In'} · ${money(cost)}` : 'Locked in';
+  const lockLabel = drafting ? `Lock In · ${money(cost)}` : 'Locked in';
   const feeNote = drafting && tableFee > 0 ? `Includes a ${money(tableFee)} table fee.` : '';
   // ---- auto-play: keep firing the same bet on the same formation ------------------------
   const [auto, setAuto] = useState({ on: false, bet: 0, start: 0, n: 0 });
@@ -481,7 +482,7 @@ export default function App() {
     if (phase === 'playing') { skipToEnd(); return undefined; } // run the match out
     if (phase === 'done') {
       setAuto((a) => ({ ...a, n: a.n + 1 }));
-      const t = setTimeout(newMatch, 900); // a beat to see the result
+      const t = setTimeout(newMatch, encounter ? 3400 : 900); // a beat to see the result (longer for a boss payout)
       return () => clearTimeout(t);
     }
     if (phase === 'draft') {
@@ -525,13 +526,14 @@ export default function App() {
         />
 
         <main className="stage">
-          <div className={lesson && CENTER_STEPS.includes(tStep) ? "table dimmed" : "table"} style={{ width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
+          <div className={`table${lesson && CENTER_STEPS.includes(tStep) ? ' dimmed' : ''}${encounter ? ' boss' : ''}`} style={{ width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
             <section className="scorebar">
               <div className="side blue"><span className="num">{phase === 'done' && result ? result.score.blue : live2.blue}</span><i>you</i></div>
               <div className="mid">
-                {drafting && <p>{notice || (selected ? <>Previewing <b>{selected.name}</b>. {challenger ? <>Boss fight: <b>{challenger.name}</b>, hidden payout. </> : null}Lock In to bet {money(cost)}.</> : 'Choose a formation from the sidebar.')}</p>}
+                {drafting && <p>{notice || (selected ? <>Previewing <b>{selected.name}</b>. Lock In to bet {money(cost)}.</> : 'Choose a formation from the sidebar.')}</p>}
                 {phase === 'locked' && (
                   <>
+                    {encounter && <p className="bossline">⚠ BOSS: {encounter.name} · hidden payout up to ×20</p>}
                     <p><b>{selected && selected.name}</b> vs <b className="red">{botName}</b></p>
                   </>
                 )}
@@ -596,8 +598,6 @@ export default function App() {
           audibleChoiceId={audibleChoice} canAudible={canAudible}
           audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${tutorial ? 'free' : money(audiblePrice)}` : 'Pick a formation'}
           onAudibleConfirm={confirmAudible}
-          bosses={tutorial ? null : { list: unlockedBosses(save), all: BOSSES, ready: bossReady(save), toGo: winsToBoss(save), beaten: save.boss.beaten, selected: bossId }}
-          onBoss={(id) => setBossId(id)}
           onNewMatch={newMatch} onReplay={watchReplay} onAutoStart={startAuto} onAutoStop={() => stopAuto('')}
           auto={tutorial ? null : { on: auto.on, n: auto.n, net: save.balance - auto.start, piece: autoPiece, onPiece: setAutoPiece, hasPiece: Boolean(obj && drop) }} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}

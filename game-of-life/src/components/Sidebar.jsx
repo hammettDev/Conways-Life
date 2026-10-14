@@ -15,7 +15,7 @@ export default function Sidebar({
   objectId, onObject, placed, armed, onArm, onDragStart, onClearPlace,
   lockLabel, lockHint, canLock, onLockIn,
   audibleChoiceId, onAudibleConfirm, audibleLabel, canAudible,
-  onSnap, onSkip, onReplay, onAutoStart, onAutoStop, auto, cancelFee, custom, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
+  onSnap, onSkip, onReplay, onAutoStart, onAutoStop, auto, cancelFee, custom, onNewMatch, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
 }) {
   const [tab, setTab] = useState('formations');
   const [shopMode, setShopMode] = useState('pieces');
@@ -60,7 +60,6 @@ export default function Sidebar({
     <aside className="sidebar">
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={activeTab === 'formations'} onClick={() => setTab('formations')}>Formations</button>
-        {bosses && <button role="tab" aria-selected={activeTab === 'boss'} onClick={() => setTab('boss')} disabled={picking}>Boss{bosses.ready ? ' !' : ''}</button>}
         <button role="tab" aria-selected={activeTab === 'shop'} onClick={() => setTab('shop')} disabled={picking}>
           Shop{chosen && placed ? ' ·1' : ''}
         </button>
@@ -68,34 +67,7 @@ export default function Sidebar({
 
       {picking && <p className="banner">Audible! Pick the formation you want to switch to.</p>}
 
-      {activeTab === 'boss' && bosses ? (
-        <>
-          <p className="note">
-            {bosses.ready
-              ? 'A boss fight is open. Beat one and your winnings are multiplied by a hidden number from x2 to x20, revealed after the win. A loss costs your bet as usual.'
-              : `Win ${bosses.toGo} more regular match${bosses.toGo === 1 ? '' : 'es'} to open a boss fight.`}
-          </p>
-          <ul className="list">
-            {bosses.all.map((b) => {
-              const open = bosses.list.some((x) => x.id === b.id);
-              const beaten = bosses.beaten.includes(b.id);
-              return (
-                <li key={b.id}>
-                  <button
-                    className={bosses.selected === b.id ? 'item on bossitem' : 'item bossitem'}
-                    disabled={!drafting || !bosses.ready || !open}
-                    onClick={() => onBoss(bosses.selected === b.id ? null : b.id)}
-                  >
-                    <span className="name">{b.name}{beaten ? ' ✓' : ''}</span>
-                    <span className="meta">{open ? (b.blurb) : 'Beat the boss before to unlock'}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {bosses.selected && <p className="hint">Boss fight selected. Pick a formation and Challenge.</p>}
-        </>
-      ) : activeTab === 'formations' ? (
+      {activeTab === 'formations' ? (
         <>
           {custom && (custom.unlocked ? (
             <button className="ghost" onClick={custom.onNew} disabled={!drafting || custom.list.length >= custom.max}>

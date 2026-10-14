@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   BOSSES, getBoss, unlockedBosses, bossReady, winsToBoss, pickBossSetup, withItem, rollMultiplier,
+  encounterChance, rollEncounter,
 } from './bosses.js';
 import { newSave, noteResult, noteFormation, settle, placeBet } from './wallet.js';
 import { importCode, exportCode } from './saveStore.js';
 import { createRng } from '../engine/rng.js';
 import { COUNTERS } from '../engine/counters.js';
-import { BOSS_UNLOCK_WINS, BOSS_MULTIPLIERS, WAGER } from '../engine/constants.js';
+import { BOSS_UNLOCK_WINS, BOSS_MULTIPLIERS, WAGER, BOSS_CHANCE_BASE, BOSS_CHANCE_MAX } from '../engine/constants.js';
+import { getTable } from './tables.js';
 
 describe('boss progress', () => {
   it('opens a fight after enough ordinary wins, and a boss fight resets the count', () => {
@@ -102,5 +104,47 @@ describe('hidden multiplier', () => {
     const held = placeBet(newSave(), WAGER);
     expect(settle(held, 'win', WAGER, 7).balance).toBe(newSave().balance - WAGER + WAGER + WAGER * 7);
     expect(settle(held, 'lose', WAGER, 7).balance).toBe(newSave().balance - WAGER);
+  });
+});
+
+describe('bosses show up on their own', () => {
+  it('the chance grows with each match without one, up to a ceiling', () => {
+    const at = (since) => encounterChance({ ...newSave(), boss: { ...newSave().boss, since } });
+    expect(at(0)).toBe(BOSS_CHANCE_BASE);
+    expect(at(10)).toBeGreaterThan(at(0));
+    expect(at(500)).toBe(BOSS_CHANCE_MAX);
+  });
+  it('is seeded by the match, so cancelling and locking in again meets the same boss', () => {
+    const save = { ...newSave(), boss: { ...newSave().boss, since: 400 } };
+    for (let seed = 1; seed <= 40; seed++) {
+      const a = rollEncounter(save, getTable('high'), createRng(seed));
+      const b = rollEncounter(save, getTable('high'), createRng(seed));
+      expect(a && a.id).toBe(b && b.id);
+    }
+  });
+  it('turns up about every dozen or so matches, and resets when one does', () => {
+    let save = newSave();
+    const rng = createRng(5);
+    let bosses = 0;
+    const MATCHES = 600;
+    for (let i = 0; i < MATCHES; i++) {
+      const b = rollEncounter(save, getTable('rookie'), rng);
+      save = noteResult(save, 'lose', b ? b.id : null);
+      if (b) { bosses++; expect(save.boss.since).toBe(0); }
+    }
+    expect(MATCHES / bosses).toBeGreaterThan(8);
+    expect(MATCHES / bosses).toBeLessThan(30);
+  });
+  it('the higher the table, the tougher the bosses that can appear', () => {
+    const seen = (id) => {
+      const out = new Set();
+      const save = { ...newSave(), boss: { ...newSave().boss, since: 999 } };
+      for (let s = 1; s <= 400; s++) { const b = rollEncounter(save, getTable(id), createRng(s)); if (b) out.add(b.id); }
+      return out;
+    };
+    expect(seen('rookie').has('dealer')).toBe(false);
+    expect(seen('rookie').has('mirror')).toBe(false);
+    expect(seen('mogul').has('dealer')).toBe(true);
+    expect(seen('mogul').has('scout')).toBe(false);
   });
 });
