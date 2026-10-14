@@ -372,3 +372,13 @@ body {
   .scorebar:has(.side.green) { width: min(100vw - 12px, 560px); position: relative; left: 50%; transform: translateX(-50%); box-sizing: border-box; }
   .scorebar:has(.side.green) .mid { min-width: 0; }
 }
+
+/* placing a piece: the side panels fold away and the arena takes the room, so the drop is easy to aim */
+.armcancel { display: block; width: 100%; margin: 0 0 6px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--hot, #ffb02e); background: rgba(255, 176, 46, 0.14); color: var(--text); font-weight: 700; cursor: pointer; }
+@media (min-width: 640px) {
+  .layout[data-armed] { grid-template-columns: 0 minmax(0, 1fr) 0; gap: 0; }
+  .layout[data-armed] > .lobby, .layout[data-armed] > .sidebar { visibility: hidden; padding: 0; border: 0; overflow: hidden; }
+  .layout[data-armed] .table { width: min(100%, calc((100vh - 200px) * var(--aspect))) !important; }
+}
+/* shorter demo window in the shop card on small screens, so the piece list sits higher */
+@media (max-width: 1099px) { .dragzone { max-height: 96px; } .dragzone canvas, .dragzone svg { max-height: 96px; width: 100%; object-fit: cover; } }

@@ -153,9 +153,7 @@ export default function Sidebar(props) {
             </>
           ) : (
           <>
-          <p className="note">
-            One piece per match. It replaces your back-row reserves. {shopOpen ? 'Pick one, then drag its card onto your half of the board.' : 'Locked until the next match.'}
-          </p>
+          {!shopOpen && <p className="note">Locked until the next match.</p>}
 
           {chosen && (
             <div className={`shopcard ${placed ? 'placed' : armed ? 'armed' : ''}`}>

@@ -589,7 +589,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="layout" data-sheet={sheet || 'none'}>
+      <div className="layout" data-sheet={sheet || 'none'} data-armed={armed ? '1' : undefined}>
         <Tables
           save={save} tableId={table.id} drafting={drafting && !auto.on} tutorial={tutorial} scout={scoutP} repeat={repeatShare(save)}
           onPick={(id) => commit((s) => ({ ...s, table: id }))}
@@ -597,6 +597,7 @@ export default function App() {
         />
 
         <main className="stage">
+          {armed && <button className="armcancel" onClick={() => setArmed(false)}>Tap a spot on your half to place · Cancel</button>}
           <div className={`table${lesson && CENTER_STEPS.includes(tStep) ? ' dimmed' : ''}${encounter ? ' boss' : ''}`} style={{ '--aspect': TABLE.cols / TABLE.rows, width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
             <section className="scorebar">
               <div className="side blue"><span className="num">{shown.blue}</span><i>you</i></div>
@@ -674,7 +675,7 @@ export default function App() {
           objectId={objectId}
           onObject={(id) => { setObjectId(id); setDrop(null); setArmed(false); setNotice(''); }}
           placed={Boolean(drop)} armed={armed}
-          onArm={() => setArmed(true)} onDragStart={onDragStart}
+          onArm={() => { setArmed(true); setSheet(null); }} onDragStart={onDragStart}
           onClearPlace={() => { setDrop(null); setArmed(false); }}
           lockLabel={lockLabel} lockHint={lockHint || feeNote} canLock={canLock} onLockIn={lockIn}
           audibleChoiceId={audibleChoice} canAudible={canAudible}
