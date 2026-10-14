@@ -58,6 +58,16 @@ export const TUNE = {
   sackYards: 6,
 };
 
+// The ball and a run's carrier are gliders that touch only the coverage players (and, for the ball, the receiver it is
+// thrown to): next to a copy of the coverage as it stands this tick, the glider lives or dies by Life's rules, and
+// everything else on the field is a ghost to it.
+function stepGlider(cells, coverGrid) {
+  const g = new Uint8Array(SIZE);
+  for (let k = 0; k < SIZE; k++) if (coverGrid[k] === TEAM.COVER) g[k] = TEAM.COVER;
+  for (const [x, y] of cells) g[y * COLS + x] = TEAM.BALL;
+  return cellsOf(stepMulti(g), TEAM.BALL);
+}
+
 export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tune = TUNE }) {
   const defPlayers = def.players.filter((p) => p.role !== 'RS');
   const front = placeFormation({ players: defPlayers.filter((p) => p.role === 'DL') }, 2);
@@ -67,119 +77,118 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
   const qb = qbSpec ? placeFormation({ players: [qbSpec] }, 1) : [];
   const qbC = centroid(qb.map((c) => [c.x, c.y])) || [BLUE_LOS_X - 6, CENTER_Y];
 
-  const p = { kind, tick: 0, phase: 'snap', result: null, off, def, lane, throwTick: null, target: null, caught: null, carryStart: 0, log: [] };
+  const p = { kind, tick: 0, phase: 'snap', result: null, off, def, lane, throwTick: null, target: null, caught: null, carryStart: 0, progressX: null, live: 0 };
+
+  // the line fight (your blockers against their linemen) and the field layer (coverage + receivers) are separate worlds
+  let FG = new Uint8Array(SIZE); put(FG, line, 1); put(FG, front, 2);
+  let W = new Uint8Array(SIZE); put(W, cover, TEAM.COVER);
+  let glider = []; // the ball in the air, or the runner
+  const recv = kind === 'pass' ? off.receivers.map((r, i) => ({ i, id: RECV0 + i, ...r, alive: true, x: 0, y: 0 })) : [];
+  recv.forEach((r) => put(W, placeObject(getObject('lwss'), 1, { depth: r.depth, lat: r.lat }), r.id));
+  const refresh = () => {
+    for (const r of recv) {
+      const cs = cellsOf(W, r.id);
+      r.alive = cs.length >= 5;
+      if (r.alive) { const c = centroid(cs); r.x = c[0]; r.y = c[1]; }
+    }
+  };
+  refresh();
+
+  // what the screen draws: the field layer with the glider on top
+  p.grids = () => {
+    const D = new Uint8Array(W);
+    for (const [x, y] of glider) D[y * COLS + x] = TEAM.BALL;
+    return { FG, W: D };
+  };
+  p.receivers = recv;
+  p.qb = { x: qbC[0], y: qbC[1] };
+  p.start = () => { p.phase = 'live'; };
+  const finish = (kindR, yards, note) => { p.phase = 'done'; p.result = { kind: kindR, yards, note }; };
+  const spawnGlider = (flip, sx, sy) => {
+    const cells = placeObject(getObject('glider'), 1, { depth: 0, lat: 0, flip });
+    const gx = Math.min(...cells.map((c) => c.x)); const gy = Math.round(centroid(cells.map((c) => [c.x, c.y]))[1]);
+    return cells.map((c) => [c.x - gx + sx, c.y - gy + sy]).filter(([x, y]) => x >= 0 && y >= 0 && x < COLS && y < ROWS);
+  };
+  const inBounds = (cells) => cells.filter(([x, y]) => x >= 0 && y >= 0 && x < COLS && y < ROWS);
 
   if (kind === 'pass') {
-    // layers: FG = linemen fight; W = receivers + ball + coverage
-    let FG = new Uint8Array(SIZE); put(FG, line, 1); put(FG, front, 2);
-    let W = new Uint8Array(SIZE); put(W, cover, TEAM.COVER);
-    const recv = off.receivers.map((r, i) => ({ i, id: RECV0 + i, ...r, alive: true, x: 0, y: 0, hasBall: false }));
-    recv.forEach((r) => put(W, placeObject(getObject('lwss'), 1, { depth: r.depth, lat: r.lat }), r.id));
     let maxCatch = -1;
-    let ballAlive = false; let ballSign = 1; let ballFired = -1;
+    let ballFired = -1;
+    p.ball = () => (glider.length ? centroid(glider) : null);
 
-    const refresh = () => {
-      for (const r of recv) {
-        const cs = cellsOf(W, r.id);
-        r.alive = cs.length >= 5;
-        if (r.alive) { const c = centroid(cs); r.x = c[0]; r.y = c[1]; }
-      }
-    };
-    refresh();
-
-    p.grids = () => ({ FG, W });
-    p.receivers = recv;
-    p.qb = { x: qbC[0], y: qbC[1] };
-    p.ball = () => (ballAlive ? centroid(cellsOf(W, TEAM.BALL)) : null);
-
-    // When should the quarterback fire at receiver i? Returns ticks from now (0 = fire now), and whether it can still be hit.
+    // When must the quarterback fire at receiver i? Ticks from now (0 = fire now), and whether it can still connect.
     p.aim = (i) => {
       const r = recv[i];
-      if (!r || !r.alive || ballAlive || p.caught) return { ok: false, wait: null, d: 0 };
+      if (!r || !r.alive || glider.length || p.caught !== null) return { ok: false, wait: null, d: 0 };
       const d = Math.abs(r.y - qbC[1]);
       if (d < 3) return { ok: false, wait: null, d };
-      // meet when the glider (fired at f, reaches lateral d after 4d ticks and x = qx + d) meets the receiver
       const qx = qbC[0] + 2;
-      const wait = 2 * (qx - r.x) - 2 * d + 0; // ticks until the shot must leave
+      const wait = 2 * (qx - r.x) - 2 * d; // the glider meets the receiver at x = qx + d
       return { ok: wait >= -6, wait, d };
     };
 
     p.throwTo = (i) => {
-      if (p.phase !== 'live' || ballAlive || p.caught) return false;
+      if (p.phase !== 'live' || glider.length || p.caught !== null) return false;
       const r = recv[i]; if (!r || !r.alive) return false;
-      ballSign = r.y < qbC[1] ? -1 : 1;
-      const cells = placeObject(getObject('glider'), 1, { depth: 0, lat: 0, flip: ballSign < 0 });
-      // lift the glider so it starts just in front of the quarterback
-      const sx = Math.round(qbC[0]) + 2; const sy = Math.round(qbC[1]);
-      const gx = Math.min(...cells.map((c) => c.x)); const gy = Math.round(centroid(cells.map((c) => [c.x, c.y]))[1]);
-      put(W, cells.map((c) => ({ x: c.x - gx + sx, y: c.y - gy + sy })), TEAM.BALL);
-      ballAlive = true; ballFired = p.tick; p.target = i; p.throwTick = p.tick;
+      glider = spawnGlider(r.y < qbC[1], Math.round(qbC[0]) + 2, Math.round(qbC[1]));
+      ballFired = p.tick; p.target = i; p.throwTick = p.tick;
       return true;
     };
-
-    p.start = () => { p.phase = 'live'; };
-
-    const finish = (kindR, yards, note) => { p.phase = 'done'; p.result = { kind: kindR, yards, note }; };
 
     p.step = () => {
       if (p.phase !== 'live') return;
       p.tick++;
-      // the line fight
       FG = stepMulti(FG);
       // sack: a defender reaches the quarterback
-      const reds = cellsOf(FG, 2);
-      if (!p.caught && !ballAlive && (gap(reds, [[Math.round(qbC[0]), Math.round(qbC[1])]]) <= 1)) { finish('sack', -tune.sackYards, 'Sacked'); return; }
-      // catch check before the step so the two never collide
-      if (ballAlive && !p.caught) {
-        const ballCells = cellsOf(W, TEAM.BALL);
-        for (const r of recv) {
-          if (!r.alive) continue;
-          if (gap(ballCells, cellsOf(W, r.id)) <= tune.catchGap) {
-            for (const c of ballCells) W[c[1] * COLS + c[0]] = 0; // the ball is in his hands
-            ballAlive = false; r.hasBall = true; p.caught = r.i; p.carryStart = p.tick; p.caughtAt = r.x;
-            break;
-          }
+      if (p.caught === null && !glider.length && gap(cellsOf(FG, 2), [[Math.round(qbC[0]), Math.round(qbC[1])]]) <= 1) { finish('sack', -tune.sackYards, 'Sacked'); return; }
+      // the ball against the coverage as it stands now (before the field layer moves on)
+      const coverNow = W;
+      let ballDied = false;
+      if (glider.length) {
+        // caught? only the receiver it was thrown to can take it, and the ball never touches any other receiver
+        const tr = recv[p.target];
+        if (tr && tr.alive && gap(glider, cellsOf(W, tr.id)) <= tune.catchGap) {
+          glider = []; p.caught = p.target; p.carryStart = p.tick;
+        } else {
+          glider = inBounds(stepGlider(glider, coverNow));
+          if (glider.length < 4) { glider = []; ballDied = true; }
         }
       }
       W = stepMulti(W);
       refresh();
-      if (ballAlive && countOf(W, TEAM.BALL) < 4) {
-        ballAlive = false;
-        const near = gap(cellsOf(W, TEAM.COVER), [[Math.round(qbC[0]) + 2 + (p.tick - ballFired) / 4, Math.round(qbC[1])]]);
-        const intercepted = rng() < tune.intChance && near < 30;
-        if (!p.caught) { finish(intercepted ? 'int' : 'incomplete', 0, intercepted ? 'Intercepted' : 'Ball knocked down'); return; }
+      if (ballDied && p.caught === null) {
+        const intercepted = rng() < tune.intChance;
+        finish(intercepted ? 'int' : 'incomplete', 0, intercepted ? 'Intercepted by coverage' : 'Ball knocked down'); return;
       }
       if (p.caught !== null) {
         const r = recv[p.caught];
         if (r.alive) maxCatch = Math.max(maxCatch, maxX(W, (t) => t === r.id));
-        const dead = !r.alive;
-        if (dead || p.tick - p.carryStart >= tune.carryTicks || maxCatch >= 68) {
+        p.progressX = maxCatch;
+        if (!r.alive || p.tick - p.carryStart >= tune.carryTicks || maxCatch >= 68) {
           const yards = Math.max(0, Math.min(40, maxCatch - BLUE_LOS_X));
           finish('complete', yards, `Complete for ${yards}`);
         }
         return;
       }
-      if (!ballAlive && p.tick >= tune.hold) finish('sack', -tune.sackYards, 'Held the ball too long: sacked');
+      if (!glider.length && p.tick >= tune.hold) finish('sack', -tune.sackYards, 'Held the ball too long: sacked');
     };
   } else {
-    // run: the carrier is a glider in the shared board with everyone
-    const carrierDepth = 5;
-    const carrier = placeObject(getObject('glider'), 1, { depth: carrierDepth, lat: lane, flip: lane > 0 });
-    let G = new Uint8Array(SIZE); put(G, line, 1); put(G, front, 2); put(G, cover, 2); put(G, carrier, 1);
-    let B = new Uint8Array(SIZE); put(B, line, 1); put(B, front, 2); put(B, cover, 2);
-    let a = 0; let b = 0;
-    const isBlue = (t) => t === 1;
-    p.grids = () => ({ G });
-    p.start = () => { p.phase = 'live'; };
+    // a run: the carrier is a glider behind the line; only the coverage (linebackers, corners, safeties) can stop it
+    glider = inBounds(placeObject(getObject('glider'), 1, { depth: 5, lat: lane, flip: lane > 0 }).map((c) => [c.x, c.y]));
+    let best = Math.max(...glider.map(([x]) => x));
     p.step = () => {
       if (p.phase !== 'live') return;
       p.tick++;
-      G = stepMulti(G); B = stepMulti(B);
-      a = Math.max(a, maxX(G, isBlue)); b = Math.max(b, maxX(B, isBlue));
-      p.live = a - b;
-      if (p.tick >= tune.runTicks) {
-        const yards = Math.round(Math.max(tune.runMin, Math.min(tune.runMax, (a - b) * tune.runScale)));
-        p.phase = 'done'; p.result = { kind: 'run', yards, note: yards <= 0 ? 'Stuffed at the line' : `Run for ${yards}` };
+      FG = stepMulti(FG);
+      glider = inBounds(stepGlider(glider, W));
+      W = stepMulti(W);
+      if (glider.length >= 3) best = Math.max(best, ...glider.map(([x]) => x));
+      p.progressX = best;
+      p.live = Math.max(0, Math.min(tune.runMax, best - BLUE_LOS_X));
+      if (glider.length < 3 || p.tick >= tune.runTicks || best >= 68) {
+        const yards = Math.round(Math.max(tune.runMin, Math.min(tune.runMax, (best - BLUE_LOS_X) * tune.runScale)));
+        glider = [];
+        finish('run', yards, yards <= 0 ? 'Stuffed at the line' : `Run for ${yards}`);
       }
     };
   }

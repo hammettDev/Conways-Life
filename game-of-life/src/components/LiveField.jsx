@@ -28,16 +28,22 @@ function drawField(ctx, view) {
     ctx.fillStyle = color; ctx.fillRect(sx * TILE + inset, sy * TILE + inset, TILE - inset * 2, TILE - inset * 2);
   };
   const g = play.grids();
+  const { FG, W: WG } = g;
+  for (let k = 0; k < FG.length; k++) if (FG[k]) cell(k, FG[k] === 1 ? '#2f86d6' : '#c23a5f');
+  for (let k = 0; k < WG.length; k++) {
+    const t = WG[k]; if (!t) continue;
+    if (t === 2) cell(k, '#ff8aa8');
+    else if (t === 9) cell(k, '#ffffff', 0);
+    else cell(k, RECV_COLOR[(t - 3) % RECV_COLOR.length]);
+  }
+  // how far the ball carrier has got: a line that stays put once it stops, so the yards you are given are the yards you see
+  if (play.progressX !== null && play.progressX !== undefined && play.progressX > BLUE_LOS_X) {
+    const px = (play.progressX - X0 + 1) * TILE;
+    ctx.strokeStyle = '#4dff9a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+    ctx.fillStyle = '#4dff9a'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(`+${Math.round(play.progressX - BLUE_LOS_X)} yds`, px + 5, 6);
+  }
   if (play.kind === 'pass') {
-    const { FG, W: WG } = g;
-    for (let k = 0; k < FG.length; k++) if (FG[k]) cell(k, FG[k] === 1 ? '#2f86d6' : '#c23a5f');
-    for (let k = 0; k < WG.length; k++) {
-      const t = WG[k]; if (!t) continue;
-      if (t === 2) cell(k, '#ff8aa8');
-      else if (t === 9) cell(k, '#ffffff', 0);
-      else cell(k, RECV_COLOR[(t - 3) % RECV_COLOR.length]);
-    }
-    // numbers over the receivers, and the aim line for the selected one
     play.receivers.forEach((r, i) => {
       if (!r.alive) return;
       const x = (r.x - X0 + 0.5) * TILE; const y = (r.y - Y0 - 3.2) * TILE;
@@ -47,7 +53,7 @@ function drawField(ctx, view) {
       if (i === sel) { ctx.strokeStyle = RECV_COLOR[i % RECV_COLOR.length]; ctx.lineWidth = 2; ctx.strokeRect((r.x - X0 - 3) * TILE, (r.y - Y0 - 2.5) * TILE, 8 * TILE, 6 * TILE); }
     });
     const r = play.receivers[sel];
-    if (r && r.alive && !play.caught && play.phase !== 'done') {
+    if (r && r.alive && play.caught === null && play.phase !== 'done') {
       const a = play.aim(sel);
       if (a.wait !== null) {
         const qx = play.qb.x + 2; const qy = play.qb.y;
@@ -58,12 +64,14 @@ function drawField(ctx, view) {
         ctx.beginPath(); ctx.moveTo((qx - X0 + 0.5) * TILE, (qy - Y0 + 0.5) * TILE); ctx.lineTo((qx + a.d - X0 + 0.5) * TILE, (qy + dir * a.d - Y0 + 0.5) * TILE); ctx.stroke(); ctx.setLineDash([]);
       }
     }
-    // the quarterback marker
-    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
     ctx.fillText('QB', (play.qb.x - X0 + 0.5) * TILE, (play.qb.y - Y0 + 3) * TILE);
   } else {
-    const G = g.G;
-    for (let k = 0; k < G.length; k++) if (G[k]) cell(k, G[k] === 1 ? '#3aa0ff' : '#e04a73');
+    // the runner's lane, before the snap
+    if (play.phase === 'snap') {
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText('RUNNER', (play.qb.x - X0 + 0.5) * TILE, (play.qb.y - Y0 + 3) * TILE);
+    }
   }
 }
 
