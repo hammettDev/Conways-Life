@@ -190,6 +190,7 @@ export default function Sidebar({
         </>
       )}
 
+      <div className="actions">
       {auto && auto.on ? (
         <>
           <button className="lock" onClick={onAutoStop}>Stop auto-play</button>
@@ -243,6 +244,7 @@ export default function Sidebar({
           )}
         </>
       )}
+      </div>
     </aside>
   );
 }

@@ -410,6 +410,13 @@ export default function App() {
     setNotice('');
   };
 
+  // On a phone the board is above the controls: bring it back into view when a match starts or ends.
+  useEffect(() => {
+    try {
+      if (window.matchMedia('(max-width: 900px)').matches && phase !== 'draft') window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch { /* no matchMedia */ }
+  }, [phase]);
+
   // Keep the lesson in step with what the player has done.
   useEffect(() => {
     if (tutorial) setTStep((c) => stepFor(c, { phase, hasSelection: Boolean(selectedId) }));
