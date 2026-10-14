@@ -11,6 +11,7 @@ const CORE = {
   threshold: 25,
   cooldown: 8,
   maxCrashes: Infinity, // no topple limit: every stack that reaches 25 falls
+  contain: true, // the field edge is a wall: nothing escapes the arena
   shed: true, // a topple drops the bottom 25 chips; anything above stays to topple again
   cold: true,
   coldAfter: 4,

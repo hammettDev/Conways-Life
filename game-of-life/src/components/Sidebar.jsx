@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { MiniPreview, Thumb } from './MiniPreview.jsx';
 import { DEMOS } from '../render/miniPreview.js';
 
@@ -14,9 +14,26 @@ export default function Sidebar({
   objectId, onObject, placed, armed, onArm, onDragStart, onClearPlace,
   lockLabel, lockHint, canLock, onLockIn,
   audibleChoiceId, onAudibleConfirm, audibleLabel, canAudible,
-  onSnap, onSkip, onReplay, cancelFee, custom, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
+  onSnap, onSkip, onReplay, onAutoStart, onAutoStop, auto, cancelFee, custom, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
 }) {
   const [tab, setTab] = useState('formations');
+  // Hold the Lock In button to auto-play: it keeps firing the same bet until you let go.
+  const held = useRef(false);
+  const holdTimer = useRef(null);
+  const holdToRepeat = {
+    onPointerDown: () => {
+      if (!auto) return;
+      holdTimer.current = setTimeout(() => {
+        held.current = true;
+        onAutoStart();
+        // the button is replaced by Stop once auto-play starts, so listen on the window for the release
+        window.addEventListener('pointerup', () => { held.current = false; onAutoStop(); }, { once: true });
+      }, 500);
+    },
+    onPointerUp: () => clearTimeout(holdTimer.current),
+    onPointerLeave: () => clearTimeout(holdTimer.current),
+  };
+
   const [sport, setSport] = useState('all');
   const [query, setQuery] = useState('');
 
@@ -165,7 +182,12 @@ export default function Sidebar({
         </>
       )}
 
-      {picking ? (
+      {auto && auto.on ? (
+        <>
+          <button className="lock" onClick={onAutoStop}>Stop auto-play</button>
+          <p className="hint">Auto-play: {auto.n} played · {auto.net >= 0 ? '+' : '−'}{money(Math.abs(auto.net))}</p>
+        </>
+      ) : picking ? (
         <>
           <button className="lock" onClick={onAudibleConfirm} disabled={!canAudible}>{audibleLabel}</button>
           <button className="ghost" onClick={onBackAudible}>Back</button>
@@ -199,8 +221,13 @@ export default function Sidebar({
               />
             </div>
           )}
-          <button className="lock" onClick={onLockIn} disabled={!canLock}>{lockLabel}</button>
+          <button
+            className="lock" disabled={!canLock} {...holdToRepeat}
+            onClick={() => { if (!held.current) onLockIn(); held.current = false; }}
+          >{lockLabel}</button>
           {lockHint && <p className="hint">{lockHint}</p>}
+          {!lockHint && auto && <p className="hint">Hold Lock In to keep playing the same bet.</p>}
+          {auto && <button className="ghost small" onClick={onAutoStart} disabled={!canLock}>Auto-play</button>}
         </>
       )}
     </aside>

@@ -429,6 +429,35 @@ export default function App() {
       : !afford ? 'Not enough cash for this bet.' : '';
   const challenger = !tutorial && bossId ? getBoss(bossId) : null;
   const lockLabel = drafting ? `${challenger ? `Challenge ${challenger.name}` : 'Lock In'} · ${money(cost)}` : 'Locked in';
+  // ---- auto-play: keep firing the same bet on the same formation ------------------------
+  const [auto, setAuto] = useState({ on: false, bet: 0, start: 0, n: 0 });
+  const stopAuto = (why) => {
+    setAuto((a) => ({ ...a, on: false }));
+    if (why) setNotice(why);
+  };
+  const startAuto = () => {
+    if (!canLock || tutorial) return;
+    setAuto({ on: true, bet: wager, start: save.balance, n: 0 });
+    lockIn();
+  };
+  useEffect(() => {
+    if (!auto.on) return undefined;
+    if (phase === 'locked') {
+      const t = setTimeout(snap, 200);
+      return () => clearTimeout(t);
+    }
+    if (phase === 'playing') { skipToEnd(); return undefined; } // run the match out
+    if (phase === 'done') {
+      setAuto((a) => ({ ...a, n: a.n + 1 }));
+      const t = setTimeout(newMatch, 900); // a beat to see the result
+      return () => clearTimeout(t);
+    }
+    if (phase === 'draft') {
+      if (canLock && wager >= auto.bet) lockIn();
+      else stopAuto('Auto-play stopped: not enough cash to repeat the bet.');
+    }
+    return undefined;
+  }, [auto.on, phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const audibleBuild = findBuild(audibleChoice);
   const canAudible = Boolean(audibleBuild) && audibleBuild.id !== selectedId && canAfford(save, audiblePrice);
 
@@ -530,7 +559,8 @@ export default function App() {
           onAudibleConfirm={confirmAudible}
           bosses={tutorial ? null : { list: unlockedBosses(save), all: BOSSES, ready: bossReady(save), toGo: winsToBoss(save), beaten: save.boss.beaten, selected: bossId }}
           onBoss={(id) => setBossId(id)}
-          onNewMatch={newMatch} onReplay={watchReplay} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
+          onNewMatch={newMatch} onReplay={watchReplay} onAutoStart={startAuto} onAutoStop={() => stopAuto('')}
+          auto={tutorial ? null : { on: auto.on, n: auto.n, net: save.balance - auto.start }} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(AUDIBLE_PRICE)}
           custom={tutorial ? null : {

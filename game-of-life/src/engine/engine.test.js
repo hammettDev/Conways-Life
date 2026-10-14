@@ -675,3 +675,29 @@ describe('shipped fortune rules', () => {
     });
   });
 });
+
+describe('contained arena', () => {
+  // a glider flying out through the right edge of the field
+  const glider = (x, y) => [[1, 0], [2, 1], [0, 2], [1, 2], [2, 2]].map(([dx, dy]) => ({ x: x + dx, y: y + dy, team: BLUE }));
+  const outside = (teams) => {
+    let n = 0;
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+      if (teams[y * COLS + x] !== DEAD && (x < FIELD_X0 || x >= FIELD_X0 + 60 || y < FIELD_Y0 || y >= FIELD_Y0 + 40)) n++;
+    }
+    return n;
+  };
+  const run = (fortune) => {
+    const e = createEngine({ seed: 1, fortune, freezeUnderworld: true, maxTicks: 400 });
+    e.loadTeams(glider(FIELD_X0 + 55, FIELD_Y0 + 20));
+    let leaked = 0;
+    for (let i = 0; i < 120 && e.status === 'running'; i++) { e.tick(); leaked = Math.max(leaked, outside(e.teams)); }
+    return leaked;
+  };
+  it('cells can leave the field when containment is off', () => {
+    expect(run({ threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 2, unit: 5, fence: false, contain: false })).toBeGreaterThan(0);
+  });
+  it('the field edge is a wall when it is on, and the shipped rules turn it on', () => {
+    expect(run({ threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 2, unit: 5, fence: false, contain: true })).toBe(0);
+    expect(DEFAULT_FORTUNE_RULES.contain).toBe(true);
+  });
+});

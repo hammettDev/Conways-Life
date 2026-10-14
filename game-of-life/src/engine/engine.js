@@ -34,7 +34,7 @@ export function createEngine({
 } = {}) {
   const F = fortune && {
     threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 3,
-    hotValue: 5, restValue: 1, unit: 5, fence: true, shed: false, maxBlocks: Infinity,
+    hotValue: 5, restValue: 1, unit: 5, fence: true, contain: false, shed: false, maxBlocks: Infinity,
     overtime: 0,                      // ticks to play on after settling while flashers are still stacking, until the first topple
     spread: false, line: 0, spacing: 6, slide: 30,        // drop pieces far apart, only into clear space
     cold: false, coldAfter: 4,        // still cells stop adding chips after this many quiet ticks
@@ -382,11 +382,23 @@ export function createEngine({
     if (tickCount >= maxTicks) status = 'cap';
   }
 
+  // With `contain` on, the field edge is a wall: anything that drifts or spills past it is gone,
+  // so nothing can escape the arena (spaceships, gliders and debris all die at the boundary).
+  function clearOutsideField(g) {
+    for (let y = 0; y < ROWS; y++) {
+      const inRow = y >= FIELD_Y0 && y < FIELD_Y1;
+      for (let x = 0; x < COLS; x++) {
+        if (!inRow || x < FIELD_X0 || x >= FIELD_X1) g[y * COLS + x] = DEAD;
+      }
+    }
+  }
+
   function tick() {
     if (status !== 'running') return { tick: tickCount, status, hotHits: 0 };
 
     stepTeams(teams, nextTeams);
     [teams, nextTeams] = [nextTeams, teams];
+    if (F && F.contain) clearOutsideField(teams);
 
     if (!freezeUnderworld) {
       stepUnderworld(hot, nextHot);
