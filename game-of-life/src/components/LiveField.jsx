@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createLivePlay, LIVE_OFFENCES, liveOffenceById } from '../engine/footballLive.js';
 import { RUN_LANES } from '../engine/football.js';
-import { drawField, TICK_MS, VW, VH, TILE, LANE_LABEL } from './fieldDraw.js';
+import { drawField, driveLines, canvasSize, TICK_MS, LANE_LABEL } from './fieldDraw.js';
+import { inFgRange, fgDistance, fgChance } from '../engine/football.js';
 import { createRng } from '../engine/rng.js';
 
 const EMPTY_DEF = { id: 'none', name: 'unknown', players: [] };
@@ -10,7 +11,7 @@ const EMPTY_DEF = { id: 'none', name: 'unknown', players: [] };
 // audible (a limited number a game) to change your call: a good opponent may answer with a counter. Then snap, and on
 // a pass fire the ball with a key or a tap.
 // Keys: Space = lock in / snap / throw / next, 1-4 pick a receiver, Left/Right cycle receivers, P / R switch pass / run.
-export default function LiveField({ team, defFor, counterFor, audibles, onAudible, seed, onPlay }) {
+export default function LiveField({ team, defFor, counterFor, audibles, onAudible, seed, onPlay, drive, rotate, onKick }) {
   const [offId, setOffId] = useState(LIVE_OFFENCES[0].id);
   const [kind, setKind] = useState('pass');
   const [lane, setLane] = useState(1);
@@ -22,6 +23,9 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
   const canvas = useRef(null);
   const playRef = useRef(null);
   const view = useRef({});
+  const extra = useRef({});
+  extra.current = { rotate, lines: driveLines(drive) };
+  const size = canvasSize(rotate);
   const timer = useRef(null);
   const rngRef = useRef(createRng(seed));
   const [, force] = useState(0);
@@ -40,7 +44,7 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
   useEffect(() => {
     const c = canvas.current; if (!c) return undefined;
     const ctx = c.getContext('2d'); let raf;
-    const loop = () => { drawField(ctx, view.current); raf = requestAnimationFrame(loop); };
+    const loop = () => { drawField(ctx, { ...view.current, ...extra.current }); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, []);
@@ -114,7 +118,7 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
   return (
     <div className="livefield">
       <div className="driveplay">
-        <canvas ref={canvas} width={VW * TILE} height={VH * TILE} className="drivecanvas" aria-label="The play" onClick={act} />
+        <canvas ref={canvas} width={size.w} height={size.h} className="drivecanvas" style={{ aspectRatio: `${size.w} / ${size.h}`, width: `min(100%, calc((100dvh - 170px) * ${(size.w / size.h).toFixed(4)}))` }} aria-label="The play" onClick={act} />
         <div className="drivedef">
           {def ? <>{team.name} show <b>{def.name}</b>. {note}</> : 'Call your play. The defence has not shown its hand.'}
         </div>
@@ -138,6 +142,9 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
               ? <p className="note">{kind === 'pass' ? 'Receivers are light spaceships; the ball is a glider you fire from the quarterback. After the snap pick a receiver (1-4) and press Space when the dashed line turns green.' : 'The runner is a glider sent through the line.'}</p>
               : <p className="note drivemsg">Audible: change your call. A sharp team may see it coming.</p>}
             <button className="lock" onClick={phase === 'call' ? lockIn : confirmAudible}>{phase === 'call' ? 'Lock in call · Space' : 'Confirm audible · Space'}</button>
+            {phase === 'call' && drive && inFgRange(drive.spot) && (
+              <button className="ghost" onClick={onKick}>Kick field goal · {fgDistance(drive.spot)} yds · {Math.round(fgChance(drive.spot) * 100)}%</button>
+            )}
           </>
         )}
         {(phase === 'revealed' || phase === 'revealed2') && (

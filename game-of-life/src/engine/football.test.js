@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  fgChance, fgDistance, inFgRange, FG_SPOT,
   OFFENCES, DEFENCES, DRIVE, receiversOf, resolvePlay, newDrive, advance, chooseDefence, callClass, COUNTER, defenceById,
 } from './football.js';
 import { createRng } from './rng.js';
@@ -62,6 +63,20 @@ describe('football drive', () => {
     it('a sack loses yards but never goes behind your own goal line', () => {
       const s = advance({ ...newDrive(), spot: 2 }, { kind: 'sack', yards: -8, note: '' });
       expect(s.spot).toBe(0);
+    });
+  });
+
+  describe('field goals', () => {
+    it('are in range from their 38 and longer kicks are harder', () => {
+      expect(inFgRange(FG_SPOT)).toBe(true);
+      expect(inFgRange(FG_SPOT - 1)).toBe(false);
+      expect(fgDistance(90)).toBe(27);
+      expect(fgChance(95)).toBeGreaterThan(fgChance(FG_SPOT));
+      expect(fgChance(FG_SPOT)).toBeGreaterThan(0.3);
+    });
+    it('a kick ends the drive: good or missed', () => {
+      expect(advance(newDrive(), { kind: 'kick', made: true, yards: 0 }).over).toBe('fg');
+      expect(advance(newDrive(), { kind: 'kick', made: false, yards: 0 }).over).toBe('miss');
     });
   });
 

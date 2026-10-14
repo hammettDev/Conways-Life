@@ -179,10 +179,19 @@ export function chooseDefence(rng, calls, scout = 0.8) {
   return DEFENCES[Math.floor(rng() * DEFENCES.length)];
 }
 
+// ---- field goals ---------------------------------------------------------------
+export const FG_SPOT = 62;          // from here (their 38) a kick is in range: 55 yards counting the end zone
+export const CELL_YARDS = 1.5;      // the field is 60 cells for 100 yards
+export const fgDistance = (spot) => DRIVE.goal - spot + 17;
+export const inFgRange = (spot) => spot >= FG_SPOT;
+// Chance the kick is good: near-certain from short range, a coin flip from the edge of range.
+export const fgChance = (spot) => Math.max(0.3, Math.min(0.97, 1 - (fgDistance(spot) - 18) * 0.0165));
+
 // ---- the drive ----------------------------------------------------------------
 export const newDrive = () => ({ down: 1, toGo: DRIVE.firstDown, spot: DRIVE.startSpot, plays: 0, over: null, log: [] });
 
 export function advance(state, outcome) {
+  if (outcome.kind === 'kick') return { ...state, plays: state.plays + 1, log: [...state.log, outcome], over: outcome.made ? 'fg' : 'miss' };
   const spot = Math.max(0, state.spot + outcome.yards);
   const s = { ...state, spot, plays: state.plays + 1, log: [...state.log, outcome] };
   if (outcome.kind === 'int') return { ...s, over: 'int', spot: state.spot };

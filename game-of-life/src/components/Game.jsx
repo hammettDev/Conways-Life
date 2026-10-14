@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import LiveField from './LiveField.jsx';
 import DefendField from './DefendField.jsx';
 import { botCall } from '../game/botOffence.js';
-import { defenceById, newDrive, advance, DRIVE } from '../engine/football.js';
+import { defenceById, newDrive, advance, DRIVE, fgChance, inFgRange } from '../engine/football.js';
 import {
   TEAMS, GAME_DRIVES, SEASON_GAMES, PLAYOFF_WINS, newSeason, seasonOver, record, champion, nextTeam,
   drivePoints, driveNote, botDrive, teamDefence, bestDefenceFor, scoreText,
@@ -10,6 +10,8 @@ import {
 import { createRng } from '../engine/rng.js';
 
 export const AUDIBLES = 4; // audibles per game, for both your offence and your defence
+const startSpot = () => { try { const v = Number(new URLSearchParams(window.location.search).get('spot')); return v > 0 && v < 100 ? v : null; } catch { return null; } }; // ?spot=70 starts every drive there, for testing
+const freshDrive = () => { const d = newDrive(); const sp = startSpot(); return sp ? { ...d, spot: sp } : d; };
 const ordinal = (n) => ['', '1st', '2nd', '3rd', '4th'][n];
 const spotText = (s) => (s >= DRIVE.goal ? 'Goal' : s <= 50 ? `Own ${s}` : `Opp ${DRIVE.goal - s}`);
 const classOf = (r) => (r.kind === 'run' ? 'run' : r.yards > 14 ? 'deep' : r.yards > 7 ? 'mid' : 'short');
@@ -18,6 +20,8 @@ const STYLE_TEXT = { run: 'run the ball', short: 'throw short', mid: 'throw over
 // The football game: a season of 8 games. Each game is 6 drives each; you play yours by hand, the opponent's are simulated
 // against the defence you call.
 export default function Game({ season, onSeason, onExit }) {
+  const [madden, setMadden] = useState(() => { try { return localStorage.getItem('fbview') !== 'side'; } catch { return true; } });
+  const toggleView = () => setMadden((m) => { try { localStorage.setItem('fbview', m ? 'side' : 'madden'); } catch { /* storage unavailable */ } return !m; });
   const [stage, setStage] = useState('hub');         // hub -> game
   const [g, setG] = useState(null);
   const [leaving, setLeaving] = useState(false);
@@ -29,12 +33,12 @@ export default function Game({ season, onSeason, onExit }) {
   const startGame = () => {
     const seed = (cur.seed + cur.week * 7919) >>> 0;
     const rng = createRng(seed);
-    setG({ seed, rng, aud: AUDIBLES, you: 0, them: 0, driveIdx: 0, drive: newDrive(), classes: [], plays: 0, defId: teamDefence(rng, team, []), between: null, mode: 'off', foe: null, foePlays: 0, foeCall: null, mine: 0, mineNote: '' });
+    setG({ seed, rng, aud: AUDIBLES, you: 0, them: 0, driveIdx: 0, drive: freshDrive(), classes: [], plays: 0, defId: teamDefence(rng, team, []), between: null, mode: 'off', foe: null, foePlays: 0, foeCall: null, mine: 0, mineNote: '' });
     setStage('game');
   };
 
   const startFoe = (s, mine, mineNote) => ({
-    ...s, mode: 'def', mine, mineNote, you: s.you + mine, foe: newDrive(), foePlays: 0, foeCall: botCall(s.rng, team),
+    ...s, mode: 'def', mine, mineNote, you: s.you + mine, foe: freshDrive(), foePlays: 0, foeCall: botCall(s.rng, team),
   });
   const onPlay = (result) => {
     setG((s) => {
@@ -53,7 +57,9 @@ export default function Game({ season, onSeason, onExit }) {
   };
   const onFoePlay = (result) => {
     setG((s) => {
-      const foe = advance(s.foe, { kind: result.kind, yards: result.yards, note: result.note });
+      let foe = advance(s.foe, { kind: result.kind, yards: result.yards, note: result.note });
+      // a team in range on 4th down kicks
+      if (!foe.over && foe.down === 4 && inFgRange(foe.spot)) foe = advance(foe, { kind: 'kick', made: s.rng() < fgChance(foe.spot), yards: 0 });
       if (foe.over) return endFoe(s, foe);
       return { ...s, foe, foePlays: s.foePlays + 1, foeCall: botCall(s.rng, team) };
     });
@@ -65,6 +71,15 @@ export default function Game({ season, onSeason, onExit }) {
     });
   };
 
+  // kick a field goal on your drive
+  const kickFg = () => {
+    setG((s) => {
+      if (!inFgRange(s.drive.spot)) return s;
+      const made = s.rng() < fgChance(s.drive.spot);
+      const drive = advance(s.drive, { kind: 'kick', made, yards: 0 });
+      return startFoe({ ...s, drive, plays: s.plays + 1 }, drivePoints(drive), driveNote(drive));
+    });
+  };
   const useAudible = () => setG((s) => ({ ...s, aud: Math.max(0, s.aud - 1) }));
   const counterFor = (call, cur) => {
     // a sharp opponent sees your audible and swaps to the defence from its own pool that stops it best
@@ -77,7 +92,7 @@ export default function Game({ season, onSeason, onExit }) {
     setG((s) => {
       const idx = s.driveIdx + 1;
       if (idx >= GAME_DRIVES) return { ...s, driveIdx: idx, between: null, finished: true };
-      return { ...s, driveIdx: idx, drive: newDrive(), classes: [], between: null, mode: 'off', defId: teamDefence(s.rng, team, []) };
+      return { ...s, driveIdx: idx, drive: freshDrive(), classes: [], between: null, mode: 'off', defId: teamDefence(s.rng, team, []) };
     });
   };
   const finishGame = () => {
@@ -102,6 +117,7 @@ export default function Game({ season, onSeason, onExit }) {
         {stage === 'game' && g ? (
           <div className="scoreline"><span className="aud" title="Audibles left">A{g.aud}</span><span className="you">You {g.you}</span><span className="vs">–</span><span className="them">{g.them} {team.name.split(' ').pop()}</span></div>
         ) : <div className="scoreline" />}
+        <button className="ghost small" onClick={toggleView}>View: {madden ? 'Madden' : 'Sideways'}</button>
         <button className="ghost small" onClick={() => (stage === 'game' && g && !g.finished ? setLeaving(true) : onExit())}>Exit</button>
       </div>
       {leaving && (
@@ -147,10 +163,10 @@ export default function Game({ season, onSeason, onExit }) {
       )}
 
       {stage === 'game' && g && !g.finished && !g.between && g.mode === 'def' && (
-        <DefendField key={`d${g.driveIdx}-${g.foePlays}`} call={g.foeCall} team={team} audibles={g.aud} onAudible={useAudible} seed={(g.seed + g.foePlays * 977 + g.driveIdx * 31) >>> 0} onPlay={onFoePlay} onSim={simFoe} />
+        <DefendField key={`d${g.driveIdx}-${g.foePlays}`} drive={g.foe} rotate={madden} call={g.foeCall} team={team} audibles={g.aud} onAudible={useAudible} seed={(g.seed + g.foePlays * 977 + g.driveIdx * 31) >>> 0} onPlay={onFoePlay} onSim={simFoe} />
       )}
       {stage === 'game' && g && !g.finished && !g.between && g.mode === 'off' && (
-        <LiveField key={`${g.driveIdx}-${g.plays}`} team={team} defFor={defFor} counterFor={counterFor} audibles={g.aud} onAudible={useAudible}
+        <LiveField key={`${g.driveIdx}-${g.plays}`} drive={g.drive} rotate={madden} onKick={kickFg} team={team} defFor={defFor} counterFor={counterFor} audibles={g.aud} onAudible={useAudible}
           seed={(g.seed + g.plays * 131 + g.driveIdx * 17) >>> 0} onPlay={onPlay} />
       )}
       {stage === 'game' && g && g.between && (

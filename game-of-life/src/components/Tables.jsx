@@ -38,7 +38,7 @@ export default function Tables({ save, tableId, onPick, drafting, tutorial, scou
           {repeat > 0.2 ? ` (you have been repeating: ${Math.round(repeat * 100)}%)` : ''}. Mix up your formations to keep it guessing.
         </p>
       )}
-      <h2>Game mode</h2>
+      <h2>Conway's Takeover</h2>
       <ul className="list">
         <li>
           <button className={mode === '2p' ? 'item on tableitem' : 'item tableitem'} aria-pressed={mode === '2p'} disabled={!drafting || tutorial} onClick={() => onMode('2p')}>
@@ -50,9 +50,12 @@ export default function Tables({ save, tableId, onPick, drafting, tutorial, scou
             <span className="name">4-player arena</span><span className="meta">A board twice the size, three bots, a bigger pit. Winner takes all: a win pays ×3.</span>
           </button>
         </li>
+      </ul>
+      <h2>Gridiron Cellular Warfare</h2>
+      <ul className="list">
         <li>
           <button className={mode === 'drive' ? 'item on tableitem' : 'item tableitem'} aria-pressed={mode === 'drive'} disabled={!drafting || tutorial} onClick={() => onMode('drive')}>
-            <span className="name">Football season</span><span className="meta">Call plays against a bot defence. Score a touchdown: a touchdown pays ×1.5.</span>
+            <span className="name">Season mode</span><span className="meta">Call plays against a bot defence. Score a touchdown: a touchdown pays ×1.5.</span>
           </button>
         </li>
       </ul>

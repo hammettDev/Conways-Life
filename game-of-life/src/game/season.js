@@ -1,6 +1,6 @@
 // Football season: 8 games against stronger and stronger teams. In each game you run 6 offensive drives by hand
 // (live Life physics, see engine/footballLive.js) and the opponent runs 6 simulated drives against the defence you
-// pick. A touchdown is 7, and a drive that stalls inside the opponent's 40 kicks a field goal for 3.
+// pick. A touchdown is 7, and you can kick a field goal for 3 from inside their 38.
 import { DEFENCES, DRIVE } from '../engine/football.js';
 import { createRng } from '../engine/rng.js';
 
@@ -42,8 +42,8 @@ export const champion = (s) => seasonOver(s) && record(s).wins >= PLAYOFF_WINS;
 export const nextTeam = (s) => TEAMS[Math.min(s.week, TEAMS.length - 1)];
 
 // Points a finished drive is worth.
-export const drivePoints = (d) => (d.over === 'td' ? 7 : (d.over === 'downs' || d.over === 'clock') && d.spot >= 55 ? 3 : 0);
-export const driveNote = (d) => (d.over === 'td' ? 'Touchdown' : drivePoints(d) === 3 ? 'Field goal' : d.over === 'int' ? 'Intercepted' : 'Turned it over on downs');
+export const drivePoints = (d) => (d.over === 'td' ? 7 : d.over === 'fg' ? 3 : 0);
+export const driveNote = (d) => (d.over === 'td' ? 'Touchdown' : d.over === 'fg' ? 'Field goal' : d.over === 'miss' ? 'Missed field goal' : d.over === 'int' ? 'Intercepted' : 'Turned it over on downs');
 
 // The opponent's drive against the defence you called. Each team has a favourite kind of play (its style); a defence
 // that is weak to that style gives up more, a strong one less, and a defence you keep repeating gets read better.
@@ -55,7 +55,7 @@ export function botDrive(seed, team, defId, repeats = 0) {
   const fg = Math.min(0.3, td * 0.8);
   const r = rng();
   if (r < td) return { over: 'td', spot: DRIVE.goal };
-  if (r < td + fg) return { over: 'downs', spot: 62 };
+  if (r < td + fg) return { over: 'fg', spot: 62 };
   return { over: rng() < 0.3 ? 'int' : 'downs', spot: 40 };
 }
 

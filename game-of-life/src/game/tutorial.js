@@ -4,7 +4,7 @@
 // Shop pieces and the audible are free here so the numbers stay exact.
 export const STEPS = {
   pick: {
-    title: 'Welcome to the gridiron',
+    title: "Welcome to Conway's Takeover",
     text: 'You are blue. Two armies of cells fight on the field, and Conway\'s Life decides who wins. Pick any formation from the sidebar to preview it on your half.',
     wait: 'Choose a formation to continue.',
   },

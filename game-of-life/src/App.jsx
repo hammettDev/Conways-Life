@@ -588,8 +588,8 @@ export default function App() {
   return (
     <div className="app">
       <header className="top">
-        <h1>Gridiron <span>Cellular Warfare</span></h1>
-        <p>Pick a formation, lock it in, and watch the board decide.</p>
+        <h1>The Cell <span>Games</span></h1>
+        <p>{mode === 'drive' ? 'Gridiron Cellular Warfare: call your plays, fire the glider, win the season.' : "Conway's Takeover: pick a formation, lock it in, and watch the board decide."}</p>
         <div className="toggles">
           <div className="wallet" title={`${save.stats.wins} wins · ${save.stats.losses} losses · best streak ${save.stats.bestStreak}`}>
             <span className="cash">{money(save.balance)}</span>

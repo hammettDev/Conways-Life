@@ -19,9 +19,11 @@ describe('football season', () => {
     expect(record(s)).toEqual({ wins: 6, losses: 2, ties: 0 });
     expect(champion(s)).toBe(true);
   });
-  it('scores a touchdown 7 and a stalled drive inside the 40 a field goal', () => {
+  it('scores a touchdown 7 and a made field goal 3; a miss or a turnover nothing', () => {
     expect(drivePoints({ over: 'td', spot: 100 })).toBe(7);
-    expect(drivePoints({ over: 'downs', spot: 65 })).toBe(3);
+    expect(drivePoints({ over: 'fg', spot: 70 })).toBe(3);
+    expect(drivePoints({ over: 'miss', spot: 70 })).toBe(0);
+    expect(drivePoints({ over: 'downs', spot: 65 })).toBe(0);
     expect(drivePoints({ over: 'downs', spot: 30 })).toBe(0);
     expect(drivePoints({ over: 'int', spot: 70 })).toBe(0);
   });

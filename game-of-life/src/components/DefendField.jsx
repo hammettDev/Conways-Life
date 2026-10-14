@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createLivePlay, LIVE_OFFENCES } from '../engine/footballLive.js';
 import { DEFENCES, defenceById, RUN_LANES } from '../engine/football.js';
-import { drawField, TICK_MS, VW, VH, TILE } from './fieldDraw.js';
+import { drawField, driveLines, canvasSize, TICK_MS } from './fieldDraw.js';
 import { botDriver } from '../game/botOffence.js';
 import { defenceHint, bestKindAgainst } from '../game/season.js';
 import { createRng } from '../engine/rng.js';
@@ -11,7 +11,7 @@ const NO_OFFENCE = { id: 'none', name: 'unknown', line: [], receivers: [] };
 // One play of their drive. You pick your defence without seeing their formation; locking in reveals it, and you may
 // audible (a limited number a game). A sharp team may answer by changing its own play. Then the bot throws or runs
 // on its own. Tap the field to speed it up.
-export default function DefendField({ call: firstCall, team, audibles, onAudible, seed, onPlay, onSim }) {
+export default function DefendField({ call: firstCall, team, audibles, onAudible, seed, onPlay, onSim, drive, rotate }) {
   const [defId, setDefId] = useState('fb-cover-3');
   const [phase, setPhase] = useState('call'); // call -> revealed -> (audible -> revealed2) -> live -> result
   const [call, setCall] = useState(firstCall);
@@ -20,6 +20,9 @@ export default function DefendField({ call: firstCall, team, audibles, onAudible
   const [fast, setFast] = useState(false);
   const canvas = useRef(null);
   const view = useRef({});
+  const extra = useRef({});
+  extra.current = { rotate, lines: driveLines(drive) };
+  const size = canvasSize(rotate);
   const timer = useRef(null);
   const playRef = useRef(null);
   const fastRef = useRef(false);
@@ -34,7 +37,7 @@ export default function DefendField({ call: firstCall, team, audibles, onAudible
   useEffect(() => {
     const c = canvas.current; if (!c) return undefined;
     const ctx = c.getContext('2d'); let raf;
-    const loop = () => { drawField(ctx, view.current); raf = requestAnimationFrame(loop); };
+    const loop = () => { drawField(ctx, { ...view.current, ...extra.current }); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, []);
@@ -91,7 +94,7 @@ export default function DefendField({ call: firstCall, team, audibles, onAudible
   return (
     <div className="livefield">
       <div className="driveplay">
-        <canvas ref={canvas} width={VW * TILE} height={VH * TILE} className="drivecanvas" aria-label="Their play" onClick={phase === 'live' ? speed : act} />
+        <canvas ref={canvas} width={size.w} height={size.h} className="drivecanvas" style={{ aspectRatio: `${size.w} / ${size.h}`, width: `min(100%, calc((100dvh - 170px) * ${(size.w / size.h).toFixed(4)}))` }} aria-label="Their play" onClick={phase === 'live' ? speed : act} />
         <div className="drivedef">
           {phase === 'call' ? `${team.name} have not shown their formation. Pick your defence.` : <>{team.name} line up in <b>{call.off.name}</b>. {note}{phase === 'live' ? ' Tap the field to speed up.' : ''}</>}
         </div>
