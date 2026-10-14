@@ -18,6 +18,7 @@ export function driveLines(drive) {
     firstX: x(toFirst), firstIsGoal: drive.spot + drive.toGo >= 100,
     fgX: drive.spot < FG_SPOT ? x(FG_SPOT - drive.spot) : null,
     goalX: x(100 - drive.spot),
+    spot: drive.spot,
   };
 }
 // Size of the canvas for a view: the Madden view turns the field to run up the screen.
@@ -37,8 +38,32 @@ export function drawField(ctx, view) {
     ctx.restore();
   };
   ctx.fillStyle = '#0d2a19'; ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
-  for (let x = 0; x <= VW; x += 5) { ctx.beginPath(); ctx.moveTo(x * TILE, 0); ctx.lineTo(x * TILE, H); ctx.stroke(); }
+  const yardsOn = view.lines && typeof view.lines.spot === 'number';
+  if (!yardsOn) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+    for (let x = 0; x <= VW; x += 5) { ctx.beginPath(); ctx.moveTo(x * TILE, 0); ctx.lineTo(x * TILE, H); ctx.stroke(); }
+  } else {
+    // real yard lines: the field slides under the line of scrimmage as you move the chains, so you feel the push downfield
+    const spot = view.lines.spot;
+    const ux = (yard) => (BLUE_LOS_X + 1 + (yard - spot) / CELL_YARDS - X0) * TILE;
+    for (let yard = 0; yard <= 100; yard++) {
+      const u = ux(yard);
+      if (u < -TILE || u > W + TILE) continue;
+      if (yard % 5 === 0) {
+        ctx.strokeStyle = yard % 10 === 0 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)'; ctx.lineWidth = yard % 10 === 0 ? 2 : 1;
+        ctx.beginPath(); ctx.moveTo(u, 0); ctx.lineTo(u, H); ctx.stroke();
+        if (yard % 10 === 0 && yard > 0 && yard < 100) {
+          const n = String(Math.min(yard, 100 - yard));
+          label(n, u, H * 0.1, 'rgba(255,255,255,0.28)', 'bold 20px system-ui');
+          label(n, u, H * 0.9, 'rgba(255,255,255,0.28)', 'bold 20px system-ui');
+        }
+      } else {
+        // hash marks every yard, in two rows
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)'; ctx.lineWidth = 1;
+        for (const f of [0.38, 0.62]) { ctx.beginPath(); ctx.moveTo(u, H * f - 4); ctx.lineTo(u, H * f + 4); ctx.stroke(); }
+      }
+    }
+  }
   const vline = (bx, color, width, dash, text) => {
     const u = (bx - X0) * TILE;
     if (u < 0 || u > W) return;
