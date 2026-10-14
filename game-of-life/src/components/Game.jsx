@@ -7,7 +7,7 @@ import { defenceById, DRIVE, fgChance, inFgRange, puntDistance } from '../engine
 import {
   TEAMS, SEASON_GAMES, PLAYOFF_WINS, newSeason, seasonOver, record, champion, nextTeam, botDrive, teamDefence, bestDefenceFor, scoreText,
 } from '../game/season.js';
-import { newGame, startPlay, afterPlay, afterSimDrive, savable, clockText, PLAY_SECONDS } from '../game/gameclock.js';
+import { newGame, startPlay, afterPlay, afterSimDrive, savable, clockText, botFourthDown } from '../game/gameclock.js';
 import { TOSS_IDS, TOSS_BEATS, tossBuilds, playToss } from '../game/toss.js';
 import { createRng } from '../engine/rng.js';
 
@@ -59,11 +59,12 @@ export default function Game({ season, onSeason, onExit, sfx }) {
   const onFoePlay = (result) => {
     setG((s) => {
       let n = afterPlay(s, { kind: result.kind, yards: result.yards, note: result.note }, startSpot());
-      // on 4th down a team in range kicks, a team out of range with a long way to go punts
+      // on 4th down the bot kicks, punts or goes for it (see botFourthDown)
       if (n.poss === 'them' && n.drive.down === 4 && n.phase === 'play') {
         const r = createRng((s.seed ^ Math.imul(s.plays + 7, 0x85ebca6b)) >>> 0);
-        if (inFgRange(n.drive.spot)) n = afterPlay(n, { kind: 'kick', made: r() < fgChance(n.drive.spot), yards: 0 }, startSpot());
-        else if (n.drive.toGo > 5) n = afterPlay(n, { kind: 'punt', dist: puntDistance(r()), yards: 0 }, startSpot());
+        const call = botFourthDown(n);
+        if (call === 'kick') n = afterPlay(n, { kind: 'kick', made: r() < fgChance(n.drive.spot), yards: 0 }, startSpot());
+        else if (call === 'punt') n = afterPlay(n, { kind: 'punt', dist: puntDistance(r()), yards: 0 }, startSpot());
       }
       return n;
     });

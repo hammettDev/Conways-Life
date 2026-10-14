@@ -2,7 +2,7 @@
 // put down mid-quarter and picked up from the save.
 //   - every play takes 15 seconds of game clock, a quarter is 4 minutes (16 plays), a game is 4 quarters
 //   - the ball changes hands on a score, a turnover or turnover on downs; after the half the other team receives
-import { newDrive, advance, DRIVE } from '../engine/football.js';
+import { newDrive, advance, DRIVE, inFgRange } from '../engine/football.js';
 import { drivePoints, driveNote } from './season.js';
 
 export const PLAY_SECONDS = 15;
@@ -65,6 +65,17 @@ export function afterPlay(g, outcome, spotOverride = null) {
 // how many snaps it took.
 export function afterSimDrive(g, result, plays, spotOverride = null) {
   return settle(g, { ...g.drive, ...result, plays: g.drive.plays + plays }, PLAY_SECONDS * plays, spotOverride);
+}
+
+// What the bot does on its own 4th down: 'kick', 'punt' or 'go' (run the play). Normally it kicks in range and punts on a
+// long way to go; late in the game it plays to win. In the 4th quarter, trailing by more than a field goal it needs a
+// touchdown, so it goes for it rather than kick or punt; trailing at all with under 90 seconds left it goes for it too.
+export function botFourthDown(g) {
+  const trailBy = g.you - g.them; // the bot is `them`
+  if (g.q === 4 && trailBy > 3) return 'go';
+  if (g.q === 4 && trailBy > 0 && g.clock <= 90) return 'go';
+  if (inFgRange(g.drive.spot)) return 'kick';
+  return g.drive.toGo > 5 ? 'punt' : 'go';
 }
 
 export const finalResult = (g) => ({ team: g.teamId, you: g.you, them: g.them });

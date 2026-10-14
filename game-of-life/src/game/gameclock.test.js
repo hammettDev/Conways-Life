@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newGame, startPlay, afterPlay, afterSimDrive, other, clockText, PLAY_SECONDS, QUARTER_SECONDS, savable } from './gameclock.js';
+import { newGame, startPlay, afterPlay, afterSimDrive, other, clockText, PLAY_SECONDS, QUARTER_SECONDS, savable, botFourthDown } from './gameclock.js';
 import { DRIVE } from '../engine/football.js';
 
 const play = (g, yards = 3, kind = 'run') => afterPlay(g, { kind, yards, note: '' });
@@ -95,5 +95,28 @@ describe('game clock', () => {
     const g = savable(play(begun()));
     expect(JSON.parse(JSON.stringify(g))).toEqual(g);
     expect(other('you')).toBe('them');
+  });
+
+  describe('the bot on 4th down', () => {
+    const them = (over = {}, drive = {}) => ({ ...begun('them'), q: 2, clock: 200, you: 0, them: 0, ...over, drive: { ...begun('them').drive, down: 4, toGo: 12, spot: 40, ...drive } });
+    it('kicks in range and punts a long way out of range, early in the game', () => {
+      expect(botFourthDown(them({}, { spot: 70 }))).toBe('kick');
+      expect(botFourthDown(them({}, { spot: 40, toGo: 12 }))).toBe('punt');
+      expect(botFourthDown(them({}, { spot: 40, toGo: 3 }))).toBe('go');
+    });
+    it('in the 4th quarter, trailing by more than a field goal, goes for the touchdown instead of kicking or punting', () => {
+      expect(botFourthDown(them({ q: 4, you: 10, them: 0 }, { spot: 75 }))).toBe('go');  // would have kicked
+      expect(botFourthDown(them({ q: 4, you: 10, them: 0 }, { spot: 35 }))).toBe('go');  // would have punted
+      expect(botFourthDown(them({ q: 4, you: 4, them: 0 }, { spot: 75 }))).toBe('go');   // a field goal still leaves it behind
+    });
+    it('still kicks when a field goal ties or wins it, and when it is ahead', () => {
+      expect(botFourthDown(them({ q: 4, you: 3, them: 0, clock: 200 }, { spot: 75 }))).toBe('kick'); // ties it
+      expect(botFourthDown(them({ q: 4, you: 0, them: 7 }, { spot: 75 }))).toBe('kick');
+      expect(botFourthDown(them({ q: 4, you: 7, them: 7 }, { spot: 40 }))).toBe('punt');
+    });
+    it('with under 90 seconds left and any deficit, goes for it', () => {
+      expect(botFourthDown(them({ q: 4, you: 3, them: 0, clock: 80 }, { spot: 75 }))).toBe('go');
+      expect(botFourthDown(them({ q: 3, you: 10, them: 0, clock: 80 }, { spot: 40 }))).toBe('punt'); // only the 4th quarter counts
+    });
   });
 });
