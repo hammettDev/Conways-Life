@@ -55,7 +55,7 @@ export default function Tables({ save, tableId, onPick, drafting, tutorial, scou
       <ul className="list">
         <li>
           <button className={mode === 'drive' ? 'item on tableitem' : 'item tableitem'} aria-pressed={mode === 'drive'} disabled={!drafting || tutorial} onClick={() => onMode('drive')}>
-            <span className="name">Season mode</span><span className="meta">Call plays against a bot defence. Score a touchdown: a touchdown pays ×1.5.</span>
+            <span className="name">Season mode</span><span className="meta">An 8-game football season: spaceship receivers, a glider ball, field goals. No betting.</span>
           </button>
         </li>
       </ul>
