@@ -100,6 +100,7 @@ export default function App() {
   const escrowRef = useRef(0);
   const wagerRef = useRef(WAGER);
   const bossRef = useRef(null);
+  const skipRef = useRef(false);
   const seedRef = useRef(1);
   const botRef = useRef(null);
   const botPendingRef = useRef(null);
@@ -202,6 +203,7 @@ export default function App() {
     const boss = !tutorial && bossId ? getBoss(bossId) : null;
     bossRef.current = boss;
     setBossMult(null);
+    skipRef.current = false;
     const bot = boss
       ? pickBossSetup(boss, createRng(seed), save.boss.last)
       : pickBotSetup(createRng(seed), tutorial && TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS);
@@ -251,7 +253,10 @@ export default function App() {
     setPhase('locked');
   };
 
+  const skipToEnd = () => { skipRef.current = true; };
+
   const snap = () => {
+    skipRef.current = false;
     const pending = botPendingRef.current;
     if (pending) { setBotName(pending.name); setNotice(pending.notice); botPendingRef.current = null; }
     setResult(null);
@@ -300,6 +305,7 @@ export default function App() {
       const e = engineRef.current;
       if (live.current.phase === 'playing') {
         acc += dt * TICKS_PER_SECOND * live.current.speed;
+        if (skipRef.current) acc = Infinity; // skip to the result: play every remaining tick now
         while (acc >= 1 && e.status === 'running') {
           e.tick();
           acc -= 1;
@@ -309,6 +315,7 @@ export default function App() {
             if (lc.spilled > 0) spillsRef.current.push({ born: performance.now(), crash: lc });
           }
         }
+        if (skipRef.current) { acc = 0; skipRef.current = false; }
         if (now - hudAt > 90) {
           hudAt = now;
           // Score what the player can see: the pit counts only chips that have landed.
@@ -457,7 +464,7 @@ export default function App() {
           onAudibleConfirm={confirmAudible}
           bosses={tutorial ? null : { list: unlockedBosses(save), all: BOSSES, ready: bossReady(save), toGo: winsToBoss(save), beaten: save.boss.beaten, selected: bossId }}
           onBoss={(id) => setBossId(id)}
-          onNewMatch={newMatch} onSnap={snap} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
+          onNewMatch={newMatch} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(AUDIBLE_PRICE)}
         />
