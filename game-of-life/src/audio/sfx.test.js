@@ -17,6 +17,15 @@ describe('sfx', () => {
     expect(createSfx({ AudioContextImpl: undefined }).play('lockIn')).toBe('silent');
   });
 
+  it('can be muted and unmuted', () => {
+    const sfx = createSfx({ AudioContextImpl: FakeCtx, useFiles: true, fetchImpl: missingFetch });
+    sfx.setMuted(true);
+    expect(sfx.isMuted()).toBe(true);
+    expect(sfx.play('lockIn')).toBe('silent');
+    sfx.setMuted(false);
+    expect(sfx.play('lockIn')).toBe('synth');
+  });
+
   it('ignores unknown cues', () => {
     expect(createSfx({ AudioContextImpl: FakeCtx, useFiles: true, fetchImpl: missingFetch }).play('nope')).toBe('unknown');
   });

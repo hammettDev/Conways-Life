@@ -81,6 +81,15 @@ export default function App() {
   const [madden, setMadden] = useState(() => {
     try { return localStorage.getItem('view') !== 'side'; } catch { return true; } // Madden is the default
   });
+  const [sound, setSound] = useState(() => {
+    try { return localStorage.getItem('sound') !== 'off'; } catch { return true; } // on by default
+  });
+  useEffect(() => { sfx.setMuted(!sound); }, [sound, sfx]);
+  const toggleSound = () => setSound((on) => {
+    const next = !on;
+    try { localStorage.setItem('sound', next ? 'on' : 'off'); } catch { /* storage unavailable */ }
+    return next;
+  });
   const [look, setLook] = useState(() => {
     try { return localStorage.getItem('look') === 'chips' ? 'chips' : 'heat'; } catch { return 'heat'; }
   });
@@ -480,6 +489,7 @@ export default function App() {
           </div>
           {drafting && !tutorial && <button className="viewtoggle" onClick={startTutorial}>How to play</button>}
           <button className="viewtoggle" onClick={() => setShowSave(true)}>Save</button>
+          <button className="viewtoggle" onClick={toggleSound} aria-pressed={sound}>Sound: {sound ? 'On' : 'Off'}</button>
           <button className="viewtoggle" onClick={toggleLook} aria-pressed={look === 'chips'}>Look: {look === 'chips' ? 'Chips' : 'Clean'}</button>
           <button className="viewtoggle" onClick={toggleView} aria-pressed={madden}>View: {madden ? 'Madden' : 'Sideways'}</button>
         </div>

@@ -162,7 +162,9 @@ export function drawBoard(ctx, view) {
       const x = rotate ? COLS - 1 - sy : sx;
       const y = rotate ? sx : sy;
       const i = y * COLS + x;
-      const live = teams[i];
+      // Cells that drift past the field edge are not drawn: the arena is the playing field.
+      const inField = x >= FIELD_X0 && x < FIELD_X1 && y >= FIELD_Y0 && y < FIELD_Y1;
+      const live = inField ? teams[i] : DEAD;
 
       if (heat) {
         // Clean look: a live cell is a bright square on a soft glow; no stacks drawn.
@@ -187,7 +189,7 @@ export function drawBoard(ctx, view) {
 
       const cx = sx * tile + tile / 2;
       const base = sy * tile + tile * 0.62;
-      const discs = stackDiscs(stacks && stacks[i]);
+      const discs = inField ? stackDiscs(stacks && stacks[i]) : [];
 
       for (let k = 0; k < discs.length; k++) chip(ctx, cx, base, r, discs[k], k * step);
 

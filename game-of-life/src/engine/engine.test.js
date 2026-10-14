@@ -696,8 +696,8 @@ describe('contained arena', () => {
   it('cells can leave the field when containment is off', () => {
     expect(run({ threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 2, unit: 5, fence: false, contain: false })).toBeGreaterThan(0);
   });
-  it('the field edge is a wall when it is on, and the shipped rules turn it on', () => {
+  it('the field edge is a wall when it is on (an option; the shipped rules leave it off)', () => {
     expect(run({ threshold: 25, cooldown: 8, maxCrashes: 6, chipsPerBlock: 1, chipCap: 2, unit: 5, fence: false, contain: true })).toBe(0);
-    expect(DEFAULT_FORTUNE_RULES.contain).toBe(true);
+    expect(DEFAULT_FORTUNE_RULES.contain).toBe(false); // not shipped: it shifted balance; the board just does not draw outside the field
   });
 });

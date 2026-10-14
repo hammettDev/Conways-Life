@@ -66,11 +66,13 @@ export function createSfx({
     return Boolean(ctx);
   }
 
+  let muted = false;
+
   // Returns what played: 'file', 'synth', 'unknown' or 'silent'.
   function play(name) {
     const cue = CUES[name];
     if (!cue) return 'unknown';
-    if (!unlock()) return 'silent';
+    if (muted || !unlock()) return 'silent';
     const buffer = buffers.get(name);
     if (buffer) {
       const src = ctx.createBufferSource();
@@ -83,5 +85,9 @@ export function createSfx({
     return 'synth';
   }
 
-  return { unlock, load, play };
+  return {
+    unlock, load, play,
+    setMuted: (value) => { muted = Boolean(value); },
+    isMuted: () => muted,
+  };
 }

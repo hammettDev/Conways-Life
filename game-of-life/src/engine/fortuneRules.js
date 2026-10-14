@@ -11,7 +11,7 @@ const CORE = {
   threshold: 25,
   cooldown: 8,
   maxCrashes: Infinity, // no topple limit: every stack that reaches 25 falls
-  contain: true, // the field edge is a wall: nothing escapes the arena
+  contain: false, // off: a wall at the field edge shifted win rates enough to need a full re-balance, so the sim lets cells roam and the renderer hides what leaves the field
   shed: true, // a topple drops the bottom 25 chips; anything above stays to topple again
   cold: true,
   coldAfter: 4,
