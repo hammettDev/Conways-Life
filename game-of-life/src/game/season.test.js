@@ -58,7 +58,7 @@ describe('football season', () => {
   it('a season survives the save round trip', () => {
     const save = { ...newSave(), season: { seed: 9, week: 2, results: [{ team: 'rookies', you: 14, them: 7 }, { team: 'mudhens', you: 3, them: 10 }] } };
     const back = importCode(exportCode(save));
-    expect(back.season).toEqual({ ...save.season, game: null });
+    expect(back.season).toEqual({ ...save.season, game: null, playoffs: null });
     expect(sanitize({ ...save, season: 'junk' }).season).toBeNull();
   });
 });

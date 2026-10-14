@@ -119,4 +119,34 @@ describe('game clock', () => {
       expect(botFourthDown(them({ q: 3, you: 10, them: 0, clock: 80 }, { spot: 40 }))).toBe('punt'); // only the 4th quarter counts
     });
   });
+
+  describe('playoff overtime', () => {
+    const tied = () => ({ ...startPlay(newGame(7, 'kings', { playoff: true, tiebreak: 'you' }), 'you'), q: 4, clock: PLAY_SECONDS, you: 10, them: 10 });
+    it('a tie after four quarters goes to sudden death, with the ball to the team that kicked off', () => {
+      const g = afterPlay(tied(), { kind: 'run', yards: 2, note: '' });
+      expect(g.q).toBe(5);
+      expect(g.phase).toBe('play');
+      expect(g.poss).toBe('them');
+      expect(g.note).toMatch(/Overtime/);
+    });
+    it('the next score wins it', () => {
+      let g = afterPlay(tied(), { kind: 'run', yards: 2, note: '' });
+      g = { ...g, poss: 'you', drive: { ...g.drive, spot: 70 } };
+      g = afterPlay(g, { kind: 'kick', made: true, yards: 0 });
+      expect(g.phase).toBe('final');
+      expect(g.you).toBe(13);
+    });
+    it('level after overtime too: the game ends tied and the saved tiebreak decides', () => {
+      let g = { ...afterPlay(tied(), { kind: 'run', yards: 2, note: '' }), clock: PLAY_SECONDS };
+      g = afterPlay(g, { kind: 'run', yards: 1, note: '' });
+      expect(g.phase).toBe('final');
+      expect(g.you).toBe(g.them);
+      expect(g.tiebreak).toBe('you');
+    });
+    it('a regular-season game can still end level', () => {
+      let g = { ...begun(), q: 4, clock: PLAY_SECONDS, you: 7, them: 7 };
+      g = play(g, 2);
+      expect(g.phase).toBe('final');
+    });
+  });
 });

@@ -32,13 +32,13 @@ export default function TrophyRoom({ save, onClose }) {
         <section className="cabinet">
           <h3>Gridiron Cellular Warfare</h3>
           <div className="shelf">
-            {room.cups.length === 0 && <div className="cupslot empty"><Cup lit={false} /><span>Win a season to put a championship here</span></div>}
+            {room.cups.length === 0 && <div className="cupslot empty"><Cup lit={false} /><span>Win the playoffs to put a championship here</span></div>}
             {room.cups.map((c) => (
               <div key={c.n} className="cupslot"><Cup /><b>Season {c.n}</b><span>{c.wins}-{c.losses}{c.ties ? `-${c.ties}` : ''} · {c.pf}-{c.pa}</span></div>
             ))}
           </div>
           {room.seasons.length > room.cups.length && (
-            <p className="note">Seasons without a title: {room.seasons.filter((s) => !s.champion).map((s) => `#${s.n} (${s.wins}-${s.losses})`).join(', ')}</p>
+            <p className="note">Seasons without a title: {room.seasons.filter((s) => !s.champion).map((s) => `#${s.n} (${s.wins}-${s.losses}${s.finish ? `, ${s.finish.toLowerCase()}` : ''})`).join(', ')}</p>
           )}
         </section>
 

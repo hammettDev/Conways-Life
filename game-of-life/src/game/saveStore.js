@@ -95,10 +95,10 @@ function sanitizeGame(x) {
   const toss = x.toss && typeof x.toss === 'object' ? { pick: String(x.toss.pick || ''), botId: String(x.toss.botId || ''), outcome: ['win', 'lose', 'push'].includes(x.toss.outcome) ? x.toss.outcome : 'push', winner: side(x.toss.winner) } : null;
   const phase = ['toss', 'play', 'final'].includes(x.phase) ? x.phase : 'toss';
   return {
-    teamId: x.teamId.slice(0, 24), seed: n(x.seed, 0, 2 ** 32, 0), phase, q: n(x.q, 1, 4, 1), clock: n(x.clock, 0, 240, 240),
+    teamId: x.teamId.slice(0, 24), seed: n(x.seed, 0, 2 ** 32, 0), phase, q: n(x.q, 1, 5, 1), clock: n(x.clock, 0, 240, 240),
     you: n(x.you, 0, 999, 0), them: n(x.them, 0, 999, 0), poss: side(x.poss), first: side(x.first), drive: sanitizeDrive(x.drive),
     aud: n(x.aud, 0, 9, 0), plays: n(x.plays, 0, 999, 0), classes: Array.isArray(x.classes) ? x.classes.filter((c) => typeof c === 'string').slice(-8) : [],
-    note: typeof x.note === 'string' ? x.note.slice(0, 200) : '', pending: x.pending === true, td: n(x.td, 0, 99, 0), fg: n(x.fg, 0, 99, 0), toss,
+    note: typeof x.note === 'string' ? x.note.slice(0, 200) : '', pending: x.pending === true, playoff: x.playoff === true, tiebreak: side(x.tiebreak), foeKinds: Array.isArray(x.foeKinds) ? x.foeKinds.filter((k) => k === 'run' || k === 'pass').slice(-12) : [], td: n(x.td, 0, 99, 0), fg: n(x.fg, 0, 99, 0), toss,
   };
 }
 
@@ -108,7 +108,7 @@ function sanitizeTrophies(x) {
   const f = x.football && typeof x.football === 'object' ? x.football : {};
   const keys = ['games', 'wins', 'losses', 'ties', 'pf', 'pa', 'bestScore', 'bigWin', 'shutouts', 'td', 'fg', 'streak', 'bestStreak'];
   const football = Object.fromEntries(keys.map((k) => [k, n(f[k])]));
-  const seasons = Array.isArray(x.seasons) ? x.seasons.slice(-40).map((s, i) => ({ n: n(s.n) || i + 1, wins: n(s.wins), losses: n(s.losses), ties: n(s.ties), pf: n(s.pf), pa: n(s.pa), champion: s.champion === true })) : [];
+  const seasons = Array.isArray(x.seasons) ? x.seasons.slice(-40).map((s, i) => ({ n: n(s.n) || i + 1, wins: n(s.wins), losses: n(s.losses), ties: n(s.ties), pf: n(s.pf), pa: n(s.pa), champion: s.champion === true, finish: typeof s.finish === 'string' ? s.finish.slice(0, 40) : '' })) : [];
   return { football, seasons };
 }
 
@@ -116,7 +116,12 @@ function sanitizeSeason(x) {
   if (!x || typeof x !== 'object' || !Array.isArray(x.results)) return null;
   const n = (v) => (Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
   const results = x.results.slice(0, 16).map((r) => ({ team: typeof r.team === 'string' ? r.team : '', you: n(r.you), them: n(r.them) }));
-  return { seed: n(x.seed), week: Math.min(n(x.week), results.length), results, game: sanitizeGame(x.game) };
+  const pl = x.playoffs && typeof x.playoffs === 'object' ? x.playoffs : null;
+  const playoffs = pl ? {
+    seed: Math.max(1, Math.min(8, n(pl.seed) || 3)), round: Math.min(3, n(pl.round)), out: pl.out === true, champion: pl.champion === true,
+    games: Array.isArray(pl.games) ? pl.games.slice(0, 3).map((g, i) => ({ round: n(g.round) || i, team: typeof g.team === 'string' ? g.team : '', you: n(g.you), them: n(g.them), tb: g.tb === 'you' || g.tb === 'them' ? g.tb : null })) : [],
+  } : null;
+  return { seed: n(x.seed), week: Math.min(n(x.week), results.length), results, playoffs, game: sanitizeGame(x.game) };
 }
 
 // Anything that is not a sane save falls back to a fresh one.

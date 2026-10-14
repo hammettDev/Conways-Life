@@ -3,10 +3,11 @@
 // streaks, bosses beaten).
 import { BOSSES } from './bosses.js';
 import { SEASON_GAMES } from './season.js';
+import { finishText, champion as wonTitle } from './playoffs.js';
 
 export const newTrophies = () => ({
   football: { games: 0, wins: 0, losses: 0, ties: 0, pf: 0, pa: 0, bestScore: 0, bigWin: 0, shutouts: 0, td: 0, fg: 0, streak: 0, bestStreak: 0 },
-  seasons: [], // { n, wins, losses, ties, pf, pa, champion }
+  seasons: [], // { n, wins, losses, ties, pf, pa, champion, finish }
 });
 
 // A finished football game: you, them, and how many touchdowns and field goals you scored.
@@ -22,14 +23,14 @@ export function recordGame(save, { you, them, td = 0, fg = 0 }) {
 }
 
 // A finished season (`season.results` has every game): the cup goes in the cabinet if you won enough.
-export function recordSeason(save, season, winsNeeded) {
+export function recordSeason(save, season) {
   const t = save.trophies || newTrophies();
   const wins = season.results.filter((r) => r.you > r.them).length;
   const losses = season.results.filter((r) => r.you < r.them).length;
   const ties = season.results.length - wins - losses;
   const pf = season.results.reduce((n, r) => n + r.you, 0);
   const pa = season.results.reduce((n, r) => n + r.them, 0);
-  const entry = { n: t.seasons.length + 1, wins, losses, ties, pf, pa, champion: wins >= winsNeeded };
+  const entry = { n: t.seasons.length + 1, wins, losses, ties, pf, pa, champion: wonTitle(season), finish: finishText(season) };
   return { ...save, trophies: { ...t, seasons: [...t.seasons, entry].slice(-40) } };
 }
 

@@ -11,7 +11,7 @@ const NO_OFFENCE = { id: 'none', name: 'unknown', line: [], receivers: [] };
 // One play of their drive. You pick your defence without seeing their formation; locking in reveals it, and you may
 // audible (a limited number a game). A sharp team may answer by changing its own play. Then the bot throws or runs
 // on its own. Tap the field to speed it up.
-export default function DefendField({ call: firstCall, team, audibles, onAudible, seed, onPlay, onSim, drive, rotate }) {
+export default function DefendField({ call: firstCall, team, audibles, onAudible, seed, onPlay, onSim, drive, rotate, tendency = [] }) {
   const [defId, setDefId] = useState('fb-cover-3');
   const [phase, setPhase] = useState('call'); // call -> revealed -> (audible -> revealed2) -> live -> result
   const [call, setCall] = useState(firstCall);
@@ -105,6 +105,7 @@ export default function DefendField({ call: firstCall, team, audibles, onAudible
             <div className="drivepick" role="group" aria-label="Your defence">
               {LIVE_DEFENCES.map((d) => <button key={d.id} className={defId === d.id ? 'chip on' : 'chip'} onClick={() => setDefId(d.id)}>{d.name}</button>)}
             </div>
+            {tendency.length >= 2 && <p className="note scout">Scouting: their last {tendency.length} calls were {tendency.map((k) => (k === 'run' ? 'R' : 'P')).join(' ')} ({Math.round((100 * tendency.filter((k) => k === 'pass').length) / tendency.length)}% pass).</p>}
             <p className="note">{def.name} {defenceHint(defId)}. {phase === 'call' ? 'You both lock in at the same time: they have not shown whether it is a pass or a run.' : 'Audible: change your defence. A sharp team may change its play.'}</p>
             <button className="lock" onClick={phase === 'call' ? lockIn : confirmAudible}>{phase === 'call' ? 'Lock in defence · Space' : 'Confirm audible · Space'}</button>
             {phase === 'call' && <button className="ghost small" onClick={() => onSim(defId)}>Sim the rest of their drive</button>}

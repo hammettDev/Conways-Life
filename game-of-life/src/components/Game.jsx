@@ -5,8 +5,11 @@ import Cheer from './Cheer.jsx';
 import { botCall } from '../game/botOffence.js';
 import { defenceById, DRIVE, fgChance, inFgRange, puntDistance } from '../engine/football.js';
 import {
-  TEAMS, SEASON_GAMES, PLAYOFF_WINS, newSeason, seasonOver, record, champion, nextTeam, botDrive, teamDefence, bestDefenceFor, scoreText,
+  TEAMS, SEASON_GAMES, PLAYOFF_WINS, newSeason, record, botDrive, teamDefence, bestDefenceFor, scoreText,
 } from '../game/season.js';
+import {
+  qualified, startPlayoffs, bracket, playoffResult, seasonDone, champion, finishText, currentTeam, field, ROUND_NAMES, wonGame,
+} from '../game/playoffs.js';
 import { newGame, startPlay, afterPlay, afterSimDrive, savable, clockText, botFourthDown } from '../game/gameclock.js';
 import { TOSS_IDS, TOSS_BEATS, tossBuilds, playToss } from '../game/toss.js';
 import { createRng } from '../engine/rng.js';
@@ -19,6 +22,31 @@ const spotText = (s) => (s >= DRIVE.goal ? 'Goal' : s <= 50 ? `Own ${s}` : `Opp 
 const classOf = (r) => (r.kind === 'run' ? 'run' : r.yards > 14 ? 'deep' : r.yards > 7 ? 'mid' : 'short');
 const STYLE_TEXT = { run: 'run the ball', short: 'throw short', mid: 'throw over the middle', deep: 'go deep' };
 
+// The playoff bracket: quarterfinals, semifinals and the final, with your path lit up.
+function Bracket({ season }) {
+  const b = bracket(season);
+  const name = (seed) => (seed == null ? 'TBD' : b.ids[seed - 1] === 'you' ? 'You' : (TEAMS.find((t) => t.id === b.ids[seed - 1]) || {}).name || '?');
+  const short = (n) => (n.length > 15 ? n.split(' ').pop() : n);
+  return (
+    <div className="bracket" aria-label="Playoff bracket">
+      {b.rounds.map((matches, r) => (
+        <div key={r} className="bround">
+          <h4>{ROUND_NAMES[r]}</h4>
+          {matches.map((m, i) => (
+            <div key={i} className={m.mine ? 'bmatch mine' : 'bmatch'}>
+              {[['a', m.a, m.sa], ['b', m.b, m.sb]].map(([k, seed, score]) => (
+                <div key={k} className={m.winner != null && m.winner === seed ? 'bteam won' : 'bteam'}>
+                  <span>{seed != null ? <i>{seed}</i> : null}{short(name(seed))}</span><b>{score != null ? score : ''}</b>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Gridiron Cellular Warfare: a season of 8 games. A game is four 4-minute quarters with 15 seconds a play; a quick game of
 // Conway's Takeover decides who receives; you play offence live and defence play by play. The game and the season live in
 // the save, so you can put it down at any play and carry on later.
@@ -26,8 +54,8 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
   const [madden, setMadden] = useState(() => { try { return localStorage.getItem('fbview') !== 'side'; } catch { return true; } });
   const toggleView = () => setMadden((m) => { try { localStorage.setItem('fbview', m ? 'side' : 'madden'); } catch { /* storage unavailable */ } return !m; });
   const cur = season || null;
-  const team = cur ? nextTeam(cur) : null;
-  const [g, setG] = useState(() => (cur && cur.game && !seasonOver(cur) ? cur.game : null)); // a saved game resumes at once
+  const team = cur ? currentTeam(cur) : null;
+  const [g, setG] = useState(() => (cur && cur.game && !seasonDone(cur) ? cur.game : null)); // a saved game resumes at once
   const curRef = useRef(cur);
   curRef.current = cur;
   const saved = useRef(false);
@@ -42,7 +70,14 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
   }, [g]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startSeason = () => onSeason(newSeason((Math.random() * 2 ** 31) >>> 0));
-  const startGame = () => { saved.current = false; setWinShown(false); setG(newGame((cur.seed + cur.week * 7919) >>> 0, team.id)); };
+  const startGame = () => {
+    saved.current = false; setWinShown(false);
+    const playoff = Boolean(cur.playoffs);
+    // a playoff game that ends level goes to the higher seed
+    const ids = field(cur);
+    const tiebreak = playoff ? (ids.indexOf('you') < ids.indexOf(team.id) ? 'you' : 'them') : null;
+    setG(newGame((cur.seed + cur.week * 7919 + (playoff ? 1000 * (cur.playoffs.round + 1) : 0)) >>> 0, team.id, { playoff, tiebreak }));
+  };
   const rngFor = (tag) => createRng((g.seed ^ Math.imul(g.plays + 1, 0x9e3779b1) ^ tag) >>> 0);
 
   // ---- the coin toss: a quick game of Conway's Takeover ----------------------------------------------------------
@@ -60,6 +95,7 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
   const onFoePlay = (result) => {
     setG((s) => {
       let n = afterPlay(s, { kind: result.kind, yards: result.yards, note: result.note }, startSpot());
+      n = { ...n, foeKinds: [...(s.foeKinds || []), result.kind === 'run' ? 'run' : 'pass'].slice(-12) }; // what you can read off them
       // on 4th down the bot kicks, punts or goes for it (see botFourthDown)
       if (n.poss === 'them' && n.drive.down === 4 && n.phase === 'play') {
         const r = createRng((s.seed ^ Math.imul(s.plays + 7, 0x85ebca6b)) >>> 0);
@@ -84,13 +120,18 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
   const defFor = () => defenceById(teamDefence(rngFor(0xdef), team, g.classes));
 
   const finishGame = () => {
-    const week = cur.week + 1;
-    const finished = { ...cur, week, results: [...cur.results, { team: g.teamId, you: g.you, them: g.them }], game: null };
-    onSeason(finished);
-    // the trophy room: this game's totals, and the cup if the season is over
+    const game = { team: g.teamId, you: g.you, them: g.them };
+    let next;
+    if (cur.playoffs) next = { ...playoffResult(cur, { ...game, tb: g.tiebreak }), game: null };
+    else {
+      next = { ...cur, week: cur.week + 1, results: [...cur.results, game], game: null };
+      if (qualified(next)) next = startPlayoffs(next); // 6 wins and you are in
+    }
+    onSeason(next);
+    // the trophy room: this game's totals, and the season when it is over
     if (onTrophy) {
       onTrophy((s) => recordGame(s, { you: g.you, them: g.them, td: g.td, fg: g.fg }));
-      if (week >= SEASON_GAMES) onTrophy((s) => recordSeason(s, finished, PLAYOFF_WINS));
+      if (seasonDone(next)) onTrophy((s) => recordSeason(s, next));
     }
     setG(null);
   };
@@ -105,7 +146,7 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
         <div className="driveinfo">
           {inGame && g.phase === 'play' ? (
             <>
-              <b>{`Q${g.q} ${clockText(g.clock)}`} · {g.poss === 'you' ? '' : 'Their '}{ordinal(g.drive.down)} & {g.drive.toGo}</b>
+              <b>{g.q === 5 ? `OT ${clockText(g.clock)}` : `Q${g.q} ${clockText(g.clock)}`} · {g.poss === 'you' ? '' : 'Their '}{ordinal(g.drive.down)} & {g.drive.toGo}</b>
               <span>{g.poss === 'you' ? spotText(g.drive.spot) : `Ball on ${g.drive.spot <= 50 ? `their ${g.drive.spot}` : `your ${DRIVE.goal - g.drive.spot}`} · you defend`}</span>
             </>
           ) : inGame && g.phase === 'toss' ? <><b>Coin toss</b><span>Gridiron Graffiti</span></>
@@ -124,20 +165,30 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
           {!cur ? (
             <>
               <h3>Gridiron Cellular Warfare</h3>
-              <p className="note">A football season on a Life board: eight games against tougher and tougher teams. Each game is four 4-minute quarters, 15 seconds a play. A quick game of Conway's Takeover decides who receives. You play your offence live and call your defence play by play. Win {PLAYOFF_WINS} to be champions. Your season saves as you go, so put it down any time.</p>
+              <p className="note">A football season on a Life board: eight games against tougher and tougher teams. Each game is four 4-minute quarters, 15 seconds a play. A quick game of Conway's Takeover decides who receives. You play your offence live and call your defence play by play. Win {PLAYOFF_WINS} to reach an 8-team playoff, then win the bracket to be champions. Your season saves as you go, so put it down any time.</p>
               <p className="note"><b>Controls.</b> Space locks in, snaps and throws. On a pass your receivers are light spaceships and the ball is a glider you fire from the quarterback: pick a receiver (1-4 or arrows) and press Space when the dashed line turns green. Taps work too.</p>
               <button className="lock" onClick={startSeason}>Start a season</button>
             </>
-          ) : seasonOver(cur) ? (
+          ) : seasonDone(cur) ? (
             <>
               <h3>{champion(cur) ? 'Champions!' : 'Season over'}</h3>
-              <p className="note">{rec.wins}-{rec.losses}{rec.ties ? `-${rec.ties}` : ''}. {champion(cur) ? 'You took the title.' : `You needed ${PLAYOFF_WINS} wins.`}</p>
+              <p className="note">{rec.wins}-{rec.losses}{rec.ties ? `-${rec.ties}` : ''} in the regular season. {finishText(cur)}.{champion(cur) ? ' The cup is in the trophy room.' : !qualified(cur) ? ` You needed ${PLAYOFF_WINS} wins for the playoffs.` : ''}</p>
+              {cur.playoffs && <Bracket season={cur} />}
               <button className="lock" onClick={startSeason}>New season</button>
+            </>
+          ) : cur.playoffs ? (
+            <>
+              <h3>Playoffs: {ROUND_NAMES[cur.playoffs.round]}</h3>
+              <p className="note">You are the {cur.playoffs.seed === 1 ? '1' : cur.playoffs.seed === 2 ? '2' : '3'} seed. Next: <b>{team.name}</b>. {team.level === 2 ? 'One of the best in the league.' : 'A tough out.'} They love to {STYLE_TEXT[team.style]}, and they usually line up in {team.def.map((id) => defenceById(id).name).join(', ')}. Lose and you are out. A tie goes to overtime.</p>
+              <Bracket season={cur} />
+              {hasSaved
+                ? <button className="lock" onClick={() => setG(cur.game)}>Continue game · Q{cur.game.q} {clockText(cur.game.clock)} · You {cur.game.you}–{cur.game.them}</button>
+                : <button className="lock" onClick={startGame}>Play the {ROUND_NAMES[cur.playoffs.round].toLowerCase()}</button>}
             </>
           ) : (
             <>
               <h3>Week {cur.week + 1}: {team.name}</h3>
-              <p className="note">Record {rec.wins}-{rec.losses}{rec.ties ? `-${rec.ties}` : ''}. {team.level === 0 ? 'A friendly start.' : team.level === 1 ? 'A real test.' : 'The best in the league.'} They love to {STYLE_TEXT[team.style]}, and they usually line up in {team.def.map((id) => defenceById(id).name).join(', ')}.</p>
+              <p className="note">Record {rec.wins}-{rec.losses}{rec.ties ? `-${rec.ties}` : ''}. {team.level === 0 ? 'A friendly start.' : team.level === 1 ? 'A real test.' : 'The best in the league.'} They love to {STYLE_TEXT[team.style]}, and they usually line up in {team.def.map((id) => defenceById(id).name).join(', ')}. Win {PLAYOFF_WINS} of {SEASON_GAMES} to make the playoffs.</p>
               {hasSaved
                 ? <button className="lock" onClick={() => setG(cur.game)}>Continue game · Q{cur.game.q} {clockText(cur.game.clock)} · You {cur.game.you}–{cur.game.them}</button>
                 : <button className="lock" onClick={startGame}>Play week {cur.week + 1}</button>}
@@ -157,7 +208,7 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
 
       {preview && <Cheer side="you" kind={preview} pts={preview === 'fg' ? 3 : 7} subtitle="You beat the Rookies 24–10" teamName="Rookies" sfx={sfx} onDone={() => setPreview(null)} />}
       {inGame && g.cheer && <Cheer side={g.cheer.side} pts={g.cheer.pts} kind={g.cheer.kind} teamName={team.name} sfx={sfx} onDone={cheerDone} />}
-      {inGame && g.phase === 'final' && !g.cheer && g.you > g.them && !winShown && (
+      {inGame && g.phase === 'final' && !g.cheer && (g.playoff ? wonGame({ you: g.you, them: g.them, tb: g.tiebreak }) : g.you > g.them) && !winShown && (
         <Cheer side="you" kind="win" pts={g.you} subtitle={`You beat ${team.name} ${g.you}–${g.them}`} teamName={team.name} sfx={sfx} onDone={() => setWinShown(true)} />
       )}
 
@@ -191,7 +242,7 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
         </section>
       )}
       {inGame && g.phase === 'play' && !g.pending && g.poss === 'them' && (
-        <DefendField key={`d${g.plays}`} drive={g.drive} rotate={madden} call={botCall(rngFor(0xb07), team)} team={team} audibles={g.aud} onAudible={useAudible}
+        <DefendField key={`d${g.plays}`} tendency={g.foeKinds} drive={g.drive} rotate={madden} call={botCall(rngFor(0xb07), team)} team={team} audibles={g.aud} onAudible={useAudible}
           seed={(g.seed + g.plays * 977) >>> 0} onPlay={onFoePlay} onSim={simFoe} />
       )}
       {inGame && g.phase === 'play' && !g.pending && g.poss === 'you' && (
@@ -200,7 +251,7 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
       )}
       {inGame && g.phase === 'final' && (
         <section className="hub">
-          <h3>{g.you > g.them ? 'Win!' : g.you < g.them ? 'Loss' : 'Tie'} {g.you}–{g.them}</h3>
+          <h3>{g.playoff ? (wonGame({ you: g.you, them: g.them, tb: g.tiebreak }) ? 'You advance!' : 'Eliminated') : g.you > g.them ? 'Win!' : g.you < g.them ? 'Loss' : 'Tie'} {g.you}–{g.them}</h3>
           <p className="note">{team.name}. {g.note}</p>
           <button className="lock" onClick={finishGame}>Back to the season</button>
         </section>

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { recordGame, recordSeason, trophyRoom } from './trophies.js';
+import { startPlayoffs, playoffResult, nextOpponent } from './playoffs.js';
 import { newSave } from './wallet.js';
 import { exportCode, importCode } from './saveStore.js';
 
@@ -28,13 +29,15 @@ describe('trophy room', () => {
 
   it('puts a cup in the cabinet for a championship season, and not for a losing one', () => {
     const season = (wins) => ({ seed: 1, week: 8, results: Array.from({ length: 8 }, (_, i) => ({ team: 't', you: i < wins ? 10 : 3, them: 7 })) });
+    const champs = () => { let x = startPlayoffs(season(8)); for (let i = 0; i < 3; i++) x = playoffResult(x, { team: nextOpponent(x).id, you: 20, them: 10 }); return x; };
     let s = newSave();
-    s = recordSeason(s, season(8), 6);
-    s = recordSeason(s, season(4), 6);
+    s = recordSeason(s, champs());
+    s = recordSeason(s, season(4));
     const r = trophyRoom(s);
     expect(r.seasons.length).toBe(2);
     expect(r.cups.length).toBe(1);
-    expect(r.cups[0]).toMatchObject({ n: 1, wins: 8, losses: 0, champion: true });
+    expect(r.cups[0]).toMatchObject({ n: 1, wins: 8, losses: 0, champion: true, finish: 'Champions' });
+    expect(r.seasons[1].finish).toBe('Missed the playoffs');
     expect(r.badges.find((b) => b.id === 'perfect').earned).toBe(true);
     expect(r.badges.find((b) => b.id === 'dynasty').earned).toBe(false);
   });
@@ -50,7 +53,7 @@ describe('trophy room', () => {
 
   it('survives the save round trip', () => {
     let s = recordGame(newSave(), { you: 31, them: 3, td: 4, fg: 1 });
-    s = recordSeason(s, { seed: 1, week: 8, results: Array.from({ length: 8 }, () => ({ team: 't', you: 14, them: 7 })) }, 6);
+    s = recordSeason(s, { seed: 1, week: 8, results: Array.from({ length: 8 }, () => ({ team: 't', you: 14, them: 7 })) });
     const back = importCode(exportCode(s));
     expect(back.trophies).toEqual(s.trophies);
   });
