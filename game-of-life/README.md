@@ -1,44 +1,43 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# Gridiron Cellular Warfare
 
-## Available Scripts
+A Conway's-Life tactical arcade game. Pick a football-style formation, bet play money, and watch two (or four)
+armies of cells fight under Life's rules on a neon-green field, with a pit underneath that scores the overflow.
+Everything is a virtual currency: no real money, no backend, saves stay on your device.
 
-In the project directory, you can run:
+## Run it
 
-### `npm start`
+```
+npm install
+npm run dev          # http://localhost:5173
+npm run dev:lan      # same, reachable from your phone on the same Wi-Fi (use the LAN IP it prints)
+npm run build        # static site in dist/ (relative paths, so it can be hosted from any sub-path)
+npm test             # Vitest (the engine regression tests take about half a minute)
+```
 
-Runs the app in the development mode.<br>
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## How to play
 
-The page will reload if you make edits.<br>
-You will also see any lint errors in the console.
+1. Pick a formation (Formations tab). It previews on your half.
+2. Optional: buy one shop piece, press **Place**, and tap a spot on your half (nudge it with the arrows on phones).
+3. Set a bet and **Lock In**, then **Snap**. The bot's formation is revealed after you lock in; an Audible lets you switch.
+4. Cells follow Life's rules; towers of chips topple into the pit. The side with more ground plus the pit bonus wins.
 
-### `npm test`
+Modes: **Classic 1v1** (even money) and the **4-player arena** (a board twice the size, three bots, winner takes all, a win pays x3).
+**Football drive**: call pass and run plays against a bot defence (4 downs per 10 yards from your own 25); a touchdown pays x1.5. Receivers pass through the defensive line, the defence's coverage players evolve under Life's rules until the ball arrives, and the formation it shows decides whether the catch is covered. Repeat a call and the defence adjusts. Balanced with `node scripts/football-sim.mjs`.
 
-Launches the test runner in the interactive watch mode.<br>
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Tables run from Rookie to Mogul with bigger bets, fees, sharper bots and bosses that turn up at random.
 
-### `npm run build`
+## Layout
 
-Builds the app for production to the `build` folder.<br>
-It correctly bundles React in production mode and optimizes the build for the best performance.
+| Path | What lives there |
+| --- | --- |
+| `src/engine/` | Deterministic Life engine (`engine.js` 2 teams, `engineN.js` any number), geometry, formations, rating, `football.js` (the drive rules) |
+| `src/game/` | Wallet and saves, tables, bosses, anti-save-scum, tutorial |
+| `src/render/` | Canvas drawing of the board, pit and chips |
+| `src/components/` | Sidebar (formations, shop), tables, arena canvas, formation designer |
+| `scripts/` | Balance, pricing and simulation tooling (`node scripts/<name>.mjs`) |
 
-The build is minified and the filenames include the hashes.<br>
-Your app is ready to be deployed!
+## Notes
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (Webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+- The engine is seeded and deterministic, so replays and settle-on-reload are exact.
+- Saves are local and revisioned; they deter casual cheating but a server is needed to make it airtight.
+- Layouts: three columns on desktop and foldables, a pinned board with bottom sheets and a dock on phones.
