@@ -3,6 +3,9 @@ import Arena from './components/Arena.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import SaveDialog from './components/SaveDialog.jsx';
 import Designer from './components/Designer.jsx';
+import Tables from './components/Tables.jsx';
+import { TABLES, getTable, tableOpen, feeFor, betStep, maxBetFor, pickTableSetup } from './game/tables.js';
+import { getStyle, colorAt, buyStyle, equipStyle } from './game/cosmetics.js';
 import { buildCustom } from './engine/custom.js';
 import { createEngine } from './engine/engine.js';
 import { FREE_BUILDS, TUTORIAL_BUILDS } from './engine/library.js';
@@ -60,7 +63,10 @@ export default function App() {
   const [boot] = useState(startUp);
   const [save, setSave] = useState(boot.save);
   // Every change to the save bumps its revision, which is what makes an older save code detectable.
-  const commit = (next) => setSave((s) => ({ ...(typeof next === 'function' ? next(s) : next), rev: s.rev + 1 }));
+  const commit = (next) => setSave((s) => {
+    const n = typeof next === 'function' ? next(s) : next;
+    return { ...n, rev: s.rev + 1, peak: Math.max(n.peak || 0, n.balance) };
+  });
   useEffect(() => { persistSave(save); }, [save]);
 
   const [phase, setPhase] = useState('draft'); // draft -> locked -> (audible) -> playing -> done
@@ -117,21 +123,26 @@ export default function App() {
   const [bossMult, setBossMult] = useState(null);   // the hidden payout, revealed after a win
   const [betPref, setBetPref] = useState(WAGER);
   const pieceCost = obj && !tutorial ? obj.price : 0;
-  const maxBet = Math.max(MIN_BET, save.balance - pieceCost);   // up to everything left after the piece
-  const wager = tutorial ? (practice ? 0 : TUTORIAL_STAKE) : Math.min(Math.max(betPref, MIN_BET), maxBet);
-  const cost = wager + pieceCost;
-  const setBet = (v) => setBetPref(Math.min(maxBet, Math.max(MIN_BET, Math.round(v))));
-  const audiblePrice = tutorial ? 0 : AUDIBLE_PRICE;
+  const candidate = getTable(save.table);
+  const table = tableOpen(save, candidate) ? candidate : TABLES[0]; // a table you no longer qualify for falls back to Rookie
+  const maxBet = Math.max(table.min, maxBetFor(table, save.balance, pieceCost)); // the table's ceiling, or what you can cover with the fee and any piece
+  const wager = tutorial ? (practice ? 0 : TUTORIAL_STAKE) : Math.min(Math.max(betPref, table.min), maxBet);
+  const tableFee = tutorial ? 0 : feeFor(table, wager);
+  const cost = wager + tableFee + pieceCost;
+  const setBet = (v) => setBetPref(Math.min(maxBet, Math.max(table.min, Math.round(v))));
+  // an audible (and backing out after the reveal) costs a share of the bet, never less than the base price
+  const audiblePrice = tutorial ? 0 : Math.max(AUDIBLE_PRICE, Math.round(wager * 0.05));
 
   // Everything the per-frame callbacks and window listeners need, kept current.
   const live = useRef({});
-  live.current = { findBuild, tutorial, practice, wager, phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
+  live.current = { styleId: save.style.equipped, findBuild, tutorial, practice, wager, phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
   const engineRef = useRef(newEngine(1)); // an empty board, so the Hot Zones show while drafting
   const spillsRef = useRef([]);
   const lastCrashId = useRef(0);
   const escrowRef = useRef(0);
   const wagerRef = useRef(WAGER);
   const bossRef = useRef(null);
+  const tableRef = useRef(null);
   const skipRef = useRef(false);
   const seedRef = useRef(1);
   const botRef = useRef(null);
@@ -179,7 +190,7 @@ export default function App() {
     }
     return {
       teams: e.teams, hot: e.hot, stacks: e.stacks, blueTower: e.blueTower, redTower: e.redTower,
-      ghost, look: lk,
+      ghost, look: lk, playerRgb: colorAt(getStyle(live.current.styleId), now),
       pit: { size: PIT, hot, blue: pitDisplay.blue, red: pitDisplay.red, ghost: pitDisplay.ghost, time: now },
       spills: spillsRef.current,
     };
@@ -233,7 +244,10 @@ export default function App() {
     const boss = !tutorial && bossId ? getBoss(bossId) : null;
     const bot = boss
       ? withItem(boss, pickBossSetup(boss, createRng(seed), save.boss.last), createRng(seed ^ 0x51ed))
-      : pickBotSetup(createRng(seed), tutorial && TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS);
+      : tutorial
+        ? pickBotSetup(createRng(seed), TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS)
+        : pickTableSetup(table, createRng(seed), save.boss.last, createRng(seed ^ 0x51ed));
+    tableRef.current = tutorial || boss ? null : table;
     const mine = blueCells(selected, obj, drop);
     // the match is written into the save now, so closing the page cannot dodge a loss
     commit(() => {
@@ -263,7 +277,7 @@ export default function App() {
     const held = escrowRef.current; // read now: the updater below runs after this handler returns
     commit((s) => {
       const back = clearPending(refund(s, held));
-      return tutorial ? back : forfeit(back, AUDIBLE_PRICE);
+      return tutorial ? back : forfeit(back, audiblePrice);
     });
     escrowRef.current = 0;
     settledRef.current = true;
@@ -286,11 +300,12 @@ export default function App() {
     const rng = createRng(seed ^ 0x9e3779b9);
     let bot = botRef.current;
     botPendingRef.current = null;
-    if (!tutorial && botAnswers(rng, bossRef.current ? bossRef.current.audible : undefined)) {
+    if (!tutorial && botAnswers(rng, bossRef.current ? bossRef.current.audible : tableRef.current ? tableRef.current.audible : undefined)) {
       const c = counterFor(next.id, FREE_BUILDS, rng);
       const flip = rng() < 0.5;
       bot = { formation: c, flip, cells: placeFormation(c, RED, { flip }) };
       if (bossRef.current) bot = withItem(bossRef.current, bot, rng);
+      else if (tableRef.current && tableRef.current.items.length && rng() < tableRef.current.itemChance) bot = withItem({ items: tableRef.current.items }, bot, rng);
       botPendingRef.current = { name: botLabel(bot), notice: `The bot called an audible: ${bot.formation.name}.` };
     }
     const mine = blueCells(next, obj, drop);
@@ -438,6 +453,7 @@ export default function App() {
       : !afford ? 'Not enough cash for this bet.' : '';
   const challenger = !tutorial && bossId ? getBoss(bossId) : null;
   const lockLabel = drafting ? `${challenger ? `Challenge ${challenger.name}` : 'Lock In'} · ${money(cost)}` : 'Locked in';
+  const feeNote = drafting && tableFee > 0 ? `Includes a ${money(tableFee)} table fee.` : '';
   // ---- auto-play: keep firing the same bet on the same formation ------------------------
   const [auto, setAuto] = useState({ on: false, bet: 0, start: 0, n: 0 });
   const stopAuto = (why) => {
@@ -496,6 +512,11 @@ export default function App() {
       </header>
 
       <div className="layout">
+        <Tables
+          save={save} tableId={table.id} drafting={drafting && !auto.on} tutorial={tutorial}
+          onPick={(id) => commit((s) => ({ ...s, table: id }))}
+        />
+
         <main className="stage">
           <div className={lesson && CENTER_STEPS.includes(tStep) ? "table dimmed" : "table"} style={{ width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
             <section className="scorebar">
@@ -555,7 +576,8 @@ export default function App() {
         </main>
 
         <Sidebar
-          builds={playerBuilds} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} bet={tutorial ? null : wager} minBet={MIN_BET} maxBet={maxBet} onBet={setBet} phase={phase}
+          builds={playerBuilds} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} bet={tutorial ? null : wager} minBet={table.min} maxBet={maxBet} betStep={betStep(table)} onBet={setBet}
+          styles={tutorial ? null : { owned: save.style.owned, equipped: save.style.equipped, onBuy: (id) => { const n = buyStyle(save, id); if (n) commit(() => n); }, onEquip: (id) => { const n = equipStyle(save, id); if (n) commit(() => n); } }} phase={phase}
           selectedId={selectedId}
           onSelect={(id) => (phase === 'audible' ? setAudibleChoice(id) : setSelectedId(id))}
           objectId={objectId}
@@ -563,16 +585,16 @@ export default function App() {
           placed={Boolean(drop)} armed={armed}
           onArm={() => setArmed(true)} onDragStart={onDragStart}
           onClearPlace={() => { setDrop(null); setArmed(false); }}
-          lockLabel={lockLabel} lockHint={lockHint} canLock={canLock} onLockIn={lockIn}
+          lockLabel={lockLabel} lockHint={lockHint || feeNote} canLock={canLock} onLockIn={lockIn}
           audibleChoiceId={audibleChoice} canAudible={canAudible}
-          audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${tutorial ? 'free' : money(AUDIBLE_PRICE)}` : 'Pick a formation'}
+          audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${tutorial ? 'free' : money(audiblePrice)}` : 'Pick a formation'}
           onAudibleConfirm={confirmAudible}
           bosses={tutorial ? null : { list: unlockedBosses(save), all: BOSSES, ready: bossReady(save), toGo: winsToBoss(save), beaten: save.boss.beaten, selected: bossId }}
           onBoss={(id) => setBossId(id)}
           onNewMatch={newMatch} onReplay={watchReplay} onAutoStart={startAuto} onAutoStop={() => stopAuto('')}
           auto={tutorial ? null : { on: auto.on, n: auto.n, net: save.balance - auto.start }} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
-          audibleFee={tutorial ? 'free' : money(AUDIBLE_PRICE)}
+          audibleFee={tutorial ? 'free' : money(audiblePrice)}
           custom={tutorial ? null : {
             unlocked: save.custom.unlocked, price: CUSTOM_PRICE, max: MAX_CUSTOM, list: save.custom.list,
             canBuy: save.balance >= CUSTOM_PRICE,
@@ -581,7 +603,7 @@ export default function App() {
             onEdit: (c) => setDesigner(c),
             onDelete: (id) => { commit((s) => deleteCustom(s, id)); if (selectedId === id) setSelectedId(null); },
           }}
-          cancelFee={tutorial ? '' : money(AUDIBLE_PRICE)}
+          cancelFee={tutorial ? '' : money(audiblePrice)}
         />
       </div>
 

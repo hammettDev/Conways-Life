@@ -1,6 +1,8 @@
 import { newSave, newPlayerSave, SAVE_VERSION } from './wallet.js';
 import { checkCustom, CUSTOM_SHAPES } from '../engine/custom.js';
 import { designHash } from '../engine/rating.js';
+import { CHIP_STYLES } from './cosmetics.js';
+import { TABLES } from './tables.js';
 import { MAX_CUSTOM, MAX_CUSTOM_UNITS, CUSTOM_RATING_CAP } from '../engine/constants.js';
 
 const KEY = 'gcw.save';
@@ -32,6 +34,14 @@ function sanitizePending(p) {
   const red = cellList(p.red);
   if (!blue.length || !red.length) return null;
   return { seed: Math.floor(p.seed) & 0x7fffffff, wager: Math.floor(p.wager), boss: typeof p.boss === 'string' ? p.boss : null, blue, red };
+}
+
+function sanitizeStyle(s) {
+  const x = s && typeof s === 'object' ? s : {};
+  const known = new Set(CHIP_STYLES.map((c) => c.id));
+  const owned = Array.isArray(x.owned) ? x.owned.filter((id) => known.has(id)) : [];
+  if (!owned.includes('classic')) owned.unshift('classic');
+  return { owned: [...new Set(owned)], equipped: owned.includes(x.equipped) ? x.equipped : 'classic' };
 }
 
 // A saved custom formation only survives if it still passes the designer's own rules.
@@ -74,6 +84,9 @@ export function sanitize(raw) {
     tutorialDone: raw.tutorialDone === true || played > 0, // older saves predate the tutorial
     boss: sanitizeBoss(raw.boss),
     custom: sanitizeCustom(raw.custom),
+    peak: Math.max(num(raw.peak, fresh.peak), num(raw.balance, fresh.balance)),
+    table: TABLES.some((t) => t.id === raw.table) ? raw.table : 'rookie',
+    style: sanitizeStyle(raw.style),
     rev: num(raw.rev, 0),
     sid: num(raw.sid, 0),
     pending: sanitizePending(raw.pending),

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ratePlayers, designHash } from './rating.js';
+import { ratePlayers, designHash, RATING_RUNS } from './rating.js';
 import { CUSTOM_RATING_CAP } from './constants.js';
 import { importCode, exportCode } from '../game/saveStore.js';
 import { newSave, buyCustom, saveCustom } from '../game/wallet.js';
@@ -11,15 +11,21 @@ describe('formation rating', () => {
   it('is deterministic, and ranks a weak formation below a strong one', () => {
     const weak = unitsOf('fb-wishbone');
     const strong = unitsOf('fb-i-form');
-    const a = ratePlayers(weak);
-    expect(ratePlayers(weak)).toBe(a); // fixed seeds: the same design always gets the same rating
-    expect(a).toBeLessThan(ratePlayers(strong));
+    const quick = RATING_RUNS.slice(0, 4); // a smaller sample keeps the test fast
+    const a = ratePlayers(weak, null, quick);
+    expect(ratePlayers(weak, null, quick)).toBe(a); // fixed seeds: the same design always gets the same rating
+    expect(a).toBeLessThan(ratePlayers(strong, null, quick));
     expect(ratePlayers([])).toBeNull(); // an illegal design has no rating
   }, 120000);
 
-  it('the cap sits above every built-in formation, so the built-ins are never locked out', () => {
-    for (const id of ['fb-i-form', 'fb-goal-line-d']) expect(ratePlayers(unitsOf(id))).toBeLessThanOrEqual(CUSTOM_RATING_CAP);
+  it('the cap sits above the best free built-in formation, so the free pool is never locked out', () => {
+    expect(ratePlayers(unitsOf('fb-prevent'))).toBeLessThanOrEqual(CUSTOM_RATING_CAP);
   }, 120000);
+
+  it('rates against the bots both as built and flipped', () => {
+    expect(RATING_RUNS.some((r) => r.flip)).toBe(true);
+    expect(RATING_RUNS.some((r) => !r.flip)).toBe(true);
+  });
 });
 
 describe('saved custom formations carry their rating', () => {

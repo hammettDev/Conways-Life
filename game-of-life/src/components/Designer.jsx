@@ -124,7 +124,7 @@ export default function Designer({ initial, onSave, onClose }) {
                   Rating {Math.round(current * 100)}% · limit {Math.round(CUSTOM_RATING_CAP * 100)}%{overCap ? ' · too strong, adjust it' : ' · allowed'}
                 </p>
               )}
-              {current == null && !progress && <p className="hint">Rate it to save: it is measured against the bot formations (about 10 seconds). The best built-in formations rate 65-67%.</p>}
+              {current == null && !progress && <p className="hint">Rate it to save: it is measured against the bot formations (about 10 to 20 seconds). The best built-in formations rate 65-67%.</p>}
             </div>
             <div className="row">
               <button className="ghost" onClick={() => setUnits([])}>Clear</button>

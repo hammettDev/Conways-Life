@@ -15,6 +15,9 @@ export const newSave = () => ({
   pending: null,   // a locked-in match that has not finished; it settles itself if the page is closed
   boss: { wins: 0, beaten: [], last: null },
   custom: { unlocked: false, list: [] }, // the formation designer and the formations you saved with it
+  peak: STARTING_WALLET, // the most cash you have ever held: it opens the higher-stakes tables
+  table: 'rookie',
+  style: { owned: ['classic'], equipped: 'classic' }, // chip colours
   bailouts: 0,
   stats: { played: 0, wins: 0, losses: 0, pushes: 0, streak: 0, bestStreak: 0 },
 });

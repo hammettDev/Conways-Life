@@ -6,6 +6,16 @@ const FILL = { [BLUE]: THEME.blue, [RED]: THEME.red };
 const EDGE = { [BLUE]: THEME.blueDeep, [RED]: THEME.redDeep };
 const GLOW = { [BLUE]: 'rgba(56,169,255,0.30)', [RED]: 'rgba(255,61,120,0.30)' };
 
+// Your colour: the equipped chip colour recolours everything drawn for the blue team. It is set
+// once per frame from view.playerRgb, so animated colours just change it every frame.
+let ME = '56,169,255';
+export function setPlayerColor(rgb) {
+  ME = rgb.join(',');
+  FILL[BLUE] = `rgb(${ME})`;
+  EDGE[BLUE] = `rgb(${rgb.map((v) => Math.round(v * 0.55)).join(',')})`;
+  GLOW[BLUE] = `rgba(${ME},0.30)`;
+}
+
 const MAX_DISCS = 14;
 
 // Sim tile (x, y) -> screen tile. Sideways: the teams face each other left to
@@ -146,7 +156,7 @@ export function drawBoard(ctx, view) {
         if (b === rd) continue;
         const [sx, sy] = toScreen(x, y, rotate);
         const a = Math.min(0.34, 0.04 + 0.035 * Math.sqrt(Math.abs(b - rd)));
-        ctx.fillStyle = b > rd ? `rgba(56,169,255,${a})` : `rgba(255,61,120,${a})`;
+        ctx.fillStyle = b > rd ? `rgba(${ME},${a})` : `rgba(255,61,120,${a})`;
         ctx.fillRect(sx * tile, sy * tile, tile, tile);
       }
     }
@@ -179,7 +189,7 @@ export function drawBoard(ctx, view) {
         }
         const gh = ghostAt.get(i);
         if (gh !== undefined) {
-          ctx.fillStyle = gh === BLUE ? 'rgba(56,169,255,0.32)' : 'rgba(255,61,120,0.32)';
+          ctx.fillStyle = gh === BLUE ? `rgba(${ME},0.32)` : 'rgba(255,61,120,0.32)';
           ctx.fillRect(px + inset, py + inset, tile - inset * 2, tile - inset * 2);
           ctx.strokeStyle = FILL[gh];
           ctx.strokeRect(px + inset + 0.5, py + inset + 0.5, tile - inset * 2 - 1, tile - inset * 2 - 1);
@@ -235,7 +245,7 @@ export function drawPit(ctx, view) {
         const g0 = view.ghost && view.ghost[k];
         if (g0) {
           // a cosmetic Life cell drifting around the owned tiles
-          const gc = g0 === 1 ? '56,169,255' : '255,61,120';
+          const gc = g0 === 1 ? ME : '255,61,120';
           ctx.fillStyle = `rgba(${gc},0.3)`;
           ctx.fillRect(x + 3, y + 3, tile - 6, tile - 6);
           ctx.fillStyle = `rgba(${gc},0.18)`;
@@ -244,7 +254,7 @@ export function drawPit(ctx, view) {
         if (b !== rd) {
           // heat: the bigger the lead, the hotter the tile (no numbers)
           const a = Math.min(0.62, 0.1 + 0.07 * Math.sqrt(lead)) * breathe;
-          ctx.fillStyle = b > rd ? `rgba(56,169,255,${a})` : `rgba(255,61,120,${a})`;
+          ctx.fillStyle = b > rd ? `rgba(${ME},${a})` : `rgba(255,61,120,${a})`;
           ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
           if (lead >= 4) {
             ctx.fillStyle = b > rd ? 'rgba(160,220,255,0.35)' : 'rgba(255,160,190,0.35)';
@@ -383,6 +393,7 @@ function tube(ctx, pts, tile) {
 
 // `view` = a Board 1 view plus { pit: {size, hot, blue, red}, spills: [{born, crash}], now (ms) }
 export function drawTable(ctx, view) {
+  if (view.playerRgb) setPlayerColor(view.playerRgb);
   const { tile, rotate = false, pit, spills = [], now = 0 } = view;
   const { cols, rows } = boardSize(rotate);
   const W = cols * tile;

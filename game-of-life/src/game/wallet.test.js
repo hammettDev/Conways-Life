@@ -66,7 +66,8 @@ describe('save store', () => {
 
   it('round-trips through localStorage', () => {
     const st = fakeStorage();
-    const s = settle(placeBet(newSave(), WAGER), 'win');
+    const won = settle(placeBet(newSave(), WAGER), 'win');
+    const s = { ...won, peak: Math.max(won.peak, won.balance) }; // the app keeps the peak current on every change
     expect(persistSave(s, st)).toBe(true);
     expect(loadSave(st)).toEqual(s);
   });
@@ -90,7 +91,8 @@ describe('save store', () => {
   });
 
   it('export codes round-trip and reject typos and edits', () => {
-    const s = settle(placeBet(newSave(), WAGER), 'win');
+    const won = settle(placeBet(newSave(), WAGER), 'win');
+    const s = { ...won, peak: Math.max(won.peak, won.balance) }; // the app keeps the peak current on every change
     const code = exportCode(s);
     expect(code.startsWith('GCW1.')).toBe(true);
     expect(importCode(code)).toEqual(s);

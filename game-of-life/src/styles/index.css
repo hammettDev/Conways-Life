@@ -27,7 +27,7 @@ body {
 .top h1 span { color: var(--hot); text-shadow: 0 0 18px rgba(255, 176, 46, 0.45); }
 .top p { margin: 4px 0 16px; color: var(--dim); }
 
-.layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
 
 .sidebar, .panel {
   background: var(--panel);
@@ -203,3 +203,15 @@ body {
 .list li.customrow .item { flex: 1; }
 
 .ratebox { display: flex; flex-direction: column; gap: 6px; }
+
+.lobby { display: flex; flex-direction: column; gap: 8px; }
+.lobby h2 { margin: 0; font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.tableitem { flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.tableitem .meta { white-space: normal; font-size: 0.72rem; }
+.list.soon .item { opacity: 0.5; cursor: default; }
+.swatch { display: inline-block; width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); flex: none; }
+.styleitem { display: flex; align-items: center; gap: 10px; }
+.styleitem .name { flex: 1; text-align: left; }
+.segment { display: flex; gap: 6px; }
+
+@media (max-width: 1100px) { .layout { grid-template-columns: minmax(0, 1fr) 300px; } .lobby { grid-column: 1 / -1; order: 3; } }

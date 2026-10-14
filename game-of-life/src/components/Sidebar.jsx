@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { MiniPreview, Thumb } from './MiniPreview.jsx';
 import { DEMOS } from '../render/miniPreview.js';
+import { CHIP_STYLES, swatch, isAnimated } from '../game/cosmetics.js';
 
 const SPORT_LABEL = { football: 'Football', soccer: 'Soccer', basketball: 'Basketball', baseball: 'Baseball', hockey: 'Hockey', custom: 'Custom' };
 const money = (n) => `$${n.toLocaleString()}`;
@@ -9,7 +10,7 @@ const money = (n) => `$${n.toLocaleString()}`;
 // In the shop each piece shows a looping demo of what it does, and can be dragged
 // from that card onto your half of the board (or placed with a click).
 export default function Sidebar({
-  builds, objects, balance, wager, phase, free, bet, minBet, maxBet, onBet,
+  builds, objects, balance, wager, phase, free, bet, minBet, maxBet, betStep = 10, onBet, styles,
   selectedId, onSelect,
   objectId, onObject, placed, armed, onArm, onDragStart, onClearPlace,
   lockLabel, lockHint, canLock, onLockIn,
@@ -17,6 +18,7 @@ export default function Sidebar({
   onSnap, onSkip, onReplay, onAutoStart, onAutoStop, auto, cancelFee, custom, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
 }) {
   const [tab, setTab] = useState('formations');
+  const [shopMode, setShopMode] = useState('pieces');
   // Hold the Lock In button to auto-play: it keeps firing the same bet until you let go.
   const held = useRef(false);
   const holdTimer = useRef(null);
@@ -143,6 +145,38 @@ export default function Sidebar({
         </>
       ) : (
         <>
+          {styles && (
+            <div className="segment" role="tablist" aria-label="Shop section">
+              <button role="tab" aria-selected={shopMode === 'pieces'} className={shopMode === 'pieces' ? 'chip on' : 'chip'} onClick={() => setShopMode('pieces')}>Pieces</button>
+              <button role="tab" aria-selected={shopMode === 'colours'} className={shopMode === 'colours' ? 'chip on' : 'chip'} onClick={() => setShopMode('colours')}>Chip colours</button>
+            </div>
+          )}
+          {styles && shopMode === 'colours' ? (
+            <>
+              <p className="note">Recolour your own cells and chips. Purely cosmetic: it changes nothing about a match. Colour-changing ones shift over time.</p>
+              <ul className="list">
+                {CHIP_STYLES.map((c) => {
+                  const own = styles.owned.includes(c.id);
+                  const on = styles.equipped === c.id;
+                  return (
+                    <li key={c.id}>
+                      <button
+                        className={on ? 'item on styleitem' : 'item styleitem'}
+                        disabled={on || (!own && balance < c.price)}
+                        onClick={() => (own ? styles.onEquip(c.id) : styles.onBuy(c.id))}
+                        aria-label={`${c.name}${isAnimated(c) ? ' (colour-changing)' : ''}`}
+                      >
+                        <span className="swatch" style={{ background: swatch(c) }} />
+                        <span className="name">{c.name}{isAnimated(c) ? ' ✦' : ''}</span>
+                        <span className="meta">{on ? 'Equipped' : own ? 'Equip' : money(c.price)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          ) : (
+          <>
           <p className="note">
             One piece per match. It replaces your back-row reserves. {shopOpen ? 'Pick one, then drag its card onto your half of the board.' : 'Locked until the next match.'}
           </p>
@@ -179,6 +213,8 @@ export default function Sidebar({
               );
             })}
           </ul>
+          </>
+          )}
         </>
       )}
 
@@ -216,7 +252,7 @@ export default function Sidebar({
                 <button className="ghost small" onClick={() => onBet(maxBet)} disabled={!drafting || bet >= maxBet}>Max</button>
               </div>
               <input
-                type="range" className="betslider" min={minBet} max={maxBet} step={10} value={bet}
+                type="range" className="betslider" min={minBet} max={maxBet} step={betStep} value={bet}
                 onChange={(e) => onBet(Number(e.target.value))} disabled={!drafting || maxBet <= minBet} aria-label="Bet amount"
               />
             </div>
