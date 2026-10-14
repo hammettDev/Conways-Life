@@ -14,13 +14,13 @@ import { withItem } from './bosses.js';
 export const TABLES = [
   { id: 'rookie', name: 'Rookie', min: 50, max: 1000, unlock: 0, itemMult: 1, fee: 0, scout: 0, strong: 0, itemChance: 0, items: [], audible: 0.3,
     blurb: 'Bots pick at random.' },
-  { id: 'regular', name: 'Regular', min: 1000, max: 10000, unlock: 5000, itemMult: 5, fee: 0.02, scout: 0.35, strong: 0, itemChance: 0.3, items: ['block', 'toad', 'glider'], audible: 0.3,
+  { id: 'regular', name: 'Regular', min: 1000, max: 10000, unlock: 5000, itemMult: 10, fee: 0.02, scout: 0.35, strong: 0, itemChance: 0.3, items: ['block', 'toad', 'glider'], audible: 0.3,
     blurb: 'Sometimes counters your last formation. Small pieces.' },
-  { id: 'high', name: 'High Roller', min: 10000, max: 100000, unlock: 50000, itemMult: 25, fee: 0.04, scout: 0.65, strong: 0.25, itemChance: 0.6, items: ['glider', 'rpent', 'lwss', 'mwss'], audible: 0.5,
+  { id: 'high', name: 'High Roller', min: 10000, max: 100000, unlock: 50000, itemMult: 100, fee: 0.04, scout: 0.65, strong: 0.25, itemChance: 0.6, items: ['glider', 'rpent', 'lwss', 'mwss'], audible: 0.5,
     blurb: 'Usually counters your last formation. Spaceships and strong builds.' },
-  { id: 'whale', name: 'Whale', min: 100000, max: 1000000, unlock: 500000, itemMult: 125, fee: 0.06, scout: 1, strong: 0.5, itemChance: 1, items: ['mwss', 'hwss', 'acorn'], audible: 0.7,
+  { id: 'whale', name: 'Whale', min: 100000, max: 1000000, unlock: 500000, itemMult: 1000, fee: 0.06, scout: 1, strong: 0.5, itemChance: 1, items: ['mwss', 'hwss', 'acorn'], audible: 0.7,
     blurb: 'Always counters your last formation, always brings a heavy piece.' },
-  { id: 'mogul', name: 'Mogul', min: 1000000, max: 10000000, unlock: 5000000, itemMult: 500, fee: 0.08, scout: 1, strong: 1, itemChance: 1, items: ['hwss', 'acorn'], audible: 1,
+  { id: 'mogul', name: 'Mogul', min: 1000000, max: 10000000, unlock: 5000000, itemMult: 10000, fee: 0.08, scout: 1, strong: 1, itemChance: 1, items: ['hwss', 'acorn'], audible: 1,
     blurb: 'The strongest builds and pieces, and it answers every audible.' },
 ];
 

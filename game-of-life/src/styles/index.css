@@ -297,7 +297,10 @@ body {
   .lobby .tableitem .meta + .meta { display: none; }
   .lobby .note, .lobby .list.soon { display: none; }
   .stage { order: 0; }
-  .sidebar { order: 0; position: sticky; top: 8px; height: calc(100vh - 150px); max-height: none; }
+  /* the right panel is exactly as tall as the board (grid stretch; its own height is ignored so the list scrolls) */
+  .layout { align-items: stretch; }
+  .sidebar { order: 0; position: static; height: 0; min-height: 100%; max-height: none; }
+  .lobby { align-self: start; }
   .sidebar .list { max-height: none; flex: 1; }
   .actions { position: static; box-shadow: none; padding: 0; background: none; max-height: none; border-top: 0; }
   .app { padding-bottom: 16px; }
