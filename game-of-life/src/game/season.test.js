@@ -42,10 +42,23 @@ describe('football season', () => {
     const rng = createRng(2);
     for (let i = 0; i < 20; i++) expect(TEAMS[1].def).toContain(teamDefence(rng, TEAMS[1], []));
   });
+  it('a game in progress survives the save round trip, clock and all', async () => {
+    const { newGame, startPlay, afterPlay, savable } = await import('./gameclock.js');
+    let g = startPlay(newGame(5, 'rookies'), 'you');
+    g = afterPlay(g, { kind: 'run', yards: 7, note: '' });
+    const save = { ...newSave(), season: { seed: 9, week: 0, results: [], game: savable({ ...g, toss: { pick: 'fb-pistol', botId: 'fb-prevent', outcome: 'win', winner: 'you' } }) } };
+    const back = importCode(exportCode(save)).season.game;
+    expect(back.clock).toBe(g.clock);
+    expect(back.q).toBe(1);
+    expect(back.drive.spot).toBe(g.drive.spot);
+    expect(back.drive.down).toBe(2);
+    expect(back.toss.winner).toBe('you');
+    expect(back.poss).toBe('you');
+  });
   it('a season survives the save round trip', () => {
     const save = { ...newSave(), season: { seed: 9, week: 2, results: [{ team: 'rookies', you: 14, them: 7 }, { team: 'mudhens', you: 3, them: 10 }] } };
     const back = importCode(exportCode(save));
-    expect(back.season).toEqual(save.season);
+    expect(back.season).toEqual({ ...save.season, game: null });
     expect(sanitize({ ...save, season: 'junk' }).season).toBeNull();
   });
 });

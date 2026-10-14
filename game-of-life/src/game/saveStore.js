@@ -80,11 +80,33 @@ function sanitizeBoss(b) {
   };
 }
 
+function sanitizeDrive(d) {
+  if (!d || typeof d !== 'object') return null;
+  const n = (v, lo, hi, def) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.floor(v))) : def);
+  const overs = ['td', 'fg', 'miss', 'int', 'downs', 'clock'];
+  return { down: n(d.down, 1, 4, 1), toGo: n(d.toGo, 1, 100, 20), spot: n(d.spot, 0, 100, 30), plays: n(d.plays, 0, 99, 0), over: overs.includes(d.over) ? d.over : null, log: [] };
+}
+
+// A football game put down mid-way: everything the clock, the ball and the score need to carry on.
+function sanitizeGame(x) {
+  if (!x || typeof x !== 'object' || typeof x.teamId !== 'string') return null;
+  const n = (v, lo, hi, def) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.floor(v))) : def);
+  const side = (v) => (v === 'you' || v === 'them' ? v : null);
+  const toss = x.toss && typeof x.toss === 'object' ? { pick: String(x.toss.pick || ''), botId: String(x.toss.botId || ''), outcome: ['win', 'lose', 'push'].includes(x.toss.outcome) ? x.toss.outcome : 'push', winner: side(x.toss.winner) } : null;
+  const phase = ['toss', 'play', 'final'].includes(x.phase) ? x.phase : 'toss';
+  return {
+    teamId: x.teamId.slice(0, 24), seed: n(x.seed, 0, 2 ** 32, 0), phase, q: n(x.q, 1, 4, 1), clock: n(x.clock, 0, 240, 240),
+    you: n(x.you, 0, 999, 0), them: n(x.them, 0, 999, 0), poss: side(x.poss), first: side(x.first), drive: sanitizeDrive(x.drive),
+    aud: n(x.aud, 0, 9, 0), plays: n(x.plays, 0, 999, 0), classes: Array.isArray(x.classes) ? x.classes.filter((c) => typeof c === 'string').slice(-8) : [],
+    note: typeof x.note === 'string' ? x.note.slice(0, 200) : '', pending: x.pending === true, toss,
+  };
+}
+
 function sanitizeSeason(x) {
   if (!x || typeof x !== 'object' || !Array.isArray(x.results)) return null;
   const n = (v) => (Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
   const results = x.results.slice(0, 16).map((r) => ({ team: typeof r.team === 'string' ? r.team : '', you: n(r.you), them: n(r.them) }));
-  return { seed: n(x.seed), week: Math.min(n(x.week), results.length), results };
+  return { seed: n(x.seed), week: Math.min(n(x.week), results.length), results, game: sanitizeGame(x.game) };
 }
 
 // Anything that is not a sane save falls back to a fresh one.
