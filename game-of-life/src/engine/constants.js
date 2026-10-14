@@ -45,6 +45,8 @@ export const BOSS_MULTIPLIERS = [[2, 30], [3, 25], [5, 20], [7, 12], [10, 8], [1
 export const DEAD = 0;
 export const BLUE = 1;
 export const RED = 2;
+export const GREEN = 3;   // the extra teams of the 4-player arena
+export const YELLOW = 4;
 
 export const HOT_BONUS = 2;
 export const BASE_GAIN = 1;

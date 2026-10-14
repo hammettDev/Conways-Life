@@ -16,7 +16,7 @@ import { BLUE, RED } from '../src/engine/constants.js';
 
 const ME = fileURLToPath(import.meta.url);
 const SEEDS = { A: [401, 402], B: [501, 502, 503, 504, 505, 506] };
-const FORMATIONS = ['fb-bunch', 'fb-flexbone', 'fb-cover-3', 'fb-singleback'];
+const FORMATIONS = ['fb-bunch', 'fb-cover-3', 'fb-flexbone'];
 const PRICE_SCALE = 10000;
 const PRICE_STEP = 25;
 
@@ -51,7 +51,7 @@ if (!isMainThread) {
   const spots = new Map();
   for (const p of pieces) for (const b of builds) {
     const list = [];
-    for (let depth = 2; depth <= 20; depth += 3) for (let lat = -18; lat <= 18; lat += 4) if (placementOk(b, getObject(p), { depth, lat })) list.push({ depth, lat });
+    for (let depth = 3; depth <= 20; depth += 4) for (let lat = -18; lat <= 18; lat += 6) if (placementOk(b, getObject(p), { depth, lat })) list.push({ depth, lat });
     spots.set(`${p}|${b.id}`, list);
     list.forEach((d, i) => t1.push([`scan|${p}|${b.id}|${i}`, b.id, p, d, 'A']));
   }
