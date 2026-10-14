@@ -113,7 +113,7 @@ export function settle(save, outcome, wager = WAGER, multiplier = 1) {
   const stats = { ...save.stats, played: save.stats.played + 1 };
   let back = 0;
   if (outcome === 'win') {
-    back = wager + wager * multiplier;
+    back = wager + Math.round(wager * multiplier);
     stats.wins++;
     stats.streak++;
     stats.bestStreak = Math.max(stats.bestStreak, stats.streak);

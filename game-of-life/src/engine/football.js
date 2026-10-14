@@ -34,7 +34,7 @@ export const TUNE = {
   runTicks: 60, runScale: 1.4, runMin: -2, runMax: 24,
 };
 
-export const DRIVE_PAYOUT = 2; // a touchdown pays this multiple of the bet
+export const DRIVE_PAYOUT = 1.5; // a touchdown pays this multiple of the bet
 export { COLS, ROWS };
 export const DEPTHS = ['short', 'mid', 'deep'];
 export const RUN_LANES = [-12, 0, 12];

@@ -151,7 +151,7 @@ export default function Drive({ balance, table, minBet, maxBet, betStep, feeFor,
 
   const over = state && state.over;
   const win = over === 'td';
-  const overText = { td: `Touchdown! +${money(held * DRIVE_PAYOUT)}`, int: 'Intercepted. Drive over.', downs: 'Turnover on downs.', clock: 'Out of time.' }[over];
+  const overText = { td: `Touchdown! +${money(Math.round(wager * DRIVE_PAYOUT))}`, int: 'Intercepted. Drive over.', downs: 'Turnover on downs.', clock: 'Out of time.' }[over];
 
   return (
     <main className="drive">
