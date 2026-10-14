@@ -78,3 +78,34 @@ describe('a ball that stops flying ends the play quickly', () => {
     }
   });
 });
+
+describe('offensive formations', () => {
+  it('there are plenty, with unique ids and names', () => {
+    expect(LIVE_OFFENCES.length).toBeGreaterThanOrEqual(10);
+    expect(new Set(LIVE_OFFENCES.map((o) => o.id)).size).toBe(LIVE_OFFENCES.length);
+    expect(new Set(LIVE_OFFENCES.map((o) => o.name)).size).toBe(LIVE_OFFENCES.length);
+  });
+  it('receivers never start on top of each other and stay on the field', () => {
+    for (const o of LIVE_OFFENCES) {
+      expect(o.receivers.length).toBeLessThanOrEqual(5);
+      o.receivers.forEach((r, i) => {
+        expect(Math.abs(r.lat)).toBeLessThanOrEqual(20);
+        expect(r.depth).toBeLessThanOrEqual(29);
+        o.receivers.slice(i + 1).forEach((q) => {
+          if (Math.abs(r.depth - q.depth) < 7) expect(Math.abs(r.lat - q.lat), `${o.id}`).toBeGreaterThanOrEqual(6);
+        });
+      });
+    }
+  });
+  it('every formation can play a pass and a run to the end', () => {
+    const open = { id: 'open', name: 'Open', players: [] };
+    for (const o of LIVE_OFFENCES) {
+      for (const kind of ['pass', 'run']) {
+        const p = createLivePlay({ off: o, def: open, kind, rng: createRng(2) });
+        p.start();
+        for (let i = 0; i < 400 && p.phase !== 'done'; i++) p.step();
+        expect(p.phase, `${o.id} ${kind}`).toBe('done');
+      }
+    }
+  });
+});

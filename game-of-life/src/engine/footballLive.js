@@ -212,8 +212,16 @@ const QB = { role: 'QB', shape: 'ell', depth: 6, lat: -1 };
 export const LIVE_OFFENCES = [
   { id: 'lo-spread', name: 'Spread', line: [...LINE5, QB], receivers: [{ lat: -16, depth: 24 }, { lat: -8, depth: 16 }, { lat: 9, depth: 17 }, { lat: 17, depth: 25 }] },
   { id: 'lo-trips', name: 'Trips Right', line: [...LINE5, QB], receivers: [{ lat: 8, depth: 15 }, { lat: 14, depth: 21 }, { lat: 20, depth: 27 }, { lat: -9, depth: 16 }] },
+  { id: 'lo-tripsl', name: 'Trips Left', line: [...LINE5, QB], receivers: [{ lat: -20, depth: 27 }, { lat: -14, depth: 21 }, { lat: -8, depth: 15 }, { lat: 9, depth: 16 }] },
   { id: 'lo-bunch', name: 'Bunch Left', line: [...LINE5, QB], receivers: [{ lat: -8, depth: 16 }, { lat: -14, depth: 22 }, { lat: -20, depth: 27 }, { lat: 10, depth: 17 }] },
+  { id: 'lo-bunchr', name: 'Bunch Right', line: [...LINE5, QB], receivers: [{ lat: 8, depth: 16 }, { lat: 14, depth: 22 }, { lat: 20, depth: 27 }, { lat: -10, depth: 17 }] },
   { id: 'lo-twins', name: 'Twins', line: [...LINE5, QB], receivers: [{ lat: -13, depth: 20 }, { lat: -19, depth: 26 }, { lat: 13, depth: 20 }, { lat: 19, depth: 26 }] },
   { id: 'lo-slot', name: 'Slot', line: [...LINE5, QB], receivers: [{ lat: -6, depth: 13 }, { lat: 7, depth: 14 }, { lat: -17, depth: 24 }, { lat: 18, depth: 25 }] },
+  { id: 'lo-empty', name: 'Empty', line: [...LINE5, QB], receivers: [{ lat: -19, depth: 26 }, { lat: -12, depth: 19 }, { lat: -6, depth: 13 }, { lat: 6, depth: 13 }, { lat: 14, depth: 21 }] },
+  { id: 'lo-stack', name: 'Stacked', line: [...LINE5, QB], receivers: [{ lat: -10, depth: 17 }, { lat: -10, depth: 27 }, { lat: 11, depth: 18 }, { lat: 11, depth: 28 }] },
+  { id: 'lo-pro', name: 'Pro Set', line: [...LINE5, QB], receivers: [{ lat: -12, depth: 18 }, { lat: -6, depth: 12 }, { lat: 5, depth: 12 }, { lat: 12, depth: 19 }] },
+  { id: 'lo-flood', name: 'Flood Right', line: [...LINE5, QB], receivers: [{ lat: 6, depth: 13 }, { lat: 12, depth: 24 }, { lat: 18, depth: 27 }, { lat: -12, depth: 18 }] },
+  { id: 'lo-floodl', name: 'Flood Left', line: [...LINE5, QB], receivers: [{ lat: -18, depth: 27 }, { lat: -12, depth: 24 }, { lat: -6, depth: 13 }, { lat: 12, depth: 18 }] },
+  { id: 'lo-deep', name: 'Deep Shot', line: [...LINE5, QB], receivers: [{ lat: -20, depth: 27 }, { lat: -7, depth: 14 }, { lat: 7, depth: 14 }, { lat: 20, depth: 27 }] },
 ];
 export const liveOffenceById = (id) => LIVE_OFFENCES.find((o) => o.id === id);

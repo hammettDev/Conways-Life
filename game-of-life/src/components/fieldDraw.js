@@ -6,7 +6,7 @@ export const Y0 = CENTER_Y - 25; export const VH = 50;
 export const TILE = 10;
 export const TICK_MS = (() => { try { const v = Number(new URLSearchParams(window.location.search).get('tick')); return v > 0 ? v : 90; } catch { return 90; } })(); // ?tick=10 for a fast test run
 export const RECV_COLOR = ['#ffd050', '#7dffb0', '#ff9be8', '#8fd0ff', '#ffb070', '#c8a0ff'];
-export const LANE_LABEL = ['Up', 'Middle', 'Down'];
+export const LANE_LABEL = ['Left', 'Middle', 'Right']; // from the runner's point of view (he faces the defence)
 
 export function drawField(ctx, view) {
   const W = VW * TILE; const H = VH * TILE;
