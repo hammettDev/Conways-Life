@@ -25,6 +25,15 @@ describe('game clock', () => {
     expect(g.note).toMatch(/Touchdown/);
   });
 
+  it('a score asks for the cheerleaders: the side that scored, the points and the kind', () => {
+    let g = { ...begun(), drive: { ...begun().drive, spot: 90 } };
+    g = play(g, 15, 'complete');
+    expect(g.cheer).toEqual({ side: 'you', pts: 7, kind: 'td' });
+    let h = afterSimDrive(begun('them'), { over: 'fg', spot: 62 }, 4);
+    expect(h.cheer).toEqual({ side: 'them', pts: 3, kind: 'fg' });
+    expect(play(begun(), 2).cheer).toBeNull();
+  });
+
   it('a turnover on downs gives them the ball where it died, mirrored', () => {
     let g = { ...begun(), drive: { ...begun().drive, spot: 50 } };
     for (let i = 0; i < 4; i++) g = play(g, 0, 'incomplete');

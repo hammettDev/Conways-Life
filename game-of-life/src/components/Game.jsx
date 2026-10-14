@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import LiveField from './LiveField.jsx';
 import DefendField from './DefendField.jsx';
+import Cheer from './Cheer.jsx';
 import { botCall } from '../game/botOffence.js';
 import { defenceById, DRIVE, fgChance, inFgRange } from '../engine/football.js';
 import {
@@ -71,6 +72,7 @@ export default function Game({ season, onSeason, onExit }) {
   });
   const useAudible = () => setG((s) => ({ ...s, aud: Math.max(0, s.aud - 1) }));
   const ack = () => setG((s) => ({ ...s, pending: false }));
+  const cheerDone = () => setG((s) => (s && s.cheer ? { ...s, cheer: null } : s));
   const counterFor = (call) => { const r = rngFor(0xc0de); return r() < team.scout ? defenceById(bestDefenceFor(team, call.kind, r)) : null; };
   const defFor = () => defenceById(teamDefence(rngFor(0xdef), team, g.classes));
 
@@ -138,6 +140,8 @@ export default function Game({ season, onSeason, onExit }) {
           )}
         </section>
       )}
+
+      {inGame && g.cheer && <Cheer side={g.cheer.side} pts={g.cheer.pts} kind={g.cheer.kind} teamName={team.name} onDone={cheerDone} />}
 
       {inGame && g.phase === 'toss' && (
         <section className="hub">

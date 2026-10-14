@@ -15,7 +15,7 @@ const freshAt = (spot) => ({ ...newDrive(), spot });
 
 export const newGame = (seed, teamId) => ({
   teamId, seed: seed >>> 0, phase: 'toss', q: 1, clock: QUARTER_SECONDS, you: 0, them: 0, poss: null, first: null,
-  drive: null, aud: AUDIBLES, plays: 0, classes: [], note: '', pending: false, toss: null,
+  drive: null, aud: AUDIBLES, plays: 0, classes: [], note: '', pending: false, cheer: null, toss: null,
 });
 
 export const startPlay = (g, firstSide, spotOverride = null) => ({ ...g, phase: 'play', poss: firstSide, first: firstSide, drive: freshAt(spotOverride || DRIVE.startSpot) });
@@ -24,12 +24,14 @@ export const startPlay = (g, firstSide, spotOverride = null) => ({ ...g, phase: 
 function settle(g, drive, secs, spotOverride = null) {
   let { q, clock, you, them, poss, classes } = g;
   const notes = [];
+  let cheer = null;
   clock -= secs;
   let d = drive;
   if (d.over) {
     const pts = drivePoints(d);
     if (poss === 'you') you += pts; else them += pts;
     notes.push(`${poss === 'you' ? 'Your' : 'Their'} drive: ${driveNote(d)}${pts ? ` (+${pts})` : ''}.`);
+    if (pts > 0) cheer = { side: poss, pts, kind: d.over === 'td' ? 'td' : 'fg' };
     const scored = d.over === 'td' || d.over === 'fg';
     const spot = scored ? DRIVE.startSpot : Math.max(20, Math.min(80, DRIVE.goal - d.spot));
     poss = other(poss);
@@ -49,7 +51,7 @@ function settle(g, drive, secs, spotOverride = null) {
       q += 1; clock = QUARTER_SECONDS;
     }
   }
-  return { ...g, q, clock, you, them, poss, drive: { ...d, log: [] }, phase, classes, plays: g.plays + 1, note: notes.join(' '), pending: notes.length > 0 };
+  return { ...g, q, clock, you, them, poss, drive: { ...d, log: [] }, phase, classes, plays: g.plays + 1, note: notes.join(' '), pending: notes.length > 0, cheer };
 }
 
 // One play of the game (a pass, a run, a kick) with its outcome from the engine.
@@ -67,4 +69,4 @@ export function afterSimDrive(g, result, plays, spotOverride = null) {
 
 export const finalResult = (g) => ({ team: g.teamId, you: g.you, them: g.them });
 // strip what need not be saved
-export const savable = (g) => ({ ...g, drive: g.drive ? { ...g.drive, log: [] } : null });
+export const savable = (g) => ({ ...g, cheer: null, drive: g.drive ? { ...g.drive, log: [] } : null });
