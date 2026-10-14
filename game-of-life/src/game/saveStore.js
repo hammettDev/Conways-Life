@@ -92,13 +92,15 @@ function sanitizeGame(x) {
   if (!x || typeof x !== 'object' || typeof x.teamId !== 'string') return null;
   const n = (v, lo, hi, def) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.floor(v))) : def);
   const side = (v) => (v === 'you' || v === 'them' ? v : null);
-  const toss = x.toss && typeof x.toss === 'object' ? { pick: String(x.toss.pick || ''), botId: String(x.toss.botId || ''), outcome: ['win', 'lose', 'push'].includes(x.toss.outcome) ? x.toss.outcome : 'push', winner: side(x.toss.winner) } : null;
-  const phase = ['toss', 'play', 'final'].includes(x.phase) ? x.phase : 'toss';
+  const tossOf = (t) => (t && typeof t === 'object' ? { pick: String(t.pick || ''), botId: String(t.botId || ''), outcome: ['win', 'lose', 'push'].includes(t.outcome) ? t.outcome : 'push', winner: side(t.winner) } : null);
+  const toss = tossOf(x.toss);
+  const foeLast = x.foeLast && typeof x.foeLast === 'object' ? { formation: String(x.foeLast.formation || '').slice(0, 30), kind: x.foeLast.kind === 'run' ? 'run' : 'pass', label: String(x.foeLast.label || '').slice(0, 40) } : null;
+  const phase = ['toss', 'ottoss', 'play', 'final'].includes(x.phase) ? x.phase : 'toss';
   return {
     teamId: x.teamId.slice(0, 24), seed: n(x.seed, 0, 2 ** 32, 0), phase, q: n(x.q, 1, 5, 1), clock: n(x.clock, 0, 240, 240),
     you: n(x.you, 0, 999, 0), them: n(x.them, 0, 999, 0), poss: side(x.poss), first: side(x.first), drive: sanitizeDrive(x.drive),
     aud: n(x.aud, 0, 9, 0), plays: n(x.plays, 0, 999, 0), classes: Array.isArray(x.classes) ? x.classes.filter((c) => typeof c === 'string').slice(-8) : [],
-    note: typeof x.note === 'string' ? x.note.slice(0, 200) : '', pending: x.pending === true, playoff: x.playoff === true, tiebreak: side(x.tiebreak), foeKinds: Array.isArray(x.foeKinds) ? x.foeKinds.filter((k) => k === 'run' || k === 'pass').slice(-12) : [], td: n(x.td, 0, 99, 0), fg: n(x.fg, 0, 99, 0), toss,
+    note: typeof x.note === 'string' ? x.note.slice(0, 200) : '', pending: x.pending === true, playoff: x.playoff === true, tiebreak: side(x.tiebreak), foeLast, otToss: tossOf(x.otToss), foeKinds: Array.isArray(x.foeKinds) ? x.foeKinds.filter((k) => k === 'run' || k === 'pass').slice(-12) : [], td: n(x.td, 0, 99, 0), fg: n(x.fg, 0, 99, 0), toss,
   };
 }
 

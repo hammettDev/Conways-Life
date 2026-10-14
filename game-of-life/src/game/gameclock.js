@@ -15,10 +15,12 @@ const freshAt = (spot) => ({ ...newDrive(), spot });
 
 export const newGame = (seed, teamId, { playoff = false, tiebreak = null } = {}) => ({
   teamId, seed: seed >>> 0, playoff, tiebreak, phase: 'toss', q: 1, clock: QUARTER_SECONDS, you: 0, them: 0, poss: null, first: null,
-  drive: null, aud: AUDIBLES, plays: 0, classes: [], note: '', pending: false, cheer: null, td: 0, fg: 0, foeKinds: [], toss: null,
+  drive: null, aud: AUDIBLES, plays: 0, classes: [], note: '', pending: false, cheer: null, td: 0, fg: 0, foeKinds: [], foeLast: null, toss: null, otToss: null,
 });
 
-export const startPlay = (g, firstSide, spotOverride = null) => ({ ...g, phase: 'play', poss: firstSide, first: firstSide, drive: freshAt(spotOverride || DRIVE.startSpot) });
+export const startPlay = (g, firstSide, spotOverride = null) => ({ ...g, phase: 'play', poss: firstSide, first: g.first || firstSide, drive: freshAt(spotOverride || DRIVE.startSpot) });
+// overtime: the toss winner takes the ball (the first-half record of who received is untouched)
+export const startOvertime = (g, side) => ({ ...g, phase: 'play', poss: side, pending: false });
 
 // Close out `secs` seconds on the clock, with the drive `drive` as it now stands (over or not).
 function settle(g, drive, secs, spotOverride = null) {
@@ -40,15 +42,16 @@ function settle(g, drive, secs, spotOverride = null) {
     classes = [];
   }
   let phase = 'play';
-  if (q === 5 && (you !== g.you || them !== g.them)) { phase = 'final'; clock = 0; notes.push('Sudden death: that is the game.'); }
+  if (q === 5 && g.phase === 'play' && (you !== g.you || them !== g.them)) { phase = 'final'; clock = 0; notes.push('Sudden death: that is the game.'); }
   else if (clock <= 0) {
     if (q === 2) { // halftime: the team that kicked off gets the ball
       notes.push('Halftime. The ball switches.');
       poss = other(g.first); d = freshAt(spotOverride || DRIVE.startSpot); classes = []; q = 3; clock = QUARTER_SECONDS;
     } else if (q === 4 && g.playoff && you === them) {
       // a playoff game cannot end level: sudden death, and if nobody scores the higher seed goes through
-      notes.push('Tied after four quarters. Overtime: next score wins.');
-      q = 5; clock = QUARTER_SECONDS; poss = other(g.first); d = freshAt(spotOverride || DRIVE.startSpot); classes = [];
+      // overtime: another quick game of Conway's Takeover decides who gets the ball, then the next score wins
+      notes.push('Tied after four quarters. Overtime: a Takeover game decides who gets the ball, then the next score wins.');
+      q = 5; clock = QUARTER_SECONDS; poss = null; d = freshAt(spotOverride || DRIVE.startSpot); classes = []; phase = 'ottoss';
     } else if (q === 5) {
       phase = 'final'; clock = 0;
       notes.push(you === them ? 'Still level: the higher seed advances.' : 'That is the game.');

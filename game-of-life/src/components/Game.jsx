@@ -10,7 +10,7 @@ import {
 import {
   qualified, startPlayoffs, bracket, playoffResult, seasonDone, champion, finishText, currentTeam, field, ROUND_NAMES, wonGame,
 } from '../game/playoffs.js';
-import { newGame, startPlay, afterPlay, afterSimDrive, savable, clockText, botFourthDown } from '../game/gameclock.js';
+import { newGame, startPlay, startOvertime, afterPlay, afterSimDrive, savable, clockText, botFourthDown } from '../game/gameclock.js';
 import { TOSS_IDS, TOSS_BEATS, tossBuilds, playToss } from '../game/toss.js';
 import { createRng } from '../engine/rng.js';
 import { recordGame, recordSeason } from '../game/trophies.js';
@@ -83,6 +83,9 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
   // ---- the coin toss: a quick game of Conway's Takeover ----------------------------------------------------------
   const pickToss = (id) => setG((s) => ({ ...s, toss: { pick: id, ...playToss((s.seed ^ 0x7055) >>> 0, id) } }));
   const kickoff = () => setG((s) => startPlay(s, s.toss.winner, startSpot()));
+  // overtime: another quick game of Takeover for the ball
+  const pickOtToss = (id) => setG((s) => ({ ...s, otToss: { pick: id, ...playToss((s.seed ^ 0x7077) >>> 0, id) } }));
+  const kickoffOt = () => setG((s) => startOvertime(s, s.otToss.winner));
 
   // ---- the plays ---------------------------------------------------------------------------------------------------
   const onPlay = (result) => {
@@ -92,10 +95,10 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
       return n.poss === 'you' && n.drive.plays > 0 ? { ...n, classes: [...s.classes, classOf(result)] } : n;
     });
   };
-  const onFoePlay = (result) => {
+  const onFoePlay = (result, _defId, detail) => {
     setG((s) => {
       let n = afterPlay(s, { kind: result.kind, yards: result.yards, note: result.note }, startSpot());
-      n = { ...n, foeKinds: [...(s.foeKinds || []), result.kind === 'run' ? 'run' : 'pass'].slice(-12) }; // what you can read off them
+      n = { ...n, foeKinds: [...(s.foeKinds || []), result.kind === 'run' ? 'run' : 'pass'].slice(-12), foeLast: detail || s.foeLast }; // what you can read off them
       // on 4th down the bot kicks, punts or goes for it (see botFourthDown)
       if (n.poss === 'them' && n.drive.down === 4 && n.phase === 'play') {
         const r = createRng((s.seed ^ Math.imul(s.plays + 7, 0x85ebca6b)) >>> 0);
@@ -149,7 +152,8 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
               <b>{g.q === 5 ? `OT ${clockText(g.clock)}` : `Q${g.q} ${clockText(g.clock)}`} · {g.poss === 'you' ? '' : 'Their '}{ordinal(g.drive.down)} & {g.drive.toGo}</b>
               <span>{g.poss === 'you' ? spotText(g.drive.spot) : `Ball on ${g.drive.spot <= 50 ? `their ${g.drive.spot}` : `your ${DRIVE.goal - g.drive.spot}`} · you defend`}</span>
             </>
-          ) : inGame && g.phase === 'toss' ? <><b>Coin toss</b><span>Gridiron Graffiti</span></>
+          ) : inGame && g.phase === 'toss' ? <><b>Coin toss</b><span>Conway&apos;s Takeover</span></>
+            : inGame && g.phase === 'ottoss' ? <><b>Overtime</b><span>Takeover for the ball</span></>
             : inGame ? <><b>Final</b><span>{team.name}</span></>
               : <><b>Football season</b><span>{cur ? `Week ${Math.min(cur.week + 1, SEASON_GAMES)} of ${SEASON_GAMES}` : 'New'}</span></>}
         </div>
@@ -212,26 +216,31 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
         <Cheer side="you" kind="win" pts={g.you} subtitle={`You beat ${team.name} ${g.you}–${g.them}`} teamName={team.name} sfx={sfx} onDone={() => setWinShown(true)} />
       )}
 
-      {inGame && g.phase === 'toss' && (
-        <section className="hub">
-          <h3>Who gets the ball?</h3>
-          {!g.toss ? (
-            <>
-              <p className="note">A quick game of Conway's Takeover decides it. Pick one of three formations; each beats one of the others and loses to the other. {team.name} pick one too, and the board settles it. The winner receives.</p>
-              <div className="drivepick" role="group" aria-label="Coin toss formation">
-                {tossBuilds().map((b) => <button key={b.id} className="chip" onClick={() => pickToss(b.id)}>{b.name}</button>)}
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="note">You picked <b>{tossBuilds().find((b) => b.id === g.toss.pick)?.name}</b>; {team.name} picked <b>{tossBuilds().find((b) => b.id === g.toss.botId)?.name}</b>. {g.toss.outcome === 'win' ? 'Your formation took the board.' : g.toss.outcome === 'lose' ? 'Theirs took the board.' : 'It was a stalemate: decided by the flip of a coin.'}</p>
-              <p className="note">{TOSS_IDS.map((id) => `${tossBuilds().find((b) => b.id === id).name} beats ${tossBuilds().find((b) => b.id === TOSS_BEATS[id]).name}`).join(' · ')}</p>
-              <p className="verdict win">{g.toss.winner === 'you' ? 'You receive.' : `${team.name} receive.`}</p>
-              <button className="lock" onClick={kickoff}>Kick off</button>
-            </>
-          )}
-        </section>
-      )}
+      {inGame && (g.phase === 'toss' || g.phase === 'ottoss') && (() => {
+        const ot = g.phase === 'ottoss';
+        const t = ot ? g.otToss : g.toss;
+        const nm = (id) => tossBuilds().find((b) => b.id === id)?.name;
+        return (
+          <section className="hub">
+            <h3>{ot ? 'Overtime: who gets the ball?' : 'Who gets the ball?'}</h3>
+            {!t ? (
+              <>
+                <p className="note">{ot ? 'Tied after four quarters. ' : ''}A quick game of Conway&apos;s Takeover decides it. Pick one of three formations; each beats one of the others and loses to the other. {team.name} pick one too, and the board settles it. The winner {ot ? 'gets the ball first in sudden death: the next score wins.' : 'receives.'}</p>
+                <div className="drivepick" role="group" aria-label="Coin toss formation">
+                  {tossBuilds().map((b) => <button key={b.id} className="chip" onClick={() => (ot ? pickOtToss(b.id) : pickToss(b.id))}>{b.name}</button>)}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="note">You picked <b>{nm(t.pick)}</b>; {team.name} picked <b>{nm(t.botId)}</b>. {t.outcome === 'win' ? 'Your formation took the board.' : t.outcome === 'lose' ? 'Theirs took the board.' : 'It was a stalemate: decided by the flip of a coin.'}</p>
+                <p className="note">{TOSS_IDS.map((id) => `${nm(id)} beats ${nm(TOSS_BEATS[id])}`).join(' · ')}</p>
+                <p className="verdict win">{t.winner === 'you' ? (ot ? 'You get the ball.' : 'You receive.') : `${team.name} ${ot ? 'get the ball' : 'receive'}.`}</p>
+                <button className="lock" onClick={ot ? kickoffOt : kickoff}>{ot ? 'Start overtime' : 'Kick off'}</button>
+              </>
+            )}
+          </section>
+        );
+      })()}
 
       {inGame && g.phase === 'play' && g.pending && (
         <section className="hub">
@@ -242,7 +251,7 @@ export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
         </section>
       )}
       {inGame && g.phase === 'play' && !g.pending && g.poss === 'them' && (
-        <DefendField key={`d${g.plays}`} tendency={g.foeKinds} drive={g.drive} rotate={madden} call={botCall(rngFor(0xb07), team)} team={team} audibles={g.aud} onAudible={useAudible}
+        <DefendField key={`d${g.plays}`} tendency={g.foeKinds} lastCall={g.foeLast} drive={g.drive} rotate={madden} call={botCall(rngFor(0xb07), team)} team={team} audibles={g.aud} onAudible={useAudible}
           seed={(g.seed + g.plays * 977) >>> 0} onPlay={onFoePlay} onSim={simFoe} />
       )}
       {inGame && g.phase === 'play' && !g.pending && g.poss === 'you' && (

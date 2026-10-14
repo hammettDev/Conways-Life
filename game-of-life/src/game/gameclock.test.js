@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newGame, startPlay, afterPlay, afterSimDrive, other, clockText, PLAY_SECONDS, QUARTER_SECONDS, savable, botFourthDown } from './gameclock.js';
+import { newGame, startPlay, startOvertime, afterPlay, afterSimDrive, other, clockText, PLAY_SECONDS, QUARTER_SECONDS, savable, botFourthDown } from './gameclock.js';
 import { DRIVE } from '../engine/football.js';
 
 const play = (g, yards = 3, kind = 'run') => afterPlay(g, { kind, yards, note: '' });
@@ -122,22 +122,27 @@ describe('game clock', () => {
 
   describe('playoff overtime', () => {
     const tied = () => ({ ...startPlay(newGame(7, 'kings', { playoff: true, tiebreak: 'you' }), 'you'), q: 4, clock: PLAY_SECONDS, you: 10, them: 10 });
-    it('a tie after four quarters goes to sudden death, with the ball to the team that kicked off', () => {
+    it('a tie after four quarters goes to an overtime toss (a Takeover game) for the ball', () => {
       const g = afterPlay(tied(), { kind: 'run', yards: 2, note: '' });
       expect(g.q).toBe(5);
-      expect(g.phase).toBe('play');
-      expect(g.poss).toBe('them');
+      expect(g.phase).toBe('ottoss');
+      expect(g.poss).toBeNull();
       expect(g.note).toMatch(/Overtime/);
+      const ot = startOvertime(g, 'them');          // they won the toss
+      expect(ot.phase).toBe('play');
+      expect(ot.poss).toBe('them');
+      expect(ot.first).toBe('you');                  // the half-time rule is untouched
+      expect(ot.drive.spot).toBe(DRIVE.startSpot);
     });
     it('the next score wins it', () => {
-      let g = afterPlay(tied(), { kind: 'run', yards: 2, note: '' });
-      g = { ...g, poss: 'you', drive: { ...g.drive, spot: 70 } };
+      let g = startOvertime(afterPlay(tied(), { kind: 'run', yards: 2, note: '' }), 'you');
+      g = { ...g, drive: { ...g.drive, spot: 70 } };
       g = afterPlay(g, { kind: 'kick', made: true, yards: 0 });
       expect(g.phase).toBe('final');
       expect(g.you).toBe(13);
     });
     it('level after overtime too: the game ends tied and the saved tiebreak decides', () => {
-      let g = { ...afterPlay(tied(), { kind: 'run', yards: 2, note: '' }), clock: PLAY_SECONDS };
+      let g = { ...startOvertime(afterPlay(tied(), { kind: 'run', yards: 2, note: '' }), 'them'), clock: PLAY_SECONDS };
       g = afterPlay(g, { kind: 'run', yards: 1, note: '' });
       expect(g.phase).toBe('final');
       expect(g.you).toBe(g.them);
