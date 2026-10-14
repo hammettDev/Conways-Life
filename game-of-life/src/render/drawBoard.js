@@ -1,10 +1,19 @@
-import { COLS, ROWS, FIELD_X0, FIELD_X1, FIELD_Y0, FIELD_Y1, BLUE, RED, DEAD } from '../engine/constants.js';
+import { BLUE, RED, GREEN, VIOLET, DEAD } from '../engine/constants.js';
+import { G2 } from '../engine/geometry.js';
 import { THEME } from './theme.js';
 import { TRAVEL_MS, STAGGER_MS } from './pitDisplay.js';
 
-const FILL = { [BLUE]: THEME.blue, [RED]: THEME.red };
-const EDGE = { [BLUE]: THEME.blueDeep, [RED]: THEME.redDeep };
-const GLOW = { [BLUE]: 'rgba(56,169,255,0.30)', [RED]: 'rgba(255,61,120,0.30)' };
+// The board being drawn. The classic game is G2; the 4-player arena is a taller board with a bigger pit.
+// Set once per frame (drawTable does it from view.geom) and by the app when the mode changes.
+let GX = G2;
+export function setGeometry(g) { GX = g || G2; }
+export const getGeometry = () => GX;
+
+const FILL = { [BLUE]: THEME.blue, [RED]: THEME.red, [GREEN]: THEME.green, [VIOLET]: THEME.violet };
+const EDGE = { [BLUE]: THEME.blueDeep, [RED]: THEME.redDeep, [GREEN]: THEME.greenDeep, [VIOLET]: THEME.violetDeep };
+const GLOW = { [BLUE]: 'rgba(56,169,255,0.30)', [RED]: 'rgba(255,61,120,0.30)', [GREEN]: 'rgba(157,255,77,0.30)', [VIOLET]: 'rgba(192,132,255,0.30)' };
+const TEAM_RGB = { [RED]: '255,61,120', [GREEN]: '157,255,77', [VIOLET]: '192,132,255' }; // BLUE is ME, the equipped chip colour
+const rgbOf = (team) => (team === BLUE ? ME : TEAM_RGB[team]);
 
 // Your colour: the equipped chip colour recolours everything drawn for the blue team. It is set
 // once per frame from view.playerRgb, so animated colours just change it every frame.
@@ -22,13 +31,13 @@ const MAX_DISCS = 14;
 // right. Madden: the field runs top to bottom with Blue at the bottom facing
 // up, so the line of scrimmage is horizontal.
 export function toScreen(x, y, rotate) {
-  return rotate ? [y, COLS - 1 - x] : [x, y];
+  return rotate ? [y, GX.cols - 1 - x] : [x, y];
 }
 // The inverse of toScreen: a screen tile back to the sim tile under it.
 export function fromScreen(sx, sy, rotate) {
-  return rotate ? [COLS - 1 - sy, sx] : [sx, sy];
+  return rotate ? [GX.cols - 1 - sy, sx] : [sx, sy];
 }
-export const boardSize = (rotate) => (rotate ? { cols: ROWS, rows: COLS } : { cols: COLS, rows: ROWS });
+export const boardSize = (rotate) => (rotate ? { cols: GX.rows, rows: GX.cols } : { cols: GX.cols, rows: GX.rows });
 
 // One chip, seen slightly from above: a flat ellipse.
 function chip(ctx, cx, cy, r, team, lift = 0) {
@@ -72,26 +81,26 @@ export function drawBoard(ctx, view) {
 
   // A rectangle given in sim tiles [x0, x1) x [y0, y1), as screen px [x, y, w, h].
   const rect = (x0, y0, x1, y1) => (rotate
-    ? [y0 * tile, (COLS - x1) * tile, (y1 - y0) * tile, (x1 - x0) * tile]
+    ? [y0 * tile, (GX.cols - x1) * tile, (y1 - y0) * tile, (x1 - x0) * tile]
     : [x0 * tile, y0 * tile, (x1 - x0) * tile, (y1 - y0) * tile]);
   // A point given in sim tile units, as screen px.
-  const pt = (x, y) => (rotate ? [y * tile, (COLS - x) * tile] : [x * tile, y * tile]);
+  const pt = (x, y) => (rotate ? [y * tile, (GX.cols - x) * tile] : [x * tile, y * tile]);
 
   ctx.fillStyle = THEME.ring;
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = THEME.field;
-  ctx.fillRect(...rect(FIELD_X0, FIELD_Y0, FIELD_X1, FIELD_Y1));
+  ctx.fillRect(...rect(GX.fx0, GX.fy0, GX.fx1, GX.fy1));
 
   // Mown-turf stripes: every other 5-tile band is a shade lighter, with a faint yard line between bands.
-  for (let x = FIELD_X0; x < FIELD_X1; x += 5) {
-    if (((x - FIELD_X0) / 5) % 2 === 1) {
+  for (let x = GX.fx0; x < GX.fx1; x += 5) {
+    if (((x - GX.fx0) / 5) % 2 === 1) {
       ctx.fillStyle = THEME.fieldStripe;
-      ctx.fillRect(...rect(x, FIELD_Y0, x + 5, FIELD_Y1));
+      ctx.fillRect(...rect(x, GX.fy0, x + 5, GX.fy1));
     }
     ctx.strokeStyle = THEME.yard;
     ctx.beginPath();
-    ctx.moveTo(...pt(x, FIELD_Y0));
-    ctx.lineTo(...pt(x, FIELD_Y1));
+    ctx.moveTo(...pt(x, GX.fy0));
+    ctx.lineTo(...pt(x, GX.fy1));
     ctx.stroke();
   }
 
@@ -106,14 +115,14 @@ export function drawBoard(ctx, view) {
   } else {
     // Faint tile centres instead of a heavy grid.
     ctx.fillStyle = THEME.grid;
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
+    for (let y = 0; y < GX.rows; y++) {
+      for (let x = 0; x < GX.cols; x++) {
         const [sx, sy] = toScreen(x, y, rotate);
         ctx.fillRect(sx * tile + tile / 2 - 0.5, sy * tile + tile / 2 - 0.5, 1, 1);
       }
     }
   }
-  const [fx, fy, fw, fh] = rect(FIELD_X0, FIELD_Y0, FIELD_X1, FIELD_Y1);
+  const [fx, fy, fw, fh] = rect(GX.fx0, GX.fy0, GX.fx1, GX.fy1);
   ctx.strokeStyle = THEME.gridField;
   ctx.lineWidth = 1;
   ctx.strokeRect(fx + 0.5, fy + 0.5, fw, fh);
@@ -123,16 +132,23 @@ export function drawBoard(ctx, view) {
   ctx.setLineDash([6, 6]);
   ctx.strokeStyle = THEME.midline;
   ctx.beginPath();
-  ctx.moveTo(...pt(COLS / 2, FIELD_Y0));
-  ctx.lineTo(...pt(COLS / 2, FIELD_Y1));
+  ctx.moveTo(...pt(GX.cols / 2, GX.fy0));
+  ctx.lineTo(...pt(GX.cols / 2, GX.fy1));
+  if (GX.teams > 2) { // the arena's seam: two fields stacked, each with its own line of scrimmage
+    const mid = (GX.fy0 + GX.fy1) / 2;
+    ctx.moveTo(...pt(GX.fx0, mid));
+    ctx.lineTo(...pt(GX.fx1, mid));
+    ctx.moveTo(...pt(GX.cols / 2, GX.fy0));
+    ctx.lineTo(...pt(GX.cols / 2, GX.fy1));
+  }
   ctx.stroke();
   ctx.restore();
 
   // Hot Zones: pulsing amber pads (clean look) or glowing rings on the ground (chips look).
   for (let i = 0; i < hot.length; i++) {
     if (!hot[i]) continue;
-    const x = i % COLS;
-    const y = (i / COLS) | 0;
+    const x = i % GX.cols;
+    const y = (i / GX.cols) | 0;
     const [sx, sy] = toScreen(x, y, rotate);
     const pulse = 0.22 + 0.16 * Math.sin(time * 2.4 + (x + y) * 0.45);
     if (heat) {
@@ -147,10 +163,27 @@ export function drawBoard(ctx, view) {
   }
 
   // Clean look: claimed ground, tinted toward whoever's tower is ahead on each tile.
-  if (heat && blueTower && redTower) {
-    for (let y = FIELD_Y0; y < FIELD_Y1; y++) {
-      for (let x = FIELD_X0; x < FIELD_X1; x++) {
-        const i = y * COLS + x;
+  if (heat && view.towers) {
+    // four teams: tint each tile toward the team with the tallest tower there
+    for (let y = GX.fy0; y < GX.fy1; y++) {
+      for (let x = GX.fx0; x < GX.fx1; x++) {
+        const i = y * GX.cols + x;
+        let best = 0; let second = 0; let who = 0;
+        for (let t = 1; t < view.towers.length; t++) {
+          const h = view.towers[t][i];
+          if (h > best) { second = best; best = h; who = t; } else if (h > second) second = h;
+        }
+        if (!who || best === second) continue;
+        const [sx, sy] = toScreen(x, y, rotate);
+        const a = Math.min(0.34, 0.04 + 0.035 * Math.sqrt(best - second));
+        ctx.fillStyle = `rgba(${rgbOf(who)},${a})`;
+        ctx.fillRect(sx * tile, sy * tile, tile, tile);
+      }
+    }
+  } else if (heat && blueTower && redTower) {
+    for (let y = GX.fy0; y < GX.fy1; y++) {
+      for (let x = GX.fx0; x < GX.fx1; x++) {
+        const i = y * GX.cols + x;
         const b = blueTower[i];
         const rd = redTower[i];
         if (b === rd) continue;
@@ -164,16 +197,16 @@ export function drawBoard(ctx, view) {
 
   const r = tile * 0.4;
   const step = Math.max(1.5, tile * 0.19);
-  const ghostAt = new Map(ghost.map((g) => [g.y * COLS + g.x, g.team]));
+  const ghostAt = new Map(ghost.map((g) => [g.y * GX.cols + g.x, g.team]));
 
   // Back to front on screen, so a tower in front covers the one behind it.
   for (let sy = 0; sy < SR; sy++) {
     for (let sx = 0; sx < SC; sx++) {
-      const x = rotate ? COLS - 1 - sy : sx;
+      const x = rotate ? GX.cols - 1 - sy : sx;
       const y = rotate ? sx : sy;
-      const i = y * COLS + x;
+      const i = y * GX.cols + x;
       // Cells that drift past the field edge are not drawn: the arena is the playing field.
-      const inField = x >= FIELD_X0 && x < FIELD_X1 && y >= FIELD_Y0 && y < FIELD_Y1;
+      const inField = x >= GX.fx0 && x < GX.fx1 && y >= GX.fy0 && y < GX.fy1;
       const live = inField ? teams[i] : DEAD;
 
       if (heat) {
@@ -189,7 +222,7 @@ export function drawBoard(ctx, view) {
         }
         const gh = ghostAt.get(i);
         if (gh !== undefined) {
-          ctx.fillStyle = gh === BLUE ? `rgba(${ME},0.32)` : 'rgba(255,61,120,0.32)';
+          ctx.fillStyle = `rgba(${rgbOf(gh)},0.32)`;
           ctx.fillRect(px + inset, py + inset, tile - inset * 2, tile - inset * 2);
           ctx.strokeStyle = FILL[gh];
           ctx.strokeRect(px + inset + 0.5, py + inset + 0.5, tile - inset * 2 - 1, tile - inset * 2 - 1);
@@ -227,41 +260,45 @@ export function drawBoard(ctx, view) {
 // the lead in the owner's colour on top.
 export function drawPit(ctx, view) {
   const { size, tile, hot, blue, red } = view;
+  const counts = view.counts || [null, blue, red]; // chip counts per team, indexed by team
   const S = size * tile;
   ctx.fillStyle = THEME.field;
   ctx.fillRect(0, 0, S, S);
-  if (view.look !== 'chips') {
+  if (view.look !== 'chips' || counts.length > 3) {
     // Clean look: tinted tiles with the lead on each.
     for (let py = 0; py < size; py++) {
       for (let px = 0; px < size; px++) {
         const k = py * size + px;
         const x = px * tile;
         const y = py * tile;
-        const b = blue[k];
-        const rd = red[k];
-        const lead = Math.abs(b - rd);
+        let best = 0; let second = 0; let who = 0;
+        for (let t = 1; t < counts.length; t++) {
+          const c = counts[t][k];
+          if (c > best) { second = best; best = c; who = t; } else if (c > second) second = c;
+        }
+        const lead = best - second;
         const phase = (((px * 7 + py * 13) % 17) / 17) * Math.PI * 2;
         const breathe = 0.88 + 0.12 * Math.sin((view.time || 0) / 260 + phase);
         const g0 = view.ghost && view.ghost[k];
         if (g0) {
           // a cosmetic Life cell drifting around the owned tiles
-          const gc = g0 === 1 ? ME : '255,61,120';
+          const gc = rgbOf(g0);
           ctx.fillStyle = `rgba(${gc},0.3)`;
           ctx.fillRect(x + 3, y + 3, tile - 6, tile - 6);
           ctx.fillStyle = `rgba(${gc},0.18)`;
           ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
         }
-        if (b !== rd) {
+        if (who && lead > 0) {
           // heat: the bigger the lead, the hotter the tile (no numbers)
           const a = Math.min(0.62, 0.1 + 0.07 * Math.sqrt(lead)) * breathe;
-          ctx.fillStyle = b > rd ? `rgba(${ME},${a})` : `rgba(255,61,120,${a})`;
+          ctx.fillStyle = `rgba(${rgbOf(who)},${a})`;
           ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
           if (lead >= 4) {
-            ctx.fillStyle = b > rd ? 'rgba(160,220,255,0.35)' : 'rgba(255,160,190,0.35)';
+            ctx.fillStyle = who === BLUE ? 'rgba(160,220,255,0.35)' : 'rgba(255,255,255,0.28)';
             const m = tile * 0.3;
             ctx.fillRect(x + m, y + m, tile - 2 * m, tile - 2 * m);
           }
-        } else if (b > 0) {
+        } else if (best > 0) {
           ctx.fillStyle = 'rgba(200,200,200,0.1)';
           ctx.fillRect(x + 1, y + 1, tile - 2, tile - 2);
         }
@@ -328,14 +365,14 @@ export function drawPit(ctx, view) {
 // The table: Board 1, the plumbing around it, and the pit underneath, all in one
 // canvas so it scales as one picture. Sizes are in board tiles.
 // ---------------------------------------------------------------------------
-export const APRON = 22;      // rows of tiles under the board: funnel + pit + margin
-const PIT_TILES = 16;         // the pit's width/height, in board tiles
 const FUNNEL = 5;             // rows between the board and the pit
+const pitTiles = () => Math.round(GX.pitSize * 1.6); // the pit's width/height, in board tiles (16 for the classic 10-cell pit)
+export const apron = () => FUNNEL + pitTiles() + 1; // rows of tiles under the board: funnel + pit + margin
 const RAIL_X = 5;             // rail centre from each side: the middle of the 10-tile border ring
 
 export function tableSize(rotate) {
   const { cols, rows } = boardSize(rotate);
-  return { cols, rows: rows + APRON, boardRows: rows };
+  return { cols, rows: rows + apron(), boardRows: rows };
 }
 
 // The route spilled chips take, as points in tile units from the topple to the
@@ -348,7 +385,7 @@ export function spillPath(crash, rotate) {
   const py = sy + 0.5;
   const cx = cols / 2;
   const pitTop = rows + FUNNEL;
-  const pitMid = [cx, pitTop + PIT_TILES / 2];
+  const pitMid = [cx, pitTop + pitTiles() / 2];
   const railL = RAIL_X;
   const railR = cols - RAIL_X;
   if (rotate) {
@@ -393,13 +430,14 @@ function tube(ctx, pts, tile) {
 
 // `view` = a Board 1 view plus { pit: {size, hot, blue, red}, spills: [{born, crash}], now (ms) }
 export function drawTable(ctx, view) {
+  setGeometry(view.geom);
   if (view.playerRgb) setPlayerColor(view.playerRgb);
   const { tile, rotate = false, pit, spills = [], now = 0 } = view;
   const { cols, rows } = boardSize(rotate);
   const W = cols * tile;
 
   ctx.fillStyle = THEME.bg;
-  ctx.fillRect(0, 0, W, (rows + APRON) * tile);
+  ctx.fillRect(0, 0, W, (rows + apron()) * tile);
   drawBoard(ctx, view);
 
   // Plumbing: a rail down each side through the border ring, a collector along the
@@ -412,8 +450,8 @@ export function drawTable(ctx, view) {
   ctx.beginPath();
   ctx.moveTo((railL - 1.2) * tile, (rows - 1) * tile);
   ctx.lineTo((railR + 1.2) * tile, (rows - 1) * tile);
-  ctx.lineTo((cx + PIT_TILES / 2 + 0.6) * tile, pitTop * tile);
-  ctx.lineTo((cx - PIT_TILES / 2 - 0.6) * tile, pitTop * tile);
+  ctx.lineTo((cx + pitTiles() / 2 + 0.6) * tile, pitTop * tile);
+  ctx.lineTo((cx - pitTiles() / 2 - 0.6) * tile, pitTop * tile);
   ctx.closePath();
   ctx.fillStyle = '#0a1f13';
   ctx.fill();
@@ -425,7 +463,7 @@ export function drawTable(ctx, view) {
   if (rotate) tube(ctx, [[railL, 5], [railR, 5]], tile);
 
   // The pit.
-  const pitPx = PIT_TILES * tile;
+  const pitPx = pitTiles() * tile;
   ctx.save();
   ctx.translate(cx * tile - pitPx / 2, pitTop * tile);
   ctx.fillStyle = '#04100a';

@@ -231,3 +231,7 @@ body {
 .lessondemo canvas { max-width: 100%; height: auto; border-radius: 8px; }
 
 .scoutnote { font-size: 0.74rem; line-height: 1.35; margin: 0; }
+
+.scorebar .side.green .num { color: #9dff4d; }
+.scorebar .side.violet .num { color: #c084ff; }
+.scorebar:has(.side.green) { grid-template-columns: auto auto minmax(0, 1fr) auto auto; }

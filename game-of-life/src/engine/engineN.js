@@ -7,7 +7,7 @@ import { G2 } from './geometry.js';
 // game, and engineN.test.js checks the two agree exactly when this one is set up as 2 teams on G2.
 // Teams are 1..n. Even-numbered teams stand on the right and push left; odd ones push right.
 
-export const TEAM_KEYS = ['', 'blue', 'red', 'green', 'yellow'];
+export const TEAM_KEYS = ['', 'blue', 'red', 'green', 'violet'];
 
 // ---- Life on a team grid ---------------------------------------------------------------------
 // Survival: 2-3 neighbours. Birth: exactly 3; the majority team of the parents wins. With more than
@@ -75,9 +75,29 @@ const ACORN = [[1, 0], [3, 1], [0, 2], [1, 2], [4, 2], [5, 2], [6, 2]];
 function seedUnderworld(rng, G) {
   const size = G.cols * G.rows;
   const g = new Uint8Array(size);
-  for (let i = 0; i < size; i++) g[i] = rng() < SOUP_DENSITY ? 1 : 0;
   const cx = G.cols >> 1;
   const cy = G.rows >> 1;
+  if (G.symmetric) {
+    // one quadrant of soup, mirrored into the other three, and four mirrored acorns round the middle
+    for (let y = 0; y < cy; y++) {
+      for (let x = 0; x < cx; x++) {
+        if (rng() < SOUP_DENSITY) {
+          g[y * G.cols + x] = 1;
+          g[y * G.cols + (G.cols - 1 - x)] = 1;
+          g[(G.rows - 1 - y) * G.cols + x] = 1;
+          g[(G.rows - 1 - y) * G.cols + (G.cols - 1 - x)] = 1;
+        }
+      }
+    }
+    for (let y = cy - 8; y < cy + 8; y++) for (let x = cx - 8; x < cx + 8; x++) g[y * G.cols + x] = 0;
+    for (const [x, y] of ACORN) {
+      const ax = cx - 8 - x; // the acorn's own columns, placed left of centre, then mirrored
+      const ay = cy - 7 + y;
+      for (const [mx, my] of [[ax, ay], [G.cols - 1 - ax, ay], [ax, G.rows - 1 - ay], [G.cols - 1 - ax, G.rows - 1 - ay]]) g[my * G.cols + mx] = 1;
+    }
+    return g;
+  }
+  for (let i = 0; i < size; i++) g[i] = rng() < SOUP_DENSITY ? 1 : 0;
   for (let y = cy - 8; y < cy + 8; y++) for (let x = cx - 8; x < cx + 8; x++) g[y * G.cols + x] = 0;
   const ox = cx - 3;
   const oy = cy - 1;
@@ -183,10 +203,19 @@ export function createEngineN({ seed, geometry = G2, maxTicks = MAX_TICKS, fortu
     }
   }
 
+  // Equal stacks are common in symmetric set-ups. Taking the first would always topple the top-left one
+  // first and feed the pit with its colour, so on a symmetric board a tie is broken at random instead.
+  const rng3 = createRng((seed ?? 1) ^ 0x2545f491);
   function tallest() {
     let best = -1;
     let h = F.threshold - 1;
-    for (let i = 0; i < SIZE; i++) if (stackH[i] > h) { h = stackH[i]; best = i; }
+    let ties = 0;
+    for (let i = 0; i < SIZE; i++) {
+      if (stackH[i] > h) { h = stackH[i]; best = i; ties = 1; } else if (G.symmetric && stackH[i] === h && best >= 0) {
+        ties++;
+        if (rng3() * ties < 1) best = i; // reservoir sampling: each tied stack is equally likely
+      }
+    }
     return best;
   }
 

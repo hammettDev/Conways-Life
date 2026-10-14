@@ -1,6 +1,5 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { drawTable, tableSize, boardSize, fromScreen } from '../render/drawBoard.js';
-import { COLS, ROWS } from '../engine/constants.js';
+import { drawTable, tableSize, boardSize, fromScreen, getGeometry } from '../render/drawBoard.js';
 
 const TILE = 12;
 
@@ -21,7 +20,8 @@ const Arena = forwardRef(function Arena({ getView, rotate = false, onHover, onTi
     const sy = Math.floor(((clientY - r.top) / r.height) * rows);
     if (sx < 0 || sx >= board.cols || sy < 0 || sy >= board.rows) return null; // off the board (or on the pit)
     const [x, y] = fromScreen(sx, sy, rotate);
-    return x >= 0 && x < COLS && y >= 0 && y < ROWS ? [x, y] : null;
+    const G = getGeometry();
+    return x >= 0 && x < G.cols && y >= 0 && y < G.rows ? [x, y] : null;
   };
   useImperativeHandle(outer, () => ({ tileAt }));
 

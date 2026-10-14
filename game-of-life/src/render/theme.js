@@ -14,6 +14,10 @@ export const THEME = {
   blueDeep: '#1763c9',
   red: '#ff3d78',
   redDeep: '#b3153f',
+  green: '#9dff4d',   // the 4-player arena's extra teams
+  greenDeep: '#4f9a14',
+  violet: '#c084ff',
+  violetDeep: '#6c34b8',
   hot: '#ffb02e',
   accent: '#45e08a',
   text: '#e8f5ec',

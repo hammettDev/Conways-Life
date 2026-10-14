@@ -17,9 +17,12 @@ import { placeFormation, pickBotSetup } from './engine/formations.js';
 import { DEFAULT_FORTUNE_RULES } from './engine/fortuneRules.js';
 import { createRng } from './engine/rng.js';
 import { createSfx } from './audio/sfx.js';
-import { BLUE, RED, COLS, ROWS, WAGER, MIN_BET, AUDIBLE_PRICE, CUSTOM_PRICE, MAX_CUSTOM, TUTORIAL_STAKE } from './engine/constants.js';
-import { tableSize } from './render/drawBoard.js';
-import { createPitDisplay, pitLead } from './render/pitDisplay.js';
+import { BLUE, RED, GREEN, VIOLET, FOUR_PLAYER_PAYOUT, WAGER, MIN_BET, AUDIBLE_PRICE, CUSTOM_PRICE, MAX_CUSTOM, TUTORIAL_STAKE } from './engine/constants.js';
+import { tableSize, setGeometry } from './render/drawBoard.js';
+import { createEngineN } from './engine/engineN.js';
+import { G2, G4 } from './engine/geometry.js';
+import { arenaCells } from './engine/arena.js';
+import { createPitDisplay, pitTilesOf } from './render/pitDisplay.js';
 import {
   loadSave, persistSave, exportCode, importCode, loadMaxRev, acceptImport,
 } from './game/saveStore.js';
@@ -38,11 +41,24 @@ import { botAnswers, counterFor } from './game/audible.js';
 const CENTER_STEPS = ['pick', 'rules', 'hot', 'shop', 'wrap']; // lessons that sit mid-board; the rest dock at the top so the action stays visible
 const TICKS_PER_SECOND = 6; // at 1x
 const SPEEDS = [0.5, 1, 2, 4];
-const PIT = DEFAULT_FORTUNE_RULES.pitSize;
-const PIT_X0 = (COLS - PIT) >> 1;
-const PIT_Y0 = (ROWS - PIT) >> 1;
+// The classic engine for two teams, the general one for the 4-player arena.
+const newEngine = (seed, geom = G2) => (geom.teams > 2
+  ? createEngineN({ seed, geometry: geom, fortune: DEFAULT_FORTUNE_RULES })
+  : createEngine({ seed, fortune: DEFAULT_FORTUNE_RULES }));
 
-const newEngine = (seed) => createEngine({ seed, fortune: DEFAULT_FORTUNE_RULES });
+// Each team's score with the pit bonus added: the team with the most pit tiles gets one plot per `unit` tiles
+// of lead over the runner-up. `counts` is the pit display's chip counts per team.
+function hudScores(score, counts, unit) {
+  const tiles = pitTilesOf(counts);
+  const order = [];
+  for (let t = 1; t < counts.length; t++) order.push(t);
+  order.sort((a, b) => tiles[b] - tiles[a] || a - b);
+  const out = { blue: score.blue, red: score.red, green: score.green || 0, violet: score.violet || 0 };
+  const names = ['', 'blue', 'red', 'green', 'violet'];
+  const lead = tiles[order[0]] - tiles[order[1]];
+  if (lead > 0) out[names[order[0]]] += Math.floor(lead / unit);
+  return { scores: out, tiles };
+}
 // Load the save, give it an id if it has none, and finish any match that was left running.
 function startUp() {
   let save = loadSave();
@@ -59,7 +75,11 @@ const blueCells = (build, obj, drop) => (obj && drop ? cellsWithObject(build, BL
 
 export default function App() {
   const sfx = useMemo(() => createSfx(), []);
-  const pitDisplay = useMemo(() => createPitDisplay(PIT), []);
+  const [mode, setMode] = useState('2p'); // '2p' the classic game, '4p' the 4-player arena
+  const geom = mode === '4p' ? G4 : G2;
+  setGeometry(geom); // the renderer and the screen maths follow the board being played
+  const PIT = geom.pitSize;
+  const pitDisplay = useMemo(() => createPitDisplay(geom.pitSize, geom.teams), [geom]);
 
   const [boot] = useState(startUp);
   const [save, setSave] = useState(boot.save);
@@ -142,7 +162,7 @@ export default function App() {
 
   // Everything the per-frame callbacks and window listeners need, kept current.
   const live = useRef({});
-  live.current = { styleId: save.style.equipped, findBuild, tutorial, practice, wager, phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
+  live.current = { geom, mode, styleId: save.style.equipped, findBuild, tutorial, practice, wager, phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
   const engineRef = useRef(newEngine(1)); // an empty board, so the Hot Zones show while drafting
   const spillsRef = useRef([]);
   const lastCrashId = useRef(0);
@@ -162,17 +182,17 @@ export default function App() {
 
   const runRef = useRef(null); // the last match's lineups and seed, so it can be watched again
   const [replaying, setReplaying] = useState(false);
-  const startEngine = (blue, red, seed) => {
-    runRef.current = { blue, red, seed };
-    const e = newEngine(seed);
-    e.loadTeams([...blue, ...red]);
+  const startEngine = (all, seed) => {
+    runRef.current = { all, seed, mode };
+    const e = newEngine(seed, geom);
+    e.loadTeams(all);
     engineRef.current = e;
     spillsRef.current = [];
     pitDisplay.reset();
     lastCrashId.current = 0;
   };
-  const emptyBoard = () => {
-    engineRef.current = newEngine(1);
+  const emptyBoard = (g = live.current.geom) => {
+    engineRef.current = newEngine(1, g);
     spillsRef.current = [];
     pitDisplay.reset();
     lastCrashId.current = 0;
@@ -181,8 +201,11 @@ export default function App() {
   const getView = useCallback(() => {
     const e = engineRef.current;
     const { phase: ph, selected: sel, obj: o, drop: d, armed: arm, audibleChoice: ac, look: lk } = live.current;
-    const hot = new Array(PIT * PIT);
-    for (let py = 0; py < PIT; py++) for (let px = 0; px < PIT; px++) hot[py * PIT + px] = e.hot2[(PIT_Y0 + py) * COLS + PIT_X0 + px];
+    const G = live.current.geom;
+    const pit0x = (G.cols - G.pitSize) >> 1;
+    const pit0y = (G.rows - G.pitSize) >> 1;
+    const hot = new Array(G.pitSize * G.pitSize);
+    for (let py = 0; py < G.pitSize; py++) for (let px = 0; px < G.pitSize; px++) hot[py * G.pitSize + px] = e.hot2[(pit0y + py) * G.cols + pit0x + px];
     const now = performance.now();
     pitDisplay.animate(now);
     pitDisplay.update(spillsRef.current, now); // chips land once their trip down the gutter has finished
@@ -199,11 +222,15 @@ export default function App() {
     }
     return {
       teams: e.teams, hot: e.hot, stacks: e.stacks, blueTower: e.blueTower, redTower: e.redTower,
+      geom: G, towers: G.teams > 2 ? e.towers : undefined,
       ghost, look: lk, playerRgb: colorAt(getStyle(live.current.styleId), now),
-      pit: { size: PIT, hot, blue: pitDisplay.blue, red: pitDisplay.red, ghost: pitDisplay.ghost, time: now },
+      pit: { size: G.pitSize, hot, blue: pitDisplay.blue, red: pitDisplay.red, counts: G.teams > 2 ? pitDisplay.counts : undefined, ghost: pitDisplay.ghost, time: now },
       spills: spillsRef.current,
     };
   }, [pitDisplay]);
+
+  // Switching mode starts a fresh empty board of the right size.
+  useEffect(() => { emptyBoard(geom); }, [geom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- placing the bought piece -------------------------------------------------
   const tryPlace = (tile) => {
@@ -250,19 +277,34 @@ export default function App() {
     if (!held) return;
     sfx.play('lockIn');
     const seed = matchSeed(save); // fixed by the save, so cancelling and locking in again faces the same opponent
-    const boss = tutorial ? null : rollEncounter(save, table, createRng(seed ^ 0xb055)); // bosses turn up on their own
+    const four = mode === '4p' && !tutorial; // the 4-player arena: three bots, winner takes all
+    const boss = tutorial || four ? null : rollEncounter(save, table, createRng(seed ^ 0xb055)); // bosses turn up on their own
     setEncounter(boss);
-    const bot = boss
-      ? withItem(boss, pickBossSetup(boss, createRng(seed), save.boss.last), createRng(seed ^ 0x51ed))
-      : tutorial
-        ? pickBotSetup(createRng(seed), TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS)
-        : pickTableSetup(table, createRng(seed), save.boss.last, createRng(seed ^ 0x51ed), scoutP);
+    let bot;
+    let arena = null;
+    let rivals = [];
+    if (four) {
+      const bots = [2, 3, 4].map((slot) => {
+        const st = pickTableSetup(table, createRng(seed ^ Math.imul(slot, 0x9e3779b1)), save.boss.last, createRng(seed ^ 0x51ed ^ slot), scoutP);
+        return { st, cells: arenaCells(st.cells, slot) };
+      });
+      bot = { ...bots[0].st, cells: bots[0].cells };
+      arena = { green: bots[1].cells, violet: bots[2].cells };
+      rivals = bots;
+    } else {
+      bot = boss
+        ? withItem(boss, pickBossSetup(boss, createRng(seed), save.boss.last), createRng(seed ^ 0x51ed))
+        : tutorial
+          ? pickBotSetup(createRng(seed), TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS)
+          : pickTableSetup(table, createRng(seed), save.boss.last, createRng(seed ^ 0x51ed), scoutP);
+    }
     tableRef.current = tutorial || boss ? null : table;
     const mine = blueCells(selected, obj, drop);
+    const allCells = four ? [...mine, ...rivals.flatMap((b) => b.cells)] : [...mine, ...bot.cells];
     // the match is written into the save now, so closing the page cannot dodge a loss
     commit(() => {
       const next = notePiece(noteFormation(held, selected.id), tutorial || !obj ? null : obj.id);
-      return tutorial ? next : setPending(next, packMatch(seed, wager, boss && boss.id, mine, bot.cells));
+      return tutorial ? next : setPending(next, packMatch(seed, wager, boss && boss.id, mine, bot.cells, arena));
     });
     escrowRef.current = cost;
     wagerRef.current = wager;
@@ -273,8 +315,8 @@ export default function App() {
     skipRef.current = false;
     botRef.current = bot;
     botPendingRef.current = null;
-    startEngine(mine, bot.cells, seed);
-    setBotName(botLabel(bot));
+    startEngine(allCells, seed);
+    setBotName(four ? rivals.map((b) => b.st.formation.name).join(' · ') : botLabel(bot));
     setNotice('');
     setAudibleUsed(false);
     setReplaying(false);
@@ -326,7 +368,7 @@ export default function App() {
     });
     botRef.current = bot;
     seedRef.current = seed;
-    startEngine(mine, bot.cells, seed);
+    startEngine([...mine, ...bot.cells], seed);
     setAudibleChoice(null);
     setPhase('locked');
   };
@@ -338,7 +380,7 @@ export default function App() {
   const watchReplay = () => {
     const run = runRef.current;
     if (!run) return;
-    startEngine(run.blue, run.red, run.seed);
+    startEngine(run.all, run.seed);
     skipRef.current = false;
     setResult(null);
     setHud(null);
@@ -424,11 +466,10 @@ export default function App() {
           // Score what the player can see: the pit counts only chips that have landed.
           pitDisplay.update(spillsRef.current, performance.now());
           const s = e.getScore(false);
-          const lead = pitLead(pitDisplay.blue, pitDisplay.red);
-          const bonus = Math.floor(Math.abs(lead.blue - lead.red) / DEFAULT_FORTUNE_RULES.unit);
+          const { scores, tiles } = hudScores(s, pitDisplay.counts, DEFAULT_FORTUNE_RULES.unit);
           setHud({
-            tick: e.tickCount, crashes: e.fortune.crashes.total, pitBlue: lead.blue, pitRed: lead.red,
-            blue: s.blue + (lead.blue > lead.red ? bonus : 0), red: s.red + (lead.red > lead.blue ? bonus : 0),
+            tick: e.tickCount, crashes: e.fortune.crashes.total,
+            pitBlue: tiles[1], pitRed: tiles[2], pitGreen: tiles[3] || 0, pitViolet: tiles[4] || 0, ...scores,
           });
         }
         if (e.status !== 'running') {
@@ -441,7 +482,8 @@ export default function App() {
             const w = wagerRef.current;
             // the tutorial bet is insured: it pays as a win whatever the board said
             const boss = bossRef.current;
-            const mult = bossMultiplier(seedRef.current, boss, r.outcome); // seeded, so a reload cannot reroll it
+            const arena4 = live.current.mode === '4p' && !live.current.tutorial;
+            const mult = arena4 ? (r.outcome === 'win' ? FOUR_PLAYER_PAYOUT : 1) : bossMultiplier(seedRef.current, boss, r.outcome); // seeded, so a reload cannot reroll it
             if (boss && r.outcome === 'win') setBossMult(mult);
             commit((s) => clearPending(live.current.tutorial
               ? (live.current.practice ? s : settle(s, 'win', w))
@@ -499,10 +541,12 @@ export default function App() {
   const audibleBuild = findBuild(audibleChoice);
   const canAudible = Boolean(audibleBuild) && audibleBuild.id !== selectedId && canAfford(save, audiblePrice);
 
-  const live2 = hud || { tick: 0, blue: 0, red: 0, crashes: 0, pitBlue: 0, pitRed: 0 };
-  const TABLE = tableSize(madden);
+  const live2 = hud || { tick: 0, blue: 0, red: 0, green: 0, violet: 0, crashes: 0, pitBlue: 0, pitRed: 0, pitGreen: 0, pitViolet: 0 };
+  const four = geom.teams > 2;
+  const shown = phase === 'done' && result ? result.score : live2;
+  const TABLE = tableSize(madden && !four);
   const verdict = result && (tutorial && !practice ? 'Insured win' : { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome]);
-  const net = result && (practice ? 'practice run, no money moved' : tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(wagerRef.current * (bossMult || 1))}` : result.outcome === 'lose' ? `−${money(wagerRef.current)}` : 'bet returned');
+  const net = result && (practice ? 'practice run, no money moved' : tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(wagerRef.current * (four ? FOUR_PLAYER_PAYOUT : bossMult || 1))}` : result.outcome === 'lose' ? `−${money(wagerRef.current)}` : 'bet returned');
 
   return (
     <div className="app">
@@ -520,7 +564,7 @@ export default function App() {
           <button className="viewtoggle" onClick={() => setShowSave(true)}>Save</button>
           <button className="viewtoggle" onClick={toggleSound} aria-pressed={sound}>Sound: {sound ? 'On' : 'Off'}</button>
           <button className="viewtoggle" onClick={toggleLook} aria-pressed={look === 'chips'}>Look: {look === 'chips' ? 'Chips' : 'Clean'}</button>
-          <button className="viewtoggle" onClick={toggleView} aria-pressed={madden}>View: {madden ? 'Madden' : 'Sideways'}</button>
+          {!four && <button className="viewtoggle" onClick={toggleView} aria-pressed={madden}>View: {madden ? 'Madden' : 'Sideways'}</button>}
         </div>
       </header>
 
@@ -528,12 +572,14 @@ export default function App() {
         <Tables
           save={save} tableId={table.id} drafting={drafting && !auto.on} tutorial={tutorial} scout={scoutP} repeat={repeatShare(save)}
           onPick={(id) => commit((s) => ({ ...s, table: id }))}
+          mode={mode} onMode={setMode}
         />
 
         <main className="stage">
           <div className={`table${lesson && CENTER_STEPS.includes(tStep) ? ' dimmed' : ''}${encounter ? ' boss' : ''}`} style={{ width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
             <section className="scorebar">
-              <div className="side blue"><span className="num">{phase === 'done' && result ? result.score.blue : live2.blue}</span><i>you</i></div>
+              <div className="side blue"><span className="num">{shown.blue}</span><i>you</i></div>
+              {four && <div className="side red"><span className="num">{shown.red}</span><i>red</i></div>}
               <div className="mid">
                 {drafting && <p>{notice || (selected ? <>Previewing <b>{selected.name}</b>. Lock In to bet {money(cost)}.</> : 'Choose a formation from the sidebar.')}</p>}
                 {phase === 'locked' && (
@@ -549,7 +595,7 @@ export default function App() {
                 )}
                 {phase === 'playing' && (
                   <>
-                    <p>{replaying ? 'Replay · ' : ''}Tick {live2.tick} · {live2.crashes} toppled · pit {live2.pitBlue}–{live2.pitRed}</p>
+                    <p>{replaying ? 'Replay · ' : ''}Tick {live2.tick} · {live2.crashes} toppled · pit {live2.pitBlue}–{live2.pitRed}{four ? `–${live2.pitGreen}–${live2.pitViolet}` : ''}</p>
                     {notice && <p className="note">{notice}</p>}
                     <div className="row speeds">
                       {SPEEDS.map((s) => <button key={s} className={s === speed ? 'on' : ''} onClick={() => setSpeed(s)}>{s}x</button>)}
@@ -568,7 +614,14 @@ export default function App() {
                   </>
                 )}
               </div>
-              <div className="side red"><span className="num">{phase === 'done' && result ? result.score.red : live2.red}</span><i>bot</i></div>
+              {four ? (
+                <>
+                  <div className="side green"><span className="num">{shown.green}</span><i>lime</i></div>
+                  <div className="side violet"><span className="num">{shown.violet}</span><i>violet</i></div>
+                </>
+              ) : (
+                <div className="side red"><span className="num">{shown.red}</span><i>bot</i></div>
+              )}
             </section>
             {lesson && (
               <aside className={`coach ${CENTER_STEPS.includes(tStep) ? 'center' : 'dock'}`} role="status" aria-live="polite">
@@ -585,7 +638,7 @@ export default function App() {
               </aside>
             )}
             <Arena
-              ref={arenaRef} getView={getView} rotate={madden}
+              ref={arenaRef} getView={getView} rotate={madden && !four}
               onHover={(t) => { hoverRef.current = t; }}
               onTileClick={(t) => { if (live.current.armed && t) tryPlace(t); }}
             />
@@ -608,7 +661,7 @@ export default function App() {
           onAudibleConfirm={confirmAudible}
           onNewMatch={newMatch} onReplay={watchReplay} onAutoStart={startAuto} onAutoStop={() => stopAuto('')}
           auto={tutorial ? null : { on: auto.on, n: auto.n, net: save.balance - auto.start, piece: autoPiece, onPiece: setAutoPiece, hasPiece: Boolean(obj && drop) }} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
-          audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
+          audibleDisabled={audibleUsed || four || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(audiblePrice)}
           custom={tutorial ? null : {
             unlocked: save.custom.unlocked, price: CUSTOM_PRICE, max: MAX_CUSTOM, list: save.custom.list,

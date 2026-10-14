@@ -41,7 +41,7 @@ describe('four teams on the doubled board', () => {
     expect(G4.fy1 - G4.fy0).toBe(2 * (G2.fy1 - G2.fy0)); // twice as tall
     expect(G4.teams).toBe(4);
     expect(G4.pitSize).toBeGreaterThan(G2.pitSize);
-    expect(TEAM_KEYS.slice(1)).toEqual(['blue', 'red', 'green', 'yellow']);
+    expect(TEAM_KEYS.slice(1)).toEqual(['blue', 'red', 'green', 'violet']);
   });
   it('a lone team of each colour survives alone and the others score nothing', () => {
     const block = (x, y, team) => [[0, 0], [1, 0], [0, 1], [1, 1]].map(([dx, dy]) => ({ x: x + dx, y: y + dy, team }));
@@ -49,7 +49,7 @@ describe('four teams on the doubled board', () => {
     e.loadTeams([...block(20, 20, 1), ...block(50, 20, 2), ...block(20, 70, 3), ...block(50, 70, 4)]);
     const r = e.runToEnd();
     expect(r.status).toBe('stable');
-    for (const k of ['blue', 'red', 'green', 'yellow']) expect(r.score[k]).toBe(4);
+    for (const k of ['blue', 'red', 'green', 'violet']) expect(r.score[k]).toBe(4);
     expect(r.winners.length).toBeGreaterThanOrEqual(1); // level plots go to total tower height (Hot Zone luck); a dead heat on that too is a push
   });
   it('a three-way birth with three different parents is settled the same way every time', () => {
@@ -63,10 +63,10 @@ describe('four teams on the doubled board', () => {
     e.loadTeams([...lay(FREE_BUILDS[0], 1), ...lay(FREE_BUILDS[1], 2), ...lay(FREE_BUILDS[2], 3), ...lay(FREE_BUILDS[3], 4)]);
     const r = e.runToEnd();
     expect(['stable', 'cap', 'extinct']).toContain(r.status);
-    const total = r.score.blue + r.score.red + r.score.green + r.score.yellow + r.score.neutral;
+    const total = r.score.blue + r.score.red + r.score.green + r.score.violet + r.score.neutral;
     expect(total).toBeGreaterThanOrEqual(60 * 80); // every field tile is counted once, plus pit bonus plots
     expect(['win', 'lose', 'push']).toContain(r.outcome);
     expect(r.fortune.crashes.total).toBeGreaterThan(0);
-    expect(r.fortune.blue + r.fortune.red + r.fortune.green + r.fortune.yellow).toBeLessThanOrEqual(G4.pitSize ** 2);
+    expect(r.fortune.blue + r.fortune.red + r.fortune.green + r.fortune.violet).toBeLessThanOrEqual(G4.pitSize ** 2);
   }, 120000);
 });

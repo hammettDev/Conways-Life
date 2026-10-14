@@ -38,6 +38,9 @@ export const BOSS_PAYOUT = 5;
 export const BOSS_CHANCE_BASE = 0.03;
 export const BOSS_CHANCE_STEP = 0.003;
 export const BOSS_CHANCE_MAX = 0.12;
+// The 4-player arena is winner-take-all: each of the three bots stakes the same wager, so a win pays this
+// many times the wager and a loss costs one. At a one-in-four chance that is fair odds, before the table fee.
+export const FOUR_PLAYER_PAYOUT = 3;
 export const BOSS_UNLOCK_WINS = 3; // wins since your last boss fight before the next challenge opens
 // [multiplier, weight]: mostly small, with a long tail. Mean is about 4.8.
 export const BOSS_MULTIPLIERS = [[2, 30], [3, 25], [5, 20], [7, 12], [10, 8], [15, 3], [20, 2]];
@@ -45,8 +48,8 @@ export const BOSS_MULTIPLIERS = [[2, 30], [3, 25], [5, 20], [7, 12], [10, 8], [1
 export const DEAD = 0;
 export const BLUE = 1;
 export const RED = 2;
-export const GREEN = 3;   // the extra teams of the 4-player arena
-export const YELLOW = 4;
+export const GREEN = 3;   // the extra teams of the 4-player arena (lime and violet on screen)
+export const VIOLET = 4;
 
 export const HOT_BONUS = 2;
 export const BASE_GAIN = 1;

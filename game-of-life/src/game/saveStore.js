@@ -25,7 +25,7 @@ const b64 = {
 };
 
 const cellList = (list) => (Array.isArray(list)
-  ? list.filter((c) => Array.isArray(c) && Number.isInteger(c[0]) && Number.isInteger(c[1]) && c[0] >= 0 && c[0] < 80 && c[1] >= 0 && c[1] < 60).slice(0, 1500).map((c) => [c[0], c[1]])
+  ? list.filter((c) => Array.isArray(c) && Number.isInteger(c[0]) && Number.isInteger(c[1]) && c[0] >= 0 && c[0] < 80 && c[1] >= 0 && c[1] < 100).slice(0, 1500).map((c) => [c[0], c[1]])
   : []);
 
 function sanitizePending(p) {
@@ -33,7 +33,14 @@ function sanitizePending(p) {
   const blue = cellList(p.blue);
   const red = cellList(p.red);
   if (!blue.length || !red.length) return null;
-  return { seed: Math.floor(p.seed) & 0x7fffffff, wager: Math.floor(p.wager), boss: typeof p.boss === 'string' ? p.boss : null, blue, red };
+  const out = { seed: Math.floor(p.seed) & 0x7fffffff, wager: Math.floor(p.wager), boss: typeof p.boss === 'string' ? p.boss : null, blue, red };
+  if (p.mode === '4p') {
+    const green = cellList(p.green);
+    const violet = cellList(p.violet);
+    if (!green.length || !violet.length) return null;
+    return { ...out, mode: '4p', green, violet };
+  }
+  return out;
 }
 
 function sanitizeStyle(s) {

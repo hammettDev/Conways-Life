@@ -57,15 +57,15 @@ describe('Madden view mapping', () => {
   });
 });
 
-import { spillPath, pointAlong, tableSize, APRON } from './drawBoard.js';
+import { spillPath, pointAlong, tableSize, apron } from './drawBoard.js';
 
 describe('the gutter route', () => {
   const blueCrash = { x: 30, y: 25, dir: 1, owner: 1, spilled: 12 };
   const redCrash = { x: 50, y: 25, dir: -1, owner: 2, spilled: 12 };
 
   it('the table is the board plus the pit apron underneath', () => {
-    expect(tableSize(true)).toEqual({ cols: ROWS, rows: COLS + APRON, boardRows: COLS });
-    expect(tableSize(false)).toEqual({ cols: COLS, rows: ROWS + APRON, boardRows: ROWS });
+    expect(tableSize(true)).toEqual({ cols: ROWS, rows: COLS + apron(), boardRows: COLS });
+    expect(tableSize(false)).toEqual({ cols: COLS, rows: ROWS + apron(), boardRows: ROWS });
   });
 
   it('Madden: Blue chips leave off the top edge, run a side rail down, and end in the pit', () => {
