@@ -26,6 +26,20 @@ export const TABLES = [
 
 export const getTable = (id) => TABLES.find((t) => t.id === id) || TABLES[0];
 export const tableOpen = (save, t) => (save.peak || 0) >= t.unlock;
+// Repeating yourself is what the house punishes. If most of your recent matches used the same formation,
+// the bots counter it far more often, at every table (the table's own scouting rate is the floor). Varying
+// your formations keeps the bots guessing. This is what stops "find the best formation and grind it".
+export function repeatShare(save) {
+  const recent = (save.recent || []).slice(-6);
+  if (recent.length < 3) return 0;
+  const last = recent[recent.length - 1];
+  return (recent.filter((id) => id === last).length - 1) / (recent.length - 1);
+}
+export const scoutChance = (table, save) => Math.min(0.9, Math.max(table.scout, 0.9 * repeatShare(save)));
+
+// The same piece bought again and again costs more: +15% for each match in a row, at most triple.
+export const pieceHeat = (save, id) => (save.pieceStreak && save.pieceStreak.id === id ? Math.min(3, 1 + 0.15 * save.pieceStreak.n) : 1);
+
 export const feeFor = (table, wager) => Math.round(wager * table.fee);
 
 // How far the bet slider moves per notch at this table.
@@ -40,11 +54,11 @@ const asSetup = (formation, rng) => {
 };
 
 // The table's bot lineup. `lastId` is the formation you used last match.
-export function pickTableSetup(table, rng, lastId, rng2) {
+export function pickTableSetup(table, rng, lastId, rng2, scout = table.scout) {
   const strong = BOSS_BUILDS.length && rng() < table.strong;
   const pool = strong ? BOSS_BUILDS : FREE_BUILDS;
   let setup;
-  if (lastId && rng() < table.scout) setup = asSetup(counterFor(lastId, [...FREE_BUILDS, ...(table.strong ? BOSS_BUILDS : [])], rng), rng);
+  if (lastId && rng() < scout) setup = asSetup(counterFor(lastId, [...FREE_BUILDS, ...(table.strong ? BOSS_BUILDS : [])], rng), rng);
   else setup = pickBotSetup(rng, pool);
   return table.items.length && rng2() < table.itemChance ? withItem({ items: table.items }, setup, rng2) : setup;
 }

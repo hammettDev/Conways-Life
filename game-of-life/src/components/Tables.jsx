@@ -5,7 +5,7 @@ const money = (n) => (n >= 1000000 ? `$${n / 1000000}M` : n >= 1000 ? `$${n / 10
 
 // The stakes tables, on the left. Higher tables take bigger bets, charge a fee and field sharper bots.
 // The other game modes will live here too.
-export default function Tables({ save, tableId, onPick, drafting, tutorial }) {
+export default function Tables({ save, tableId, onPick, drafting, tutorial, scout = 0, repeat = 0 }) {
   return (
     <aside className="lobby" aria-label="Tables">
       <h2>Tables</h2>
@@ -32,6 +32,12 @@ export default function Tables({ save, tableId, onPick, drafting, tutorial }) {
           );
         })}
       </ul>
+      {!tutorial && (
+        <p className="note scoutnote" role="status">
+          Scouting: the bot counters your last formation <b>{Math.round(scout * 100)}%</b> of the time
+          {repeat > 0.2 ? ` (you have been repeating: ${Math.round(repeat * 100)}%)` : ''}. Mix up your formations to keep it guessing.
+        </p>
+      )}
       <h2>More modes</h2>
       <ul className="list soon">
         <li><span className="item tableitem" aria-disabled="true"><span className="name">Football gauntlet</span><span className="meta">Coming soon</span></span></li>

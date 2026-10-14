@@ -5,7 +5,7 @@ import SaveDialog from './components/SaveDialog.jsx';
 import Designer from './components/Designer.jsx';
 import Tables from './components/Tables.jsx';
 import { MiniPreview } from './components/MiniPreview.jsx';
-import { TABLES, getTable, tableOpen, feeFor, betStep, maxBetFor, pickTableSetup } from './game/tables.js';
+import { TABLES, getTable, tableOpen, feeFor, betStep, maxBetFor, pickTableSetup, scoutChance, repeatShare, pieceHeat } from './game/tables.js';
 import { getStyle, colorAt, buyStyle, equipStyle } from './game/cosmetics.js';
 import { buildCustom } from './engine/custom.js';
 import { createEngine } from './engine/engine.js';
@@ -26,7 +26,7 @@ import {
 import { packMatch, bossMultiplier, resolvePending } from './game/pending.js';
 import {
   placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout, finishTutorial,
-  noteFormation, noteResult, matchSeed, setPending, clearPending, forfeit, buyCustom, saveCustom, deleteCustom,
+  noteFormation, notePiece, noteResult, matchSeed, setPending, clearPending, forfeit, buyCustom, saveCustom, deleteCustom,
 } from './game/wallet.js';
 import {
   getBoss, pickBossSetup, withItem, rollEncounter,
@@ -119,7 +119,11 @@ export default function App() {
   const candidate = getTable(save.table);
   const table = tableOpen(save, candidate) ? candidate : TABLES[0]; // a table you no longer qualify for falls back to Rookie
   // Pieces cost more the higher you play: the same piece is worth far more on a bigger bet.
-  const shopObjects = useMemo(() => OBJECTS.map((o) => ({ ...o, price: o.price * table.itemMult })), [table.itemMult]);
+  const shopObjects = useMemo(() => OBJECTS.map((o) => {
+    const heat = pieceHeat(save, o.id); // buying the same piece again and again costs more
+    return { ...o, heat, price: Math.round(o.price * table.itemMult * heat) };
+  }), [table.itemMult, save.pieceStreak]); // eslint-disable-line react-hooks/exhaustive-deps
+  const scoutP = scoutChance(table, save); // how often this table's bot counters your last formation, given how much you repeat
   const obj = objectId ? shopObjects.find((o) => o.id === objectId) || null : null;
   const [practice, setPractice] = useState(false); // replaying the tutorial: nothing is paid or won
   const tutorial = !save.tutorialDone || practice; // the guided match: fixed stake, free pieces and audible
@@ -252,12 +256,12 @@ export default function App() {
       ? withItem(boss, pickBossSetup(boss, createRng(seed), save.boss.last), createRng(seed ^ 0x51ed))
       : tutorial
         ? pickBotSetup(createRng(seed), TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS)
-        : pickTableSetup(table, createRng(seed), save.boss.last, createRng(seed ^ 0x51ed));
+        : pickTableSetup(table, createRng(seed), save.boss.last, createRng(seed ^ 0x51ed), scoutP);
     tableRef.current = tutorial || boss ? null : table;
     const mine = blueCells(selected, obj, drop);
     // the match is written into the save now, so closing the page cannot dodge a loss
     commit(() => {
-      const next = noteFormation(held, selected.id);
+      const next = notePiece(noteFormation(held, selected.id), tutorial || !obj ? null : obj.id);
       return tutorial ? next : setPending(next, packMatch(seed, wager, boss && boss.id, mine, bot.cells));
     });
     escrowRef.current = cost;
@@ -317,7 +321,7 @@ export default function App() {
     }
     const mine = blueCells(next, obj, drop);
     commit(() => {
-      const after = noteFormation(paid, next.id);
+      const after = noteFormation(paid, next.id, true);
       return tutorial ? after : setPending(after, packMatch(seed, wagerRef.current, bossRef.current && bossRef.current.id, mine, bot.cells));
     });
     botRef.current = bot;
@@ -522,7 +526,7 @@ export default function App() {
 
       <div className="layout">
         <Tables
-          save={save} tableId={table.id} drafting={drafting && !auto.on} tutorial={tutorial}
+          save={save} tableId={table.id} drafting={drafting && !auto.on} tutorial={tutorial} scout={scoutP} repeat={repeatShare(save)}
           onPick={(id) => commit((s) => ({ ...s, table: id }))}
         />
 

@@ -179,7 +179,7 @@ export default function Sidebar({
                   >
                     <Thumb shape={o.shape} />
                     <span className="name">{o.name}</span>
-                    <span className="meta">{free ? 'free' : afford ? money(o.price) : `need ${money(o.price + wager - balance)} more`}</span>
+                    <span className="meta">{free ? 'free' : afford ? `${money(o.price)}${o.heat > 1 ? ` (+${Math.round((o.heat - 1) * 100)}% repeat)` : ''}` : `need ${money(o.price + wager - balance)} more`}</span>
                   </button>
                 </li>
               );

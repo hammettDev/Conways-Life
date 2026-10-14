@@ -15,6 +15,8 @@ export const newSave = () => ({
   pending: null,   // a locked-in match that has not finished; it settles itself if the page is closed
   boss: { wins: 0, beaten: [], last: null, since: 0 }, // since: matches since a boss last showed up
   custom: { unlocked: false, list: [] }, // the formation designer and the formations you saved with it
+  recent: [],          // the formations you used in your last matches, newest last: repeating one makes bots counter it
+  pieceStreak: null,   // { id, n }: the same piece bought n matches in a row, which makes it cost more
   peak: STARTING_WALLET, // the most cash you have ever held: it opens the higher-stakes tables
   table: 'rookie',
   style: { owned: ['classic'], equipped: 'classic' }, // chip colours
@@ -32,7 +34,18 @@ export function finishTutorial(save) {
 
 // Boss progress: wins since the last boss fight, the bosses beaten, and the
 // formation used last match (some bosses counter-pick it).
-export const noteFormation = (save, id) => ({ ...save, boss: { ...save.boss, last: id } });
+// `replace` swaps the latest entry (an audible changes this match's formation instead of adding a match).
+export const noteFormation = (save, id, replace = false) => ({
+  ...save,
+  boss: { ...save.boss, last: id },
+  recent: [...(replace ? (save.recent || []).slice(0, -1) : save.recent || []), id].slice(-8),
+});
+
+// Buying the same piece match after match gets pricier; using a different one (or none) resets it.
+export const notePiece = (save, pieceId) => ({
+  ...save,
+  pieceStreak: !pieceId ? null : save.pieceStreak && save.pieceStreak.id === pieceId ? { id: pieceId, n: Math.min(save.pieceStreak.n + 1, 99) } : { id: pieceId, n: 1 },
+});
 
 export function noteResult(save, outcome, bossId = null) {
   const boss = { ...save.boss };

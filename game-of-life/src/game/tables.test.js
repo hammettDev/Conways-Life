@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { TABLES, getTable, tableOpen, feeFor, betStep, maxBetFor, pickTableSetup } from './tables.js';
+import { TABLES, getTable, tableOpen, feeFor, betStep, maxBetFor, pickTableSetup, repeatShare, scoutChance, pieceHeat } from './tables.js';
 import { CHIP_STYLES, getStyle, colorAt, buyStyle, equipStyle, isAnimated } from './cosmetics.js';
-import { newSave } from './wallet.js';
+import { newSave, noteFormation, notePiece } from './wallet.js';
 import { importCode, exportCode } from './saveStore.js';
 import { createRng } from '../engine/rng.js';
 import { FREE_BUILDS, BOSS_BUILDS } from '../engine/library.js';
@@ -81,5 +81,39 @@ describe('chip colours', () => {
     const back = importCode(exportCode(s));
     expect(back.table).toBe('high');
     expect(back.peak).toBe(80000);
+  });
+});
+
+describe('repeating yourself is punished', () => {
+  const played = (ids) => ids.reduce((s, id) => noteFormation(s, id), newSave());
+  it('measures how much of your recent play is the same formation', () => {
+    expect(repeatShare(newSave())).toBe(0);
+    expect(repeatShare(played(['a', 'a']))).toBe(0); // too little history to say
+    expect(repeatShare(played(['a', 'b', 'c', 'd', 'e', 'f']))).toBe(0);
+    expect(repeatShare(played(['a', 'a', 'a', 'a', 'a', 'a']))).toBe(1);
+    expect(repeatShare(played(['b', 'a', 'a', 'a', 'a', 'a']))).toBeCloseTo(0.8, 5);
+    expect(repeatShare(played(['a', 'b', 'a', 'b', 'a', 'b']))).toBeLessThan(0.5);
+  });
+  it('raises the chance the bot counters you, at every table, and varying drops it back', () => {
+    const rookie = getTable('rookie');
+    expect(scoutChance(rookie, played(['a', 'b', 'c', 'd', 'e', 'f']))).toBe(0);
+    expect(scoutChance(rookie, played(['a', 'a', 'a', 'a', 'a', 'a']))).toBeCloseTo(0.9, 5);
+    expect(scoutChance(getTable('whale'), played(['a', 'b', 'c', 'd', 'e', 'f']))).toBe(1 > 0.9 ? 0.9 : 1); // the table's own rate is a floor, capped
+    expect(scoutChance(rookie, played(['a', 'a', 'a', 'a', 'a', 'b']))).toBeLessThan(0.5);
+  });
+  it('makes the same piece pricier each match in a row, up to triple, and resets when you change', () => {
+    let s = newSave();
+    expect(pieceHeat(s, 'block')).toBe(1);
+    for (let i = 0; i < 4; i++) s = notePiece(s, 'block');
+    expect(pieceHeat(s, 'block')).toBeCloseTo(1.6, 5);
+    expect(pieceHeat(s, 'glider')).toBe(1); // a different piece is not taxed
+    for (let i = 0; i < 40; i++) s = notePiece(s, 'block');
+    expect(pieceHeat(s, 'block')).toBe(3);
+    expect(pieceHeat(notePiece(s, 'glider'), 'block')).toBe(1);
+    expect(pieceHeat(notePiece(s, null), 'block')).toBe(1);
+  });
+  it('an audible replaces this match, it does not add one', () => {
+    const s = noteFormation(noteFormation(newSave(), 'a'), 'b', true);
+    expect(s.recent).toEqual(['b']);
   });
 });

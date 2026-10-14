@@ -86,6 +86,9 @@ export function sanitize(raw) {
     boss: sanitizeBoss(raw.boss),
     custom: sanitizeCustom(raw.custom),
     peak: Math.max(num(raw.peak, fresh.peak), num(raw.balance, fresh.balance)),
+    recent: Array.isArray(raw.recent) ? raw.recent.filter((id) => typeof id === 'string').slice(-8) : [],
+    pieceStreak: raw.pieceStreak && typeof raw.pieceStreak.id === 'string' && Number.isInteger(raw.pieceStreak.n) && raw.pieceStreak.n > 0
+      ? { id: raw.pieceStreak.id, n: Math.min(raw.pieceStreak.n, 99) } : null,
     table: TABLES.some((t) => t.id === raw.table) ? raw.table : 'rookie',
     style: sanitizeStyle(raw.style),
     rev: num(raw.rev, 0),
