@@ -94,10 +94,11 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
     const onKey = (e) => {
       if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
       const k = e.key;
-      if (k === ' ' || k === 'Enter') { e.preventDefault(); act(); return; }
-      if (phase === 'live' && /^[1-6]$/.test(k)) { const i = Number(k) - 1; if (i < off.receivers.length) setSel(i); return; }
-      if (phase === 'live' && (k === 'ArrowRight' || k === 'ArrowDown')) { setSel((s) => (s + 1) % off.receivers.length); return; }
-      if (phase === 'live' && (k === 'ArrowLeft' || k === 'ArrowUp')) { setSel((s) => (s + off.receivers.length - 1) % off.receivers.length); return; }
+      if (k === ' ' || k === 'Enter') { e.preventDefault(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); act(); return; }
+      // receivers can be picked in any phase (before the snap too): the number keys, or the arrows to step through them
+      if (/^[1-6]$/.test(k)) { e.preventDefault(); const i = Number(k) - 1; if (i < off.receivers.length) setSel(i); return; }
+      if (k === 'ArrowRight' || k === 'ArrowDown') { e.preventDefault(); setSel((s) => (s + 1) % off.receivers.length); return; }
+      if (k === 'ArrowLeft' || k === 'ArrowUp') { e.preventDefault(); setSel((s) => (s + off.receivers.length - 1) % off.receivers.length); return; }
       if (editing) { if (k === 'p' || k === 'P') setKind('pass'); if (k === 'r' || k === 'R') setKind('run'); }
       if (phase === 'revealed' && (k === 'a' || k === 'A')) callAudible();
     };
@@ -142,6 +143,11 @@ export default function LiveField({ team, defFor, counterFor, audibles, onAudibl
         {(phase === 'revealed' || phase === 'revealed2') && (
           <>
             <p className="note drivemsg">{phase === 'revealed' ? `They showed ${def.name}.` : note}</p>
+            {kind === 'pass' && (
+              <div className="driveseg" role="group" aria-label="Receiver">
+                {off.receivers.map((r, i) => <button key={i} className={sel === i ? 'on' : ''} onClick={() => setSel(i)}>{i + 1}</button>)}
+              </div>
+            )}
             <button className="lock" onClick={snap}>Snap · Space</button>
             {phase === 'revealed' && <button className="ghost" disabled={audibles <= 0} onClick={callAudible}>Audible · A ({audibles} left)</button>}
           </>
