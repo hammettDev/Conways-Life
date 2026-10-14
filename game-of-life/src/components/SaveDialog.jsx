@@ -8,12 +8,12 @@ export default function SaveDialog({ code, onImport, onClose }) {
   const copy = async () => {
     try { await navigator.clipboard.writeText(code); setMsg('Copied.'); } catch { setMsg('Select the code and copy it.'); }
   };
-  const doImport = () => setMsg(onImport(text) ? 'Imported. Welcome back.' : 'That code did not work. Check it for typos.');
+  const doImport = () => { const problem = onImport(text); setMsg(problem || 'Imported. Welcome back.'); };
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Save and load">
       <div className="dialog">
         <h2>Save and load</h2>
-        <p className="note">Your progress lives in this browser. Copy this code somewhere safe to keep a backup or move to another device.</p>
+        <p className="note">Your progress lives in this browser. Copy this code to move to another device. A code only loads if it is newer than the progress already on the device, so it cannot be used to undo a loss.</p>
         <textarea readOnly value={code} rows={3} onFocus={(e) => e.target.select()} aria-label="Your save code" />
         <div className="row"><button className="ghost" onClick={copy}>Copy code</button></div>
         <p className="note">Have a code? Paste it here.</p>

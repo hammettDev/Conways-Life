@@ -14,10 +14,13 @@ import { createSfx } from './audio/sfx.js';
 import { BLUE, RED, COLS, ROWS, WAGER, MIN_BET, AUDIBLE_PRICE, TUTORIAL_STAKE } from './engine/constants.js';
 import { tableSize } from './render/drawBoard.js';
 import { createPitDisplay, pitLead } from './render/pitDisplay.js';
-import { loadSave, persistSave, exportCode, importCode } from './game/saveStore.js';
+import {
+  loadSave, persistSave, exportCode, importCode, loadMaxRev, acceptImport,
+} from './game/saveStore.js';
+import { packMatch, bossMultiplier, resolvePending } from './game/pending.js';
 import {
   placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout, finishTutorial,
-  noteFormation, noteResult,
+  noteFormation, noteResult, matchSeed, setPending, clearPending, forfeit,
 } from './game/wallet.js';
 import {
   BOSSES, getBoss, unlockedBosses, bossReady, winsToBoss, pickBossSetup, withItem, rollMultiplier,
@@ -34,7 +37,13 @@ const PIT_X0 = (COLS - PIT) >> 1;
 const PIT_Y0 = (ROWS - PIT) >> 1;
 
 const newEngine = (seed) => createEngine({ seed, fortune: DEFAULT_FORTUNE_RULES });
-const randomSeed = () => (Math.random() * 2 ** 31) | 0;
+// Load the save, give it an id if it has none, and finish any match that was left running.
+function startUp() {
+  let save = loadSave();
+  if (!save.sid) save = { ...save, sid: 1 + Math.floor(Math.random() * 2 ** 30) };
+  const resumed = resolvePending(save);
+  return { save: resumed ? resumed.save : save, resumed };
+}
 const money = (n) => `$${n.toLocaleString()}`;
 const findBuild = (id) => FREE_BUILDS.find((b) => b.id === id) || null;
 
@@ -47,7 +56,10 @@ export default function App() {
   const sfx = useMemo(() => createSfx(), []);
   const pitDisplay = useMemo(() => createPitDisplay(PIT), []);
 
-  const [save, setSave] = useState(() => loadSave());
+  const [boot] = useState(startUp);
+  const [save, setSave] = useState(boot.save);
+  // Every change to the save bumps its revision, which is what makes an older save code detectable.
+  const commit = (next) => setSave((s) => ({ ...(typeof next === 'function' ? next(s) : next), rev: s.rev + 1 }));
   useEffect(() => { persistSave(save); }, [save]);
 
   const [phase, setPhase] = useState('draft'); // draft -> locked -> (audible) -> playing -> done
@@ -61,7 +73,9 @@ export default function App() {
   const [hud, setHud] = useState(null);
   const [result, setResult] = useState(null);
   const [botName, setBotName] = useState(null);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(() => (boot.resumed
+    ? `A match you left running finished: ${{ win: 'you won', lose: 'you lost', push: 'it was a push' }[boot.resumed.outcome]}${boot.resumed.mult > 1 ? ` (x${boot.resumed.mult})` : ''}.`
+    : ''));
   const [showSave, setShowSave] = useState(false);
   const [madden, setMadden] = useState(() => {
     try { return localStorage.getItem('view') !== 'side'; } catch { return true; } // Madden is the default
@@ -198,30 +212,41 @@ export default function App() {
     const held = placeBet(save, cost);
     if (!held) return;
     sfx.play('lockIn');
-    setSave(noteFormation(held, selected.id));
-    escrowRef.current = cost;
-    wagerRef.current = wager;
-    settledRef.current = false;
-    const seed = randomSeed();
-    seedRef.current = seed;
+    const seed = matchSeed(save); // fixed by the save, so cancelling and locking in again faces the same opponent
     const boss = !tutorial && bossId ? getBoss(bossId) : null;
-    bossRef.current = boss;
-    setBossMult(null);
-    skipRef.current = false;
     const bot = boss
       ? withItem(boss, pickBossSetup(boss, createRng(seed), save.boss.last), createRng(seed ^ 0x51ed))
       : pickBotSetup(createRng(seed), tutorial && TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS);
+    const mine = blueCells(selected, obj, drop);
+    // the match is written into the save now, so closing the page cannot dodge a loss
+    commit(() => {
+      const next = noteFormation(held, selected.id);
+      return tutorial ? next : setPending(next, packMatch(seed, wager, boss && boss.id, mine, bot.cells));
+    });
+    escrowRef.current = cost;
+    wagerRef.current = wager;
+    settledRef.current = false;
+    seedRef.current = seed;
+    bossRef.current = boss;
+    setBossMult(null);
+    skipRef.current = false;
     botRef.current = bot;
     botPendingRef.current = null;
-    startEngine(blueCells(selected, obj, drop), bot.cells, seed);
+    startEngine(mine, bot.cells, seed);
     setBotName(botLabel(bot));
     setNotice('');
     setAudibleUsed(false);
     setPhase('locked');
   };
 
+  // Backing out after the bot is revealed costs the re-pick fee: an audible is the paid way to react,
+  // and the opponent stays the same, so cancelling is not a free look at it.
   const cancelMatch = () => {
-    setSave((s) => refund(s, escrowRef.current)); // the bet and the piece come back; an audible fee does not
+    const held = escrowRef.current; // read now: the updater below runs after this handler returns
+    commit((s) => {
+      const back = clearPending(refund(s, held));
+      return tutorial ? back : forfeit(back, AUDIBLE_PRICE);
+    });
     escrowRef.current = 0;
     settledRef.current = true;
     emptyBoard();
@@ -236,11 +261,10 @@ export default function App() {
     const next = findBuild(audibleChoice);
     const paid = spend(save, audiblePrice);
     if (!next || !paid) return;
-    setSave(noteFormation(paid, next.id));
     setAudibleUsed(true);
     setSelectedId(next.id);
-    // The bot may answer with its own audible, kept hidden until the snap.
-    const seed = randomSeed();
+    // The bot may answer with its own audible, kept hidden until the snap. It is seeded too.
+    const seed = matchSeed(save, 1);
     const rng = createRng(seed ^ 0x9e3779b9);
     let bot = botRef.current;
     botPendingRef.current = null;
@@ -251,9 +275,14 @@ export default function App() {
       if (bossRef.current) bot = withItem(bossRef.current, bot, rng);
       botPendingRef.current = { name: botLabel(bot), notice: `The bot called an audible: ${bot.formation.name}.` };
     }
+    const mine = blueCells(next, obj, drop);
+    commit(() => {
+      const after = noteFormation(paid, next.id);
+      return tutorial ? after : setPending(after, packMatch(seed, wagerRef.current, bossRef.current && bossRef.current.id, mine, bot.cells));
+    });
     botRef.current = bot;
     seedRef.current = seed;
-    startEngine(blueCells(next, obj, drop), bot.cells, seed);
+    startEngine(mine, bot.cells, seed);
     setAudibleChoice(null);
     setPhase('locked');
   };
@@ -286,7 +315,7 @@ export default function App() {
   }, [tutorial, phase, selectedId]);
   const leaveTutorial = () => {
     if (practice) setPractice(false);
-    else setSave((s) => finishTutorial(s));
+    else commit((s) => finishTutorial(s));
   };
   const startTutorial = () => {
     emptyBoard();
@@ -305,7 +334,7 @@ export default function App() {
 
   const takeBail = () => {
     const r = takeBailout(save);
-    if (r) { setSave(r.save); setNotice(`Bailout: +${money(r.amount)}. It shrinks each time, so play it smart.`); }
+    if (r) { commit(r.save); setNotice(`Bailout: +${money(r.amount)}. It shrinks each time, so play it smart.`); }
   };
 
   // Drive the simulation at a fixed tick rate, independent of the frame rate.
@@ -353,9 +382,9 @@ export default function App() {
             const w = wagerRef.current;
             // the tutorial bet is insured: it pays as a win whatever the board said
             const boss = bossRef.current;
-            const mult = boss && r.outcome === 'win' ? rollMultiplier(Math.random, boss.rolls) : 1;
+            const mult = bossMultiplier(seedRef.current, boss, r.outcome); // seeded, so a reload cannot reroll it
             if (boss && r.outcome === 'win') setBossMult(mult);
-            setSave((s) => (live.current.tutorial
+            commit((s) => clearPending(live.current.tutorial
               ? (live.current.practice ? s : settle(s, 'win', w))
               : noteResult(settle(s, r.outcome, w, mult), r.outcome, boss ? boss.id : null)));
           }
@@ -480,13 +509,20 @@ export default function App() {
           onNewMatch={newMatch} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(AUDIBLE_PRICE)}
+          cancelFee={tutorial ? '' : money(AUDIBLE_PRICE)}
         />
       </div>
 
       {showSave && (
         <SaveDialog
           code={exportCode(save)}
-          onImport={(text) => { const s = importCode(text); if (s) { setSave(s); return true; } return false; }}
+          onImport={(text) => {
+            const incoming = importCode(text);
+            if (!incoming) return 'That code did not work. Check it for typos.';
+            if (!acceptImport(incoming, save, loadMaxRev())) return 'That code is older than the progress already on this device, so it cannot be loaded.';
+            setSave(incoming); // keeps its own revision, which is above everything seen here
+            return '';
+          }}
           onClose={() => setShowSave(false)}
         />
       )}

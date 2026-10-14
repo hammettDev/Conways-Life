@@ -19,6 +19,18 @@ const b64 = {
   dec: (s) => (typeof atob === 'function' ? atob(s) : Buffer.from(s, 'base64').toString('binary')),
 };
 
+const cellList = (list) => (Array.isArray(list)
+  ? list.filter((c) => Array.isArray(c) && Number.isInteger(c[0]) && Number.isInteger(c[1]) && c[0] >= 0 && c[0] < 80 && c[1] >= 0 && c[1] < 60).slice(0, 1500).map((c) => [c[0], c[1]])
+  : []);
+
+function sanitizePending(p) {
+  if (!p || typeof p !== 'object' || !Number.isFinite(p.seed) || !Number.isFinite(p.wager) || p.wager < 0) return null;
+  const blue = cellList(p.blue);
+  const red = cellList(p.red);
+  if (!blue.length || !red.length) return null;
+  return { seed: Math.floor(p.seed) & 0x7fffffff, wager: Math.floor(p.wager), boss: typeof p.boss === 'string' ? p.boss : null, blue, red };
+}
+
 function sanitizeBoss(b) {
   const x = b && typeof b === 'object' ? b : {};
   const beaten = Array.isArray(x.beaten) ? x.beaten.filter((id) => typeof id === 'string').slice(0, 20) : [];
@@ -40,6 +52,9 @@ export function sanitize(raw) {
     v: SAVE_VERSION,
     tutorialDone: raw.tutorialDone === true || played > 0, // older saves predate the tutorial
     boss: sanitizeBoss(raw.boss),
+    rev: num(raw.rev, 0),
+    sid: num(raw.sid, 0),
+    pending: sanitizePending(raw.pending),
     balance: num(raw.balance, fresh.balance),
     bailouts: num(raw.bailouts, 0),
     stats: {
@@ -74,9 +89,21 @@ export function loadSave(storage = globalThis.localStorage) {
   }
 }
 
+// The highest revision this browser has ever held. A save code at or below it is
+// older than what is already here, so it cannot be used to roll the save back.
+const REV_KEY = 'gcw.maxRev';
+export function loadMaxRev(storage = globalThis.localStorage) {
+  try { return Number(storage && storage.getItem(REV_KEY)) || 0; } catch { return 0; }
+}
+
+export const acceptImport = (imported, current, maxRev) => imported.rev > Math.max(current.rev, maxRev);
+
 export function persistSave(save, storage = globalThis.localStorage) {
   try {
-    if (storage) storage.setItem(KEY, JSON.stringify(save));
+    if (storage) {
+      storage.setItem(KEY, JSON.stringify(save));
+      if (save.rev > loadMaxRev(storage)) storage.setItem(REV_KEY, String(save.rev));
+    }
     return true;
   } catch {
     return false;

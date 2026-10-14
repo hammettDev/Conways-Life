@@ -10,6 +10,9 @@ export const newSave = () => ({
   v: SAVE_VERSION,
   balance: STARTING_WALLET,
   tutorialDone: true,
+  rev: 0,          // goes up with every change, so an older save code can be told from a newer one
+  sid: 0,          // per-save id that seeds the opponents, so cancelling or reloading cannot reroll them
+  pending: null,   // a locked-in match that has not finished; it settles itself if the page is closed
   boss: { wins: 0, beaten: [], last: null },
   bailouts: 0,
   stats: { played: 0, wins: 0, losses: 0, pushes: 0, streak: 0, bestStreak: 0 },
@@ -37,6 +40,21 @@ export function noteResult(save, outcome, bossId = null) {
   }
   return { ...save, boss };
 }
+
+// The seed for the next match is fixed by the save and how many matches it has played,
+// so cancelling and locking in again (or reloading) faces exactly the same opponent.
+export function matchSeed(save, salt = 0) {
+  let h = (save.sid ^ Math.imul(save.stats.played + 1, 0x9e3779b1) ^ Math.imul(salt + 1, 0x85ebca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+  return (h ^ (h >>> 16)) & 0x7fffffff;
+}
+
+export const setPending = (save, pending) => ({ ...save, pending });
+export const clearPending = (save) => (save.pending ? { ...save, pending: null } : save);
+
+// Pay a fee out of whatever is left (a cancelled lock-in forfeits the re-pick fee, never more than you have).
+export const forfeit = (save, amount) => ({ ...save, balance: save.balance - Math.min(amount, save.balance) });
 
 export const canAfford = (save, cost) => save.balance >= cost;
 

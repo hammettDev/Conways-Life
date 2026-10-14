@@ -14,7 +14,7 @@ export default function Sidebar({
   objectId, onObject, placed, armed, onArm, onDragStart, onClearPlace,
   lockLabel, lockHint, canLock, onLockIn,
   audibleChoiceId, onAudibleConfirm, audibleLabel, canAudible,
-  onSnap, onSkip, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
+  onSnap, onSkip, cancelFee, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
 }) {
   const [tab, setTab] = useState('formations');
   const [sport, setSport] = useState('all');
@@ -160,7 +160,7 @@ export default function Sidebar({
           <button className="lock" onClick={onSnap}>Snap</button>
           <div className="betrow">
             <button className="ghost" onClick={onCallAudible} disabled={audibleDisabled} title="Switch your formation after seeing the bot's">Audible {audibleFee}</button>
-            <button className="ghost" onClick={onCancel}>Cancel</button>
+            <button className="ghost" onClick={onCancel}>Cancel{cancelFee ? ` · −${cancelFee}` : ''}</button>
           </div>
         </>
       ) : (
