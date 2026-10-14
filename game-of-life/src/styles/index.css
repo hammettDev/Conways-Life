@@ -309,17 +309,18 @@ body {
   :root { --dock: 176px; }
   .layout { display: block; }
   .stage { position: sticky; top: 0; z-index: 20; background: var(--bg); padding: 4px 0 6px; }
-  .table { --boardvh: 54vh; width: min(100%, calc((var(--boardvh) - 84px) * var(--aspect))) !important; }
-  .layout:not([data-sheet='none']) .table { --boardvh: 38vh; }
+  .app { padding-left: 6px; padding-right: 6px; }
+  .table { --boardvh: 66vh; width: min(100%, calc((var(--boardvh) - 70px) * var(--aspect))) !important; }
+  .layout:not([data-sheet='none']) .table { --boardvh: 31vh; }
   .sidebar { display: contents; }
   .panelbody { display: none; }
   .layout[data-sheet='formations'] .panelbody, .layout[data-sheet='shop'] .panelbody {
-    display: flex; flex-direction: column; gap: 8px; position: fixed; left: 0; right: 0; bottom: var(--dock); height: 40vh;
+    display: flex; flex-direction: column; gap: 8px; position: fixed; left: 0; right: 0; bottom: var(--dock); height: calc(100dvh - var(--dock) - 39vh);
     overflow-y: auto; z-index: 25; background: var(--panel); border-top: 1px solid var(--edge); padding: 10px 12px;
   }
   .lobby { display: none; }
   .layout[data-sheet='tables'] .lobby {
-    display: flex; position: fixed; left: 0; right: 0; bottom: var(--dock); height: 40vh; overflow-y: auto; z-index: 25;
+    display: flex; position: fixed; left: 0; right: 0; bottom: var(--dock); height: calc(100dvh - var(--dock) - 39vh); overflow-y: auto; z-index: 25;
     background: var(--panel); border-top: 1px solid var(--edge); padding: 10px 12px; grid-column: auto;
   }
   .app { padding-bottom: calc(var(--dock) + 12px); }
