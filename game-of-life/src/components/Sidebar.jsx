@@ -79,13 +79,10 @@ export default function Sidebar(props) {
               + Design a formation{custom.list.length >= custom.max ? ' (slots full)' : ''}
             </button>
           ) : (
-            <div className="customcard">
-              <b>Formation Designer · {money(custom.price)}</b>
-              <p className="note">Design your own formation under the same rules as every other one. One-time unlock; save up to {custom.max}.</p>
-              <button className="ghost" onClick={custom.onBuy} disabled={!custom.canBuy || !drafting}>
-                {custom.canBuy ? `Unlock for ${money(custom.price)}` : `Need ${money(custom.price - balance)} more`}
-              </button>
-            </div>
+            <button className="ghost blip" onClick={custom.onBuy} disabled={!custom.canBuy || !drafting}
+              title={`Design your own formation under the same rules as the rest. One-time unlock; save up to ${custom.max}.`}>
+              Formation Designer · {custom.canBuy ? `unlock ${money(custom.price)}` : `need ${money(custom.price - balance)} more`}
+            </button>
           ))}
           <input
             className="search" type="search" placeholder="Search formations" value={query}
