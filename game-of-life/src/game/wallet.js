@@ -21,6 +21,7 @@ export const newSave = () => ({
   table: 'rookie',
   style: { owned: ['classic'], equipped: 'classic' }, // chip colours
   bailouts: 0,
+  season: null,        // the football season in progress, or null (see game/season.js)
   stats: { played: 0, wins: 0, losses: 0, pushes: 0, streak: 0, bestStreak: 0 },
 });
 

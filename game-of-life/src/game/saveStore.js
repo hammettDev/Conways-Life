@@ -80,6 +80,13 @@ function sanitizeBoss(b) {
   };
 }
 
+function sanitizeSeason(x) {
+  if (!x || typeof x !== 'object' || !Array.isArray(x.results)) return null;
+  const n = (v) => (Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
+  const results = x.results.slice(0, 16).map((r) => ({ team: typeof r.team === 'string' ? r.team : '', you: n(r.you), them: n(r.them) }));
+  return { seed: n(x.seed), week: Math.min(n(x.week), results.length), results };
+}
+
 // Anything that is not a sane save falls back to a fresh one.
 export function sanitize(raw) {
   if (!raw || typeof raw !== 'object' || raw.v !== SAVE_VERSION) return null;
@@ -103,6 +110,7 @@ export function sanitize(raw) {
     pending: sanitizePending(raw.pending),
     balance: num(raw.balance, fresh.balance),
     bailouts: num(raw.bailouts, 0),
+    season: sanitizeSeason(raw.season),
     stats: {
       played, wins: num(st.wins, 0), losses: num(st.losses, 0),
       pushes: num(st.pushes, 0), streak: num(st.streak, 0), bestStreak: num(st.bestStreak, 0),

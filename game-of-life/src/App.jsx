@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Drive from './components/Drive.jsx';
-import { DRIVE_PAYOUT } from './engine/football.js';
+import Game from './components/Game.jsx';
 import Arena from './components/Arena.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import SaveDialog from './components/SaveDialog.jsx';
@@ -614,10 +613,9 @@ export default function App() {
         />
 
         {mode === 'drive' ? (
-          <Drive
-            balance={save.balance} table={table} minBet={table.min} maxBet={maxBet} betStep={betStep(table)} feeFor={feeFor} seed={matchSeed(save)}
-            onStart={(c) => { const held = placeBet(save, c); if (!held) return false; commit(() => held); return true; }}
-            onFinish={(win, w) => commit((cur) => noteResult(settle(cur, win ? 'win' : 'lose', w, DRIVE_PAYOUT)))}
+          <Game
+            season={save.season}
+            onSeason={(se) => commit((cur) => ({ ...cur, season: se }))}
             onExit={() => setMode('2p')}
           />
         ) : (
