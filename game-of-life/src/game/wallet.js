@@ -22,6 +22,7 @@ export const newSave = () => ({
   style: { owned: ['classic'], equipped: 'classic' }, // chip colours
   bailouts: 0,
   season: null,        // the football season in progress, or null (see game/season.js)
+  trophies: null,      // football totals and finished seasons for the trophy room (game/trophies.js)
   stats: { played: 0, wins: 0, losses: 0, pushes: 0, streak: 0, bestStreak: 0 },
 });
 

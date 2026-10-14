@@ -98,8 +98,18 @@ function sanitizeGame(x) {
     teamId: x.teamId.slice(0, 24), seed: n(x.seed, 0, 2 ** 32, 0), phase, q: n(x.q, 1, 4, 1), clock: n(x.clock, 0, 240, 240),
     you: n(x.you, 0, 999, 0), them: n(x.them, 0, 999, 0), poss: side(x.poss), first: side(x.first), drive: sanitizeDrive(x.drive),
     aud: n(x.aud, 0, 9, 0), plays: n(x.plays, 0, 999, 0), classes: Array.isArray(x.classes) ? x.classes.filter((c) => typeof c === 'string').slice(-8) : [],
-    note: typeof x.note === 'string' ? x.note.slice(0, 200) : '', pending: x.pending === true, toss,
+    note: typeof x.note === 'string' ? x.note.slice(0, 200) : '', pending: x.pending === true, td: n(x.td, 0, 99, 0), fg: n(x.fg, 0, 99, 0), toss,
   };
+}
+
+function sanitizeTrophies(x) {
+  if (!x || typeof x !== 'object') return null;
+  const n = (v) => (Number.isFinite(v) && v >= 0 ? Math.min(Math.floor(v), 1e7) : 0);
+  const f = x.football && typeof x.football === 'object' ? x.football : {};
+  const keys = ['games', 'wins', 'losses', 'ties', 'pf', 'pa', 'bestScore', 'bigWin', 'shutouts', 'td', 'fg', 'streak', 'bestStreak'];
+  const football = Object.fromEntries(keys.map((k) => [k, n(f[k])]));
+  const seasons = Array.isArray(x.seasons) ? x.seasons.slice(-40).map((s, i) => ({ n: n(s.n) || i + 1, wins: n(s.wins), losses: n(s.losses), ties: n(s.ties), pf: n(s.pf), pa: n(s.pa), champion: s.champion === true })) : [];
+  return { football, seasons };
 }
 
 function sanitizeSeason(x) {
@@ -133,6 +143,7 @@ export function sanitize(raw) {
     balance: num(raw.balance, fresh.balance),
     bailouts: num(raw.bailouts, 0),
     season: sanitizeSeason(raw.season),
+    trophies: sanitizeTrophies(raw.trophies),
     stats: {
       played, wins: num(st.wins, 0), losses: num(st.losses, 0),
       pushes: num(st.pushes, 0), streak: num(st.streak, 0), bestStreak: num(st.bestStreak, 0),

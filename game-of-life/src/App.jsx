@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Game from './components/Game.jsx';
+import TrophyRoom from './components/TrophyRoom.jsx';
 import Arena from './components/Arena.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import SaveDialog from './components/SaveDialog.jsx';
@@ -114,6 +115,7 @@ export default function App() {
       return window.innerWidth >= 640; // Madden is the default; on a phone the sideways board is wider and fits better
     } catch { return true; }
   });
+  const [showTrophies, setShowTrophies] = useState(false);
   const [sound, setSound] = useState(() => {
     try { return localStorage.getItem('sound') !== 'off'; } catch { return true; } // on by default
   });
@@ -587,6 +589,7 @@ export default function App() {
 
   return (
     <div className="app">
+      {showTrophies && <TrophyRoom save={save} onClose={() => setShowTrophies(false)} />}
       <header className="top">
         <h1>The Cell <span>Games</span></h1>
         <p>{mode === 'drive' ? 'Gridiron Cellular Warfare: call your plays, fire the glider, win the season.' : "Conway's Takeover: pick a formation, lock it in, and watch the board decide."}</p>
@@ -598,6 +601,7 @@ export default function App() {
             )}
           </div>
           {drafting && !tutorial && <button className="viewtoggle" onClick={startTutorial}>How to play</button>}
+          <button className="viewtoggle" onClick={() => setShowTrophies(true)}>Trophies</button>
           <button className="viewtoggle" onClick={() => setShowSave(true)}>Save</button>
           <button className="viewtoggle" onClick={toggleSound} aria-pressed={sound}>Sound: {sound ? 'On' : 'Off'}</button>
           <button className="viewtoggle" onClick={toggleLook} aria-pressed={look === 'chips'}>Look: {look === 'chips' ? 'Chips' : 'Clean'}</button>
@@ -615,6 +619,7 @@ export default function App() {
         {mode === 'drive' ? (
           <Game
             sfx={sfx}
+            onTrophy={(fn) => commit(fn)}
             season={save.season}
             onSeason={(se) => commit((cur) => ({ ...cur, season: se }))}
             onExit={() => setMode('2p')}

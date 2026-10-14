@@ -484,3 +484,24 @@ body {
 .cheertext span { font-size: clamp(1rem, 3.5vw, 1.6rem); font-weight: 700; color: #fff; }
 .cheer small { color: var(--dim); }
 @keyframes cheerpop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ---- the trophy room ---- */
+.trophyroom { position: fixed; inset: 0; z-index: 90; background: rgba(2, 8, 5, 0.86); display: grid; place-items: start center; overflow-y: auto; padding: 16px 10px; }
+.trophybox { width: min(100%, 820px); background: var(--panel); border: 1px solid var(--edge); border-radius: 16px; padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.trophyhead { display: flex; align-items: center; gap: 12px; }
+.trophyhead h2 { margin: 0; flex: 1; }
+.trophybox h3 { margin: 0 0 6px; font-size: 0.85rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.shelf { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px; border-radius: 12px; background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.25)); border-bottom: 6px solid #3a2a12; min-height: 90px; align-items: flex-end; }
+.cupslot { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 84px; text-align: center; }
+.cupslot span { font-size: 0.72rem; color: var(--dim); }
+.cupslot.empty { opacity: 0.55; }
+.cup { color: #4a5a50; } .cup.lit { color: #ffc93d; filter: drop-shadow(0 0 8px rgba(255, 201, 61, 0.45)); }
+.records { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.records dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; }
+.records dt { color: var(--dim); } .records dd { margin: 0; font-weight: 700; text-align: right; }
+.badges { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.badge { padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--edge); display: flex; flex-direction: column; gap: 2px; opacity: 0.6; }
+.badge span { font-size: 0.74rem; color: var(--dim); }
+.badge.on { opacity: 1; border: 1px solid #ffc93d; background: rgba(255, 201, 61, 0.08); }
+.badge.on b { color: #ffd868; }
+@media (max-width: 639px) { .records { grid-template-columns: 1fr; } }

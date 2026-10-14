@@ -15,21 +15,22 @@ const freshAt = (spot) => ({ ...newDrive(), spot });
 
 export const newGame = (seed, teamId) => ({
   teamId, seed: seed >>> 0, phase: 'toss', q: 1, clock: QUARTER_SECONDS, you: 0, them: 0, poss: null, first: null,
-  drive: null, aud: AUDIBLES, plays: 0, classes: [], note: '', pending: false, cheer: null, toss: null,
+  drive: null, aud: AUDIBLES, plays: 0, classes: [], note: '', pending: false, cheer: null, td: 0, fg: 0, toss: null,
 });
 
 export const startPlay = (g, firstSide, spotOverride = null) => ({ ...g, phase: 'play', poss: firstSide, first: firstSide, drive: freshAt(spotOverride || DRIVE.startSpot) });
 
 // Close out `secs` seconds on the clock, with the drive `drive` as it now stands (over or not).
 function settle(g, drive, secs, spotOverride = null) {
-  let { q, clock, you, them, poss, classes } = g;
+  let { q, clock, you, them, poss, classes, td, fg } = g;
+  td = td || 0; fg = fg || 0;
   const notes = [];
   let cheer = null;
   clock -= secs;
   let d = drive;
   if (d.over) {
     const pts = drivePoints(d);
-    if (poss === 'you') you += pts; else them += pts;
+    if (poss === 'you') { you += pts; if (d.over === 'td') td += 1; else if (d.over === 'fg') fg += 1; } else them += pts;
     notes.push(`${poss === 'you' ? 'Your' : 'Their'} drive: ${driveNote(d)}${pts ? ` (+${pts})` : ''}.`);
     if (pts > 0) cheer = { side: poss, pts, kind: d.over === 'td' ? 'td' : 'fg' };
     const scored = d.over === 'td' || d.over === 'fg';
@@ -51,7 +52,7 @@ function settle(g, drive, secs, spotOverride = null) {
       q += 1; clock = QUARTER_SECONDS;
     }
   }
-  return { ...g, q, clock, you, them, poss, drive: { ...d, log: [] }, phase, classes, plays: g.plays + 1, note: notes.join(' '), pending: notes.length > 0, cheer };
+  return { ...g, td, fg, q, clock, you, them, poss, drive: { ...d, log: [] }, phase, classes, plays: g.plays + 1, note: notes.join(' '), pending: notes.length > 0, cheer };
 }
 
 // One play of the game (a pass, a run, a kick) with its outcome from the engine.

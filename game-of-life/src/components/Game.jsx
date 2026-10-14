@@ -10,6 +10,7 @@ import {
 import { newGame, startPlay, afterPlay, afterSimDrive, savable, clockText, botFourthDown } from '../game/gameclock.js';
 import { TOSS_IDS, TOSS_BEATS, tossBuilds, playToss } from '../game/toss.js';
 import { createRng } from '../engine/rng.js';
+import { recordGame, recordSeason } from '../game/trophies.js';
 
 const startSpot = () => { try { const v = Number(new URLSearchParams(window.location.search).get('spot')); return v > 0 && v < 100 ? v : null; } catch { return null; } }; // ?spot=70 starts every drive there, for testing
 const previewCheer = () => { try { const v = new URLSearchParams(window.location.search).get('cheer'); return ['td', 'fg', 'win'].includes(v) ? v : null; } catch { return null; } }; // ?cheer=win previews a routine
@@ -21,7 +22,7 @@ const STYLE_TEXT = { run: 'run the ball', short: 'throw short', mid: 'throw over
 // Gridiron Cellular Warfare: a season of 8 games. A game is four 4-minute quarters with 15 seconds a play; a quick game of
 // Conway's Takeover decides who receives; you play offence live and defence play by play. The game and the season live in
 // the save, so you can put it down at any play and carry on later.
-export default function Game({ season, onSeason, onExit, sfx }) {
+export default function Game({ season, onSeason, onExit, sfx, onTrophy }) {
   const [madden, setMadden] = useState(() => { try { return localStorage.getItem('fbview') !== 'side'; } catch { return true; } });
   const toggleView = () => setMadden((m) => { try { localStorage.setItem('fbview', m ? 'side' : 'madden'); } catch { /* storage unavailable */ } return !m; });
   const cur = season || null;
@@ -83,7 +84,14 @@ export default function Game({ season, onSeason, onExit, sfx }) {
   const defFor = () => defenceById(teamDefence(rngFor(0xdef), team, g.classes));
 
   const finishGame = () => {
-    onSeason({ ...cur, week: cur.week + 1, results: [...cur.results, { team: g.teamId, you: g.you, them: g.them }], game: null });
+    const week = cur.week + 1;
+    const finished = { ...cur, week, results: [...cur.results, { team: g.teamId, you: g.you, them: g.them }], game: null };
+    onSeason(finished);
+    // the trophy room: this game's totals, and the cup if the season is over
+    if (onTrophy) {
+      onTrophy((s) => recordGame(s, { you: g.you, them: g.them, td: g.td, fg: g.fg }));
+      if (week >= SEASON_GAMES) onTrophy((s) => recordSeason(s, finished, PLAYOFF_WINS));
+    }
     setG(null);
   };
 
