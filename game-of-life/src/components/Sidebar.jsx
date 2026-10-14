@@ -41,7 +41,6 @@ export default function Sidebar({
     <aside className="sidebar">
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={activeTab === 'formations'} onClick={() => setTab('formations')}>Formations</button>
-        {custom && <button role="tab" aria-selected={activeTab === 'custom'} onClick={() => setTab('custom')} disabled={picking}>Custom</button>}
         {bosses && <button role="tab" aria-selected={activeTab === 'boss'} onClick={() => setTab('boss')} disabled={picking}>Boss{bosses.ready ? ' !' : ''}</button>}
         <button role="tab" aria-selected={activeTab === 'shop'} onClick={() => setTab('shop')} disabled={picking}>
           Shop{chosen && placed ? ' ·1' : ''}
@@ -50,35 +49,7 @@ export default function Sidebar({
 
       {picking && <p className="banner">Audible! Pick the formation you want to switch to.</p>}
 
-      {activeTab === 'custom' && custom ? (
-        <>
-          {!custom.unlocked ? (
-            <div className="customcard">
-              <b>Formation Designer</b>
-              <p className="note">Design your own formation, place by place. It plays by the same rules as every other one (same tile budget, must hold still on its own), so you are buying the freedom to design, not extra power. Save up to {custom.max}.</p>
-              <button className="lock" onClick={custom.onBuy} disabled={!custom.canBuy || !drafting}>Unlock · {money(custom.price)}</button>
-              {!custom.canBuy && <p className="hint">You need {money(custom.price - balance)} more.</p>}
-            </div>
-          ) : (
-            <>
-              <button className="lock" onClick={custom.onNew} disabled={!drafting || custom.list.length >= custom.max}>Design a formation</button>
-              {custom.list.length >= custom.max && <p className="hint">Formation slots full. Delete one to make room.</p>}
-              <ul className="list">
-                {custom.list.map((c) => (
-                  <li key={c.id}>
-                    <div className="row">
-                      <button className="item" style={{ flex: 1 }} onClick={() => { onSelect(c.id); setTab('formations'); }} disabled={!drafting}><span className="name">{c.name}</span><span className="meta">Use</span></button>
-                      <button className="ghost small" onClick={() => custom.onEdit(c)} disabled={!drafting}>Edit</button>
-                      <button className="ghost small" onClick={() => custom.onDelete(c.id)} disabled={!drafting} aria-label={`Delete ${c.name}`}>✕</button>
-                    </div>
-                  </li>
-                ))}
-                {!custom.list.length && <li className="empty">No custom formations yet.</li>}
-              </ul>
-            </>
-          )}
-        </>
-      ) : activeTab === 'boss' && bosses ? (
+      {activeTab === 'boss' && bosses ? (
         <>
           <p className="note">
             {bosses.ready
@@ -107,6 +78,19 @@ export default function Sidebar({
         </>
       ) : activeTab === 'formations' ? (
         <>
+          {custom && (custom.unlocked ? (
+            <button className="ghost" onClick={custom.onNew} disabled={!drafting || custom.list.length >= custom.max}>
+              + Design a formation{custom.list.length >= custom.max ? ' (slots full)' : ''}
+            </button>
+          ) : (
+            <div className="customcard">
+              <b>Formation Designer · {money(custom.price)}</b>
+              <p className="note">Design your own formation under the same rules as every other one. One-time unlock; save up to {custom.max}.</p>
+              <button className="ghost" onClick={custom.onBuy} disabled={!custom.canBuy || !drafting}>
+                {custom.canBuy ? `Unlock for ${money(custom.price)}` : `Need ${money(custom.price - balance)} more`}
+              </button>
+            </div>
+          ))}
           <input
             className="search" type="search" placeholder="Search formations" value={query}
             onChange={(e) => setQuery(e.target.value)} aria-label="Search formations"
@@ -121,7 +105,7 @@ export default function Sidebar({
           </div>
           <ul className="list">
             {shown.map((b) => (
-              <li key={b.id}>
+              <li key={b.id} className={b.sport === 'custom' ? 'customrow' : undefined}>
                 <button
                   className={b.id === currentId ? 'item on' : 'item'}
                   onClick={() => onSelect(b.id)} disabled={!(drafting || picking) || (picking && b.id === selectedId)}
@@ -129,6 +113,12 @@ export default function Sidebar({
                   <span className="name">{b.name}</span>
                   <span className="meta">{picking && b.id === selectedId ? 'current' : SPORT_LABEL[b.sport] || b.sport}</span>
                 </button>
+                {b.sport === 'custom' && custom && (
+                  <>
+                    <button className="ghost small" onClick={() => custom.onEdit(custom.list.find((c) => c.id === b.id))} disabled={!drafting}>Edit</button>
+                    <button className="ghost small" onClick={() => custom.onDelete(b.id)} disabled={!drafting} aria-label={`Delete ${b.name}`}>✕</button>
+                  </>
+                )}
               </li>
             ))}
             {!shown.length && <li className="empty">No formations match.</li>}

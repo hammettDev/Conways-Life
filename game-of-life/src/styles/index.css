@@ -198,3 +198,6 @@ body {
 .hint.bad { color: #ff8fa8; }
 .note.small { font-size: 0.72rem; margin: 4px 0 0; }
 .customcard { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--accent, #ffb02e); border-radius: 10px; }
+
+.list li.customrow { display: flex; gap: 6px; align-items: stretch; }
+.list li.customrow .item { flex: 1; }
