@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar.jsx';
 import SaveDialog from './components/SaveDialog.jsx';
 import Designer from './components/Designer.jsx';
 import Tables from './components/Tables.jsx';
+import { MiniPreview } from './components/MiniPreview.jsx';
 import { TABLES, getTable, tableOpen, feeFor, betStep, maxBetFor, pickTableSetup } from './game/tables.js';
 import { getStyle, colorAt, buyStyle, equipStyle } from './game/cosmetics.js';
 import { buildCustom } from './engine/custom.js';
@@ -34,7 +35,7 @@ import { STEPS, stepFor } from './game/tutorial.js';
 import BossReveal from './components/BossReveal.jsx';
 import { botAnswers, counterFor } from './game/audible.js';
 
-const CENTER_STEPS = ['pick', 'hot', 'shop', 'wrap']; // lessons that sit mid-board; the rest dock at the top so the action stays visible
+const CENTER_STEPS = ['pick', 'rules', 'hot', 'shop', 'wrap']; // lessons that sit mid-board; the rest dock at the top so the action stays visible
 const TICKS_PER_SECOND = 6; // at 1x
 const SPEEDS = [0.5, 1, 2, 4];
 const PIT = DEFAULT_FORTUNE_RULES.pitSize;
@@ -383,7 +384,7 @@ export default function App() {
     setSelectedId(null);
     setTStep('pick');
   };
-  const nextStep = () => setTStep((c) => ({ hot: 'shop', shop: 'lock' }[c] || c));
+  const nextStep = () => setTStep((c) => ({ rules: 'hot', hot: 'shop', shop: 'lock' }[c] || c));
   const lesson = tutorial ? { ...STEPS[tStep], text: (practice && STEPS[tStep].practice) || STEPS[tStep].text } : null;
 
   const takeBail = () => {
@@ -569,6 +570,9 @@ export default function App() {
               <aside className={`coach ${CENTER_STEPS.includes(tStep) ? 'center' : 'dock'}`} role="status" aria-live="polite">
                 <b>{lesson.title}</b>
                 <p>{lesson.text}</p>
+                {lesson.rules && <ol className="rules">{lesson.rules.map((r) => <li key={r}>{r}</li>)}</ol>}
+                {lesson.demo && <div className="lessondemo"><MiniPreview objectId={lesson.demo} /></div>}
+                {lesson.after && <p>{lesson.after}</p>}
                 <div className="coachact">
                   {lesson.next && <button className="go" onClick={tStep === 'wrap' ? endTutorial : nextStep}>{lesson.next}</button>}
                   {lesson.wait && <span className="waiting">{lesson.wait}</span>}

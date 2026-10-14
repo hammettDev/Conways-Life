@@ -224,3 +224,8 @@ body {
 .bossline { color: #ff8a4a; font-weight: 800; letter-spacing: 0.04em; font-size: 0.8rem; text-shadow: 0 0 10px rgba(255, 90, 40, 0.8); }
 @keyframes bosspulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .table.boss::before { animation: none; } }
+
+.coach .rules { text-align: left; margin: 6px 0 8px; padding-left: 20px; font-size: 0.82rem; line-height: 1.4; }
+.coach .rules li { margin: 2px 0; }
+.lessondemo { display: flex; justify-content: center; margin: 6px 0; }
+.lessondemo canvas { max-width: 100%; height: auto; border-radius: 8px; }

@@ -13,7 +13,7 @@ describe('tutorial', () => {
   });
   it('advances with the match', () => {
     expect(stepFor('pick', { phase: 'draft', hasSelection: false })).toBe('pick');
-    expect(stepFor('pick', { phase: 'draft', hasSelection: true })).toBe('hot');
+    expect(stepFor('pick', { phase: 'draft', hasSelection: true })).toBe('rules');
     expect(stepFor('lock', { phase: 'locked', hasSelection: true })).toBe('snap');
     expect(stepFor('snap', { phase: 'playing', hasSelection: true })).toBe('watch');
     expect(stepFor('watch', { phase: 'done', hasSelection: true })).toBe('wrap');
