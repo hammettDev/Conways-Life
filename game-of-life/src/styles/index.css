@@ -356,3 +356,19 @@ body {
 .sidebar, .panelbody, .sidebar .list, .actions { overflow-x: hidden; }
 .sidebar .item, .sidebar .list li { min-width: 0; }
 @media (max-width: 1099px) { .scorebar .idlehint { display: none; } }
+
+/* a little breathing room: scores sit in from the edges, and the 4-player bar spaces its four seats out */
+@media (max-width: 1099px) {
+  .scorebar { padding-left: 22px; padding-right: 22px; }
+  .scorebar:has(.side.green) { padding-left: 14px; padding-right: 14px; gap: 10px; }
+  .scorebar:has(.side.green) .side { min-width: 40px; }
+}
+@media (max-width: 639px) {
+  .scorebar { padding-left: 30px; padding-right: 30px; }
+  .scorebar:has(.side.green) { padding-left: 16px; padding-right: 16px; gap: 12px; }
+}
+/* the 4-player board is tall and narrow; its score bar breaks out to the full screen width so all four seats fit */
+@media (max-width: 1099px) {
+  .scorebar:has(.side.green) { width: min(100vw - 12px, 560px); position: relative; left: 50%; transform: translateX(-50%); box-sizing: border-box; }
+  .scorebar:has(.side.green) .mid { min-width: 0; }
+}
