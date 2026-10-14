@@ -121,7 +121,7 @@ describe('game clock', () => {
   });
 
   describe('playoff overtime', () => {
-    const tied = () => ({ ...startPlay(newGame(7, 'kings', { playoff: true, tiebreak: 'you' }), 'you'), q: 4, clock: PLAY_SECONDS, you: 10, them: 10 });
+    const tied = () => ({ ...startPlay(newGame(7, 'kings', { playoff: true }), 'you'), q: 4, clock: PLAY_SECONDS, you: 10, them: 10 });
     it('a tie after four quarters goes to an overtime toss (a Takeover game) for the ball', () => {
       const g = afterPlay(tied(), { kind: 'run', yards: 2, note: '' });
       expect(g.q).toBe(5);
@@ -141,12 +141,18 @@ describe('game clock', () => {
       expect(g.phase).toBe('final');
       expect(g.you).toBe(13);
     });
-    it('level after overtime too: the game ends tied and the saved tiebreak decides', () => {
+    it('overtime never ends level: the clock rolls over and it goes on until somebody scores', () => {
       let g = { ...startOvertime(afterPlay(tied(), { kind: 'run', yards: 2, note: '' }), 'them'), clock: PLAY_SECONDS };
       g = afterPlay(g, { kind: 'run', yards: 1, note: '' });
+      expect(g.phase).toBe('play');
+      expect(g.q).toBe(5);
+      expect(g.clock).toBe(QUARTER_SECONDS);
+      expect(g.note).toMatch(/goes on/);
+      // and many periods later a score still ends it
+      g = { ...g, poss: 'them', drive: { ...g.drive, spot: 80, down: 4 } };
+      g = afterPlay(g, { kind: 'kick', made: true, yards: 0 });
       expect(g.phase).toBe('final');
-      expect(g.you).toBe(g.them);
-      expect(g.tiebreak).toBe('you');
+      expect(g.them).toBe(13);
     });
     it('a regular-season game can still end level', () => {
       let g = { ...begun(), q: 4, clock: PLAY_SECONDS, you: 7, them: 7 };

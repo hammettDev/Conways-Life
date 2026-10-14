@@ -5,8 +5,8 @@
 import { TEAMS, SEASON_GAMES, PLAYOFF_WINS, record } from './season.js';
 import { createRng } from '../engine/rng.js';
 
-// a playoff game that ended level is decided by the seeds (`tb` is the side that goes through)
-export const wonGame = (g) => g.you > g.them || (g.you === g.them && g.tb === 'you');
+// a playoff game never ends level (overtime goes on until someone scores)
+export const wonGame = (g) => g.you > g.them;
 export const ROUND_NAMES = ['Quarterfinal', 'Semifinal', 'Championship'];
 const PAIRS = [[1, 8], [4, 5], [2, 7], [3, 6]]; // seeds that meet in the first round
 // the AI seeds, strongest first (the weakest team misses out: eight teams make the bracket with you)
@@ -87,10 +87,10 @@ export function nextOpponent(s) {
 }
 
 // You have played a playoff game: move on, go out, or win it all.
-export function playoffResult(s, { team, you, them, tb = null }) {
+export function playoffResult(s, { team, you, them }) {
   const p = s.playoffs;
-  const games = [...p.games, { round: p.round, team, you, them, tb }];
-  const won = wonGame({ you, them, tb });
+  const games = [...p.games, { round: p.round, team, you, them }];
+  const won = wonGame({ you, them });
   return { ...s, playoffs: { ...p, games, round: won ? p.round + 1 : p.round, out: !won, champion: won && p.round === 2 } };
 }
 
