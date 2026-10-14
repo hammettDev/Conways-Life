@@ -403,3 +403,14 @@ body {
 }
 /* thumb reach: the nudge pad sits at the bottom right, Done / Re-place on the left */
 .placebar:has(.nudgepad) { flex-direction: row-reverse; justify-content: space-between; }
+/* foldables too: the placement bar is a fixed bottom bar, not a strip above the board */
+@media (min-width: 640px) and (max-width: 1099px) {
+  .placebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; padding: 8px 16px calc(8px + env(safe-area-inset-bottom)); background: rgba(9, 23, 15, 0.97); border-top: 1px solid var(--edge); display: flex; gap: 12px; align-items: center; }
+  .placebar .armcancel { margin: 0; }
+  .layout[data-armed] .table { width: min(100%, calc((100dvh - 230px) * var(--aspect))) !important; }
+  .app:has(.layout[data-armed]) { padding-bottom: 150px; }
+}
+@media (min-width: 640px) and (max-width: 1099px) {
+  body:has(.layout[data-armed]) .top, .layout[data-armed] .scorebar, .layout[data-armed] .coach { display: none; }
+  .layout[data-armed] .table { width: min(100%, calc((100dvh - 190px) * var(--aspect))) !important; }
+}

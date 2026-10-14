@@ -249,7 +249,7 @@ export default function App() {
     const { selected: sel, obj: o } = live.current;
     if (!sel || !o || !tile) return;
     const d = dropAt(o, tile[0], tile[1]);
-    if (placementOk(sel, o, d)) { setDrop(d); setArmed(false); hoverRef.current = null; setNotice(''); if (window.innerWidth < 900) setAdjust(true); }
+    if (placementOk(sel, o, d)) { setDrop(d); setArmed(false); hoverRef.current = null; setNotice(''); if (window.innerWidth < 1100) setAdjust(true); }
     else setNotice('Not there: keep it on your half, off your formation.');
   };
 
