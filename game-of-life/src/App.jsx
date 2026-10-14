@@ -94,6 +94,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [objectId, setObjectId] = useState(null);
   const [drop, setDrop] = useState(null);       // where the bought piece sits: { depth, lat }
+  const [adjust, setAdjust] = useState(false);   // small screens: after a tap-place, stay in the big-board view to nudge it
   const [armed, setArmed] = useState(false);    // waiting for a click on the board to place the piece
   const [audibleChoice, setAudibleChoice] = useState(null);
   const [audibleUsed, setAudibleUsed] = useState(false);
@@ -248,8 +249,21 @@ export default function App() {
     const { selected: sel, obj: o } = live.current;
     if (!sel || !o || !tile) return;
     const d = dropAt(o, tile[0], tile[1]);
-    if (placementOk(sel, o, d)) { setDrop(d); setArmed(false); hoverRef.current = null; setNotice(''); }
+    if (placementOk(sel, o, d)) { setDrop(d); setArmed(false); hoverRef.current = null; setNotice(''); if (window.innerWidth < 900) setAdjust(true); }
     else setNotice('Not there: keep it on your half, off your formation.');
+  };
+
+  // on a phone the field turns upright while placing, so the board uses the screen's full height
+  function rotatedNow() { return (madden || ((armed || adjust) && window.innerWidth < 640)) && !four; }
+
+  // move the placed piece one cell in a screen direction (the board may be rotated)
+  const nudge = (sx, sy) => {
+    const { selected: sel, obj: o, drop: d } = live.current;
+    if (!sel || !o || !d) return;
+    const dd = rotatedNow()
+      ? { depth: d.depth - sy, lat: d.lat + sx }
+      : { depth: d.depth - sx, lat: d.lat + sy };
+    if (placementOk(sel, o, dd)) { setDrop(dd); setNotice(''); } else setNotice('Not there: keep it on your half, off your formation.');
   };
 
   const onDragStart = (e) => {
@@ -276,7 +290,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') { setArmed(false); setShowSave(false); } };
+    const onKey = (e) => { if (e.key === 'Escape') { setArmed(false); setAdjust(false); setShowSave(false); } };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
@@ -422,7 +436,7 @@ export default function App() {
   };
 
   // A menu sheet closes itself once a match is under way.
-  useEffect(() => { if (phase !== 'draft') setSheet(null); }, [phase]);
+  useEffect(() => { if (phase !== 'draft') { setSheet(null); setAdjust(false); } }, [phase]);
 
   // On a phone the board is above the controls: bring it back into view when a match starts or ends.
   useEffect(() => {
@@ -565,7 +579,8 @@ export default function App() {
   const live2 = hud || { tick: 0, blue: 0, red: 0, green: 0, violet: 0, crashes: 0, pitBlue: 0, pitRed: 0, pitGreen: 0, pitViolet: 0 };
   const four = geom.teams > 2;
   const shown = phase === 'done' && result ? result.score : live2;
-  const TABLE = tableSize(madden && !four);
+  const rot = rotatedNow();
+  const TABLE = tableSize(rot);
   const verdict = result && (tutorial && !practice ? 'Insured win' : { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome]);
   const net = result && (practice ? 'practice run, no money moved' : tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(wagerRef.current * (four ? FOUR_PLAYER_PAYOUT : bossMult || 1))}` : result.outcome === 'lose' ? `−${money(wagerRef.current)}` : 'bet returned');
 
@@ -589,7 +604,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="layout" data-sheet={sheet || 'none'} data-armed={armed ? '1' : undefined}>
+      <div className="layout" data-sheet={sheet || 'none'} data-armed={armed || adjust ? '1' : undefined}>
         <Tables
           save={save} tableId={table.id} drafting={drafting && !auto.on} tutorial={tutorial} scout={scoutP} repeat={repeatShare(save)}
           onPick={(id) => commit((s) => ({ ...s, table: id }))}
@@ -597,7 +612,27 @@ export default function App() {
         />
 
         <main className="stage">
-          {armed && <button className="armcancel" onClick={() => setArmed(false)}>Tap a spot on your half to place · Cancel</button>}
+          {(armed || adjust) && (
+            <div className="placebar">
+              {armed ? (
+                <button className="armcancel" onClick={() => setArmed(false)}>Tap a spot on your half to place · Cancel</button>
+              ) : (
+                <>
+                  <div className="nudgepad" role="group" aria-label="Nudge the piece">
+                    <button onClick={() => nudge(0, -1)} aria-label="Up" style={{ gridArea: 'u' }}>▲</button>
+                    <button onClick={() => nudge(-1, 0)} aria-label="Left" style={{ gridArea: 'l' }}>◀</button>
+                    <button onClick={() => nudge(1, 0)} aria-label="Right" style={{ gridArea: 'r' }}>▶</button>
+                    <button onClick={() => nudge(0, 1)} aria-label="Down" style={{ gridArea: 'd' }}>▼</button>
+                  </div>
+                  <div className="placeside">
+                    {notice && <span className="hint bad">{notice}</span>}
+                    <button className="lock" onClick={() => setAdjust(false)}>Done</button>
+                    <button className="ghost" onClick={() => { setDrop(null); setAdjust(false); setArmed(true); }}>Re-place</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <div className={`table${lesson && CENTER_STEPS.includes(tStep) ? ' dimmed' : ''}${encounter ? ' boss' : ''}`} style={{ '--aspect': TABLE.cols / TABLE.rows, width: `min(100%, calc((100vh - 180px) * ${TABLE.cols} / ${TABLE.rows}))` }}>
             <section className="scorebar">
               <div className="side blue"><span className="num">{shown.blue}</span><i>you</i></div>
@@ -660,7 +695,7 @@ export default function App() {
               </aside>
             )}
             <Arena
-              ref={arenaRef} getView={getView} rotate={madden && !four}
+              ref={arenaRef} getView={getView} rotate={rot}
               onHover={(t) => { hoverRef.current = t; }}
               onTileClick={(t) => { if (live.current.armed && t) tryPlace(t); }}
             />
@@ -673,10 +708,10 @@ export default function App() {
           selectedId={selectedId}
           onSelect={(id) => (phase === 'audible' ? setAudibleChoice(id) : setSelectedId(id))}
           objectId={objectId}
-          onObject={(id) => { setObjectId(id); setDrop(null); setArmed(false); setNotice(''); }}
+          onObject={(id) => { setObjectId(id); setDrop(null); setArmed(false); setAdjust(false); setNotice(''); }}
           placed={Boolean(drop)} armed={armed}
           onArm={() => { setArmed(true); setSheet(null); }} onDragStart={onDragStart}
-          onClearPlace={() => { setDrop(null); setArmed(false); }}
+          onClearPlace={() => { setDrop(null); setArmed(false); setAdjust(false); }}
           lockLabel={lockLabel} lockHint={lockHint || feeNote} canLock={canLock} onLockIn={lockIn}
           audibleChoiceId={audibleChoice} canAudible={canAudible}
           audibleLabel={audibleBuild ? `Switch to ${audibleBuild.name} · ${tutorial ? 'free' : money(audiblePrice)}` : 'Pick a formation'}

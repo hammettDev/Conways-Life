@@ -382,3 +382,22 @@ body {
 }
 /* shorter demo window in the shop card on small screens, so the piece list sits higher */
 @media (max-width: 1099px) { .dragzone { max-height: 96px; } .dragzone canvas, .dragzone svg { max-height: 96px; width: 100%; object-fit: cover; } }
+
+/* placement bar: Cancel while aiming, then a nudge pad + Done so a fingertip never has to be exact */
+.placebar { margin: 0 0 6px; }
+.nudgepad { display: grid; grid-template-areas: '. u .' 'l . r' '. d .'; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(3, 40px); gap: 4px; }
+.nudgepad button { border-radius: 10px; border: 1px solid var(--edge); background: rgba(255,255,255,0.05); color: var(--text); font-size: 1.1rem; cursor: pointer; }
+.nudgepad button:active { background: var(--accent, #45e08a); color: #04100a; }
+.placeside { display: flex; flex-direction: column; gap: 6px; flex: 1; justify-content: center; }
+.placeside .lock { padding: 12px; }
+@media (max-width: 639px) {
+  /* aiming or nudging: the whole screen is the board */
+  .layout[data-armed] .stage { position: static; padding: 0; }
+  body:has(.layout[data-armed]) .top { display: none; }
+  .layout[data-armed] .scorebar, .layout[data-armed] .coach { display: none; }
+  .layout[data-armed] .actions { display: none; }
+  .layout[data-armed] .table { width: min(100%, calc((100dvh - 120px) * var(--aspect))) !important; }
+  .layout[data-armed] .app, body:has(.layout[data-armed]) .app { padding-bottom: 130px; padding-top: 4px; }
+  .placebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; margin: 0; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: rgba(9, 23, 15, 0.97); border-top: 1px solid var(--edge); display: flex; gap: 12px; align-items: center; }
+  .placebar .armcancel { margin: 0; }
+}
