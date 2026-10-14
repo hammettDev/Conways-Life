@@ -5,10 +5,11 @@ import { botCall } from '../game/botOffence.js';
 import { defenceById, newDrive, advance, DRIVE } from '../engine/football.js';
 import {
   TEAMS, GAME_DRIVES, SEASON_GAMES, PLAYOFF_WINS, newSeason, seasonOver, record, champion, nextTeam,
-  drivePoints, driveNote, botDrive, teamDefence, scoreText,
+  drivePoints, driveNote, botDrive, teamDefence, bestDefenceFor, scoreText,
 } from '../game/season.js';
 import { createRng } from '../engine/rng.js';
 
+export const AUDIBLES = 4; // audibles per game, for both your offence and your defence
 const ordinal = (n) => ['', '1st', '2nd', '3rd', '4th'][n];
 const spotText = (s) => (s >= DRIVE.goal ? 'Goal' : s <= 50 ? `Own ${s}` : `Opp ${DRIVE.goal - s}`);
 const classOf = (r) => (r.kind === 'run' ? 'run' : r.yards > 14 ? 'deep' : r.yards > 7 ? 'mid' : 'short');
@@ -28,7 +29,7 @@ export default function Game({ season, onSeason, onExit }) {
   const startGame = () => {
     const seed = (cur.seed + cur.week * 7919) >>> 0;
     const rng = createRng(seed);
-    setG({ seed, rng, you: 0, them: 0, driveIdx: 0, drive: newDrive(), classes: [], plays: 0, defId: teamDefence(rng, team, []), between: null, mode: 'off', foe: null, foePlays: 0, foeCall: null, mine: 0, mineNote: '' });
+    setG({ seed, rng, aud: AUDIBLES, you: 0, them: 0, driveIdx: 0, drive: newDrive(), classes: [], plays: 0, defId: teamDefence(rng, team, []), between: null, mode: 'off', foe: null, foePlays: 0, foeCall: null, mine: 0, mineNote: '' });
     setStage('game');
   };
 
@@ -64,6 +65,14 @@ export default function Game({ season, onSeason, onExit }) {
     });
   };
 
+  const useAudible = () => setG((s) => ({ ...s, aud: Math.max(0, s.aud - 1) }));
+  const counterFor = (call, cur) => {
+    // a sharp opponent sees your audible and swaps to the defence from its own pool that stops it best
+    if (g.rng() >= team.scout) return null;
+    return defenceById(bestDefenceFor(team, call.kind, g.rng));
+  };
+  const defFor = () => defenceById(teamDefence(g.rng, team, g.classes));
+
   const nextDrive = () => {
     setG((s) => {
       const idx = s.driveIdx + 1;
@@ -77,8 +86,7 @@ export default function Game({ season, onSeason, onExit }) {
     setG(null); setStage('hub');
   };
 
-  const def = useMemo(() => (g ? defenceById(g.defId) : null), [g && g.defId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const rec = cur ? record(cur) : null;
+    const rec = cur ? record(cur) : null;
 
   return (
     <main className="drive">
@@ -92,7 +100,7 @@ export default function Game({ season, onSeason, onExit }) {
           ) : <><b>Football season</b><span>{cur ? `Week ${Math.min(cur.week + 1, SEASON_GAMES)} of ${SEASON_GAMES}` : 'New'}</span></>}
         </div>
         {stage === 'game' && g ? (
-          <div className="scoreline"><span className="you">You {g.you}</span><span className="vs">–</span><span className="them">{g.them} {team.name.split(' ').pop()}</span></div>
+          <div className="scoreline"><span className="aud" title="Audibles left">A{g.aud}</span><span className="you">You {g.you}</span><span className="vs">–</span><span className="them">{g.them} {team.name.split(' ').pop()}</span></div>
         ) : <div className="scoreline" />}
         <button className="ghost small" onClick={() => (stage === 'game' && g && !g.finished ? setLeaving(true) : onExit())}>Exit</button>
       </div>
@@ -139,10 +147,11 @@ export default function Game({ season, onSeason, onExit }) {
       )}
 
       {stage === 'game' && g && !g.finished && !g.between && g.mode === 'def' && (
-        <DefendField key={`d${g.driveIdx}-${g.foePlays}`} call={g.foeCall} team={team} seed={(g.seed + g.foePlays * 977 + g.driveIdx * 31) >>> 0} onPlay={onFoePlay} onSim={simFoe} />
+        <DefendField key={`d${g.driveIdx}-${g.foePlays}`} call={g.foeCall} team={team} audibles={g.aud} onAudible={useAudible} seed={(g.seed + g.foePlays * 977 + g.driveIdx * 31) >>> 0} onPlay={onFoePlay} onSim={simFoe} />
       )}
-      {stage === 'game' && g && !g.finished && !g.between && g.mode === 'off' && def && (
-        <LiveField key={`${g.driveIdx}-${g.plays}`} def={def} seed={(g.seed + g.plays * 131 + g.driveIdx * 17) >>> 0} onPlay={onPlay} />
+      {stage === 'game' && g && !g.finished && !g.between && g.mode === 'off' && (
+        <LiveField key={`${g.driveIdx}-${g.plays}`} team={team} defFor={defFor} counterFor={counterFor} audibles={g.aud} onAudible={useAudible}
+          seed={(g.seed + g.plays * 131 + g.driveIdx * 17) >>> 0} onPlay={onPlay} />
       )}
       {stage === 'game' && g && g.between && (
         <section className="hub">

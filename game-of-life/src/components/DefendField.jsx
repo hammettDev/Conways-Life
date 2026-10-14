@@ -1,17 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createLivePlay } from '../engine/footballLive.js';
-import { DEFENCES, defenceById } from '../engine/football.js';
+import { createLivePlay, LIVE_OFFENCES } from '../engine/footballLive.js';
+import { DEFENCES, defenceById, RUN_LANES } from '../engine/football.js';
 import { drawField, TICK_MS, VW, VH, TILE } from './fieldDraw.js';
 import { botDriver } from '../game/botOffence.js';
-import { defenceHint } from '../game/season.js';
+import { defenceHint, bestKindAgainst } from '../game/season.js';
 import { createRng } from '../engine/rng.js';
 
+const NO_OFFENCE = { id: 'none', name: 'unknown', line: [], receivers: [] };
 
-// One play of their drive: you see the formation they lined up in, pick your defence, and watch it play out. The bot
-// throws (or runs) on its own. Tap the field to speed it up.
-export default function DefendField({ call, team, seed, onPlay, onSim }) {
+// One play of their drive. You pick your defence without seeing their formation; locking in reveals it, and you may
+// audible (a limited number a game). A sharp team may answer by changing its own play. Then the bot throws or runs
+// on its own. Tap the field to speed it up.
+export default function DefendField({ call: firstCall, team, audibles, onAudible, seed, onPlay, onSim }) {
   const [defId, setDefId] = useState('fb-cover-3');
-  const [phase, setPhase] = useState('call'); // call -> live -> result
+  const [phase, setPhase] = useState('call'); // call -> revealed -> (audible -> revealed2) -> live -> result
+  const [call, setCall] = useState(firstCall);
+  const [note, setNote] = useState('');
   const [result, setResult] = useState(null);
   const [fast, setFast] = useState(false);
   const canvas = useRef(null);
@@ -22,9 +26,11 @@ export default function DefendField({ call, team, seed, onPlay, onSim }) {
   const rngRef = useRef(createRng(seed));
   const [, force] = useState(0);
   const def = defenceById(defId);
+  const shownOff = phase === 'call' ? NO_OFFENCE : call.off;
+  const editing = phase === 'call' || phase === 'audible';
 
-  const preview = useMemo(() => createLivePlay({ off: call.off, def, kind: call.kind, lane: call.lane, rng: rngRef.current }), [call, def]);
-  useEffect(() => { if (phase === 'call') { playRef.current = preview; view.current = { play: preview, sel: -1 }; } }, [preview, phase]);
+  const preview = useMemo(() => createLivePlay({ off: shownOff, def, kind: call.kind, lane: call.lane, rng: rngRef.current }), [shownOff, def, call]);
+  useEffect(() => { if (phase !== 'live' && phase !== 'result') { playRef.current = preview; view.current = { play: preview, sel: -1 }; } }, [preview, phase]);
   useEffect(() => {
     const c = canvas.current; if (!c) return undefined;
     const ctx = c.getContext('2d'); let raf;
@@ -34,8 +40,23 @@ export default function DefendField({ call, team, seed, onPlay, onSim }) {
   }, []);
   useEffect(() => () => clearInterval(timer.current), []);
 
+  const lockIn = () => { if (phase === 'call') { setNote(''); setPhase('revealed'); } };
+  const callAudible = () => { if (phase === 'revealed' && audibles > 0) { onAudible(); setPhase('audible'); } };
+  const confirmAudible = () => {
+    if (phase !== 'audible') return;
+    // a sharp team sees your new defence and changes its play to hurt it
+    const rng = rngRef.current;
+    if (rng() < team.scout) {
+      const kind = bestKindAgainst(defId);
+      const off = LIVE_OFFENCES[Math.floor(rng() * LIVE_OFFENCES.length)];
+      const changed = kind !== call.kind || off.id !== call.off.id;
+      setCall({ off, kind, lane: RUN_LANES[Math.floor(rng() * RUN_LANES.length)] });
+      setNote(changed ? `They read it and switched to ${off.name}!` : 'They stayed put.');
+    } else setNote('They stayed put.');
+    setPhase('revealed2');
+  };
   const snap = () => {
-    if (phase !== 'call') return;
+    if (phase !== 'revealed' && phase !== 'revealed2') return;
     const play = createLivePlay({ off: call.off, def, kind: call.kind, lane: call.lane, rng: rngRef.current });
     const drive = botDriver(play, team, rngRef.current);
     playRef.current = play; view.current = { play, sel: -1 }; play.start(); setPhase('live');
@@ -50,11 +71,18 @@ export default function DefendField({ call, team, seed, onPlay, onSim }) {
     playRef.current.restart = start;
   };
   const speed = () => { fastRef.current = !fastRef.current; setFast(fastRef.current); if (playRef.current && playRef.current.restart && phase === 'live') playRef.current.restart(); };
-  const next = () => { if (phase === 'result' && result) { const r = result; setResult(null); setPhase('call'); onPlay(r, defId); } };
+  const next = () => { if (phase === 'result' && result) { const r = result; setResult(null); onPlay(r, defId); } };
 
+  const act = () => {
+    if (phase === 'call') lockIn();
+    else if (phase === 'audible') confirmAudible();
+    else if (phase === 'revealed' || phase === 'revealed2') snap();
+    else if (phase === 'result') next();
+  };
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (phase === 'call') snap(); else if (phase === 'result') next(); }
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); act(); }
+      if (phase === 'revealed' && (e.key === 'a' || e.key === 'A')) callAudible();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -63,24 +91,33 @@ export default function DefendField({ call, team, seed, onPlay, onSim }) {
   return (
     <div className="livefield">
       <div className="driveplay">
-        <canvas ref={canvas} width={VW * TILE} height={VH * TILE} className="drivecanvas" aria-label="Their play" onClick={speed} />
-        <div className="drivedef">{team.name} line up in <b>{call.off.name}</b>. Pick your defence.{phase === 'live' ? ' Tap the field to speed up.' : ''}</div>
+        <canvas ref={canvas} width={VW * TILE} height={VH * TILE} className="drivecanvas" aria-label="Their play" onClick={phase === 'live' ? speed : act} />
+        <div className="drivedef">
+          {phase === 'call' ? `${team.name} have not shown their formation. Pick your defence.` : <>{team.name} line up in <b>{call.off.name}</b>. {note}{phase === 'live' ? ' Tap the field to speed up.' : ''}</>}
+        </div>
       </div>
       <div className="drivepanel">
-        {phase === 'call' && (
+        {editing && (
           <>
             <div className="drivepick" role="group" aria-label="Your defence">
               {DEFENCES.map((d) => <button key={d.id} className={defId === d.id ? 'chip on' : 'chip'} onClick={() => setDefId(d.id)}>{d.name}</button>)}
             </div>
-            <p className="note">{def.name} {defenceHint(defId)}. They have not shown whether it is a pass or a run.</p>
-            <button className="lock" onClick={snap}>Set defence · Space</button>
-            <button className="ghost small" onClick={() => onSim(defId)}>Sim the rest of their drive</button>
+            <p className="note">{def.name} {defenceHint(defId)}. {phase === 'call' ? 'You both lock in at the same time: they have not shown whether it is a pass or a run.' : 'Audible: change your defence. A sharp team may change its play.'}</p>
+            <button className="lock" onClick={phase === 'call' ? lockIn : confirmAudible}>{phase === 'call' ? 'Lock in defence · Space' : 'Confirm audible · Space'}</button>
+            {phase === 'call' && <button className="ghost small" onClick={() => onSim(defId)}>Sim the rest of their drive</button>}
+          </>
+        )}
+        {(phase === 'revealed' || phase === 'revealed2') && (
+          <>
+            <p className="note drivemsg">{phase === 'revealed' ? `They are in ${call.off.name}.` : note}</p>
+            <button className="lock" onClick={snap}>Snap · Space</button>
+            {phase === 'revealed' && <button className="ghost" disabled={audibles <= 0} onClick={callAudible}>Audible · A ({audibles} left)</button>}
           </>
         )}
         {phase === 'live' && <p className="note drivemsg">{call.kind === 'pass' ? 'Their quarterback drops back…' : 'Handoff…'}{typeof playRef.current?.live === 'number' && call.kind === 'run' ? ` ${playRef.current.live} yds` : ''}</p>}
         {phase === 'result' && result && (
           <>
-            <p className={`verdict ${result.yards > 4 ? 'lose' : 'win'}`}>{result.kind === 'sack' ? 'Sack!' : result.kind === 'int' ? 'Interception!' : result.kind === 'incomplete' ? 'Incomplete' : result.yards <= 0 ? 'Stuffed' : `They gain ${result.yards}`}</p>
+            <p className={`verdict ${result.yards > 6 ? 'lose' : 'win'}`}>{result.kind === 'sack' ? 'Sack!' : result.kind === 'int' ? 'Interception!' : result.kind === 'incomplete' ? 'Incomplete' : result.yards <= 0 ? 'Stuffed' : `They gain ${result.yards}`}</p>
             <button className="lock" onClick={next}>Next · Space</button>
           </>
         )}

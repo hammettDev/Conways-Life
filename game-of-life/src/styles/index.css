@@ -471,3 +471,4 @@ body {
 .schedule li.w b { color: var(--accent, #45e08a); } .schedule li.l b { color: #ff6f95; }
 .lock.throw.go { background: #38e07a; color: #04140a; animation: throwpulse 0.5s ease-in-out infinite alternate; }
 @keyframes throwpulse { from { box-shadow: 0 0 0 0 rgba(56,224,122,0.6); } to { box-shadow: 0 0 18px 6px rgba(56,224,122,0.5); } }
+.scoreline .aud { font-size: 0.75rem; color: var(--dim); align-self: center; border: 1px solid var(--edge); border-radius: 999px; padding: 2px 8px; }

@@ -49,3 +49,16 @@ describe('live football physics', () => {
     expect(a.kind).toBe('run');
   });
 });
+
+describe('plays always end', () => {
+  it('a ball that settles against the edge of the board does not hang the play', () => {
+    // a receiver that cannot be reached so the ball flies on to the wall: the play must still finish
+    const open = { id: 'open', name: 'Open', players: [] };
+    const p = createLivePlay({ off: LIVE_OFFENCES[0], def: open, kind: 'pass', rng: createRng(1) });
+    p.start();
+    for (let i = 0; i < 3; i++) p.step();
+    p.throwTo(0);
+    for (let i = 0; i < 400 && p.phase !== 'done'; i++) p.step();
+    expect(p.phase).toBe('done');
+  });
+});

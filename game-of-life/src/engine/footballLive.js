@@ -144,7 +144,7 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
       if (p.caught === null && !glider.length && gap(cellsOf(FG, 2), [[Math.round(qbC[0]), Math.round(qbC[1])]]) <= 1) { finish('sack', -tune.sackYards, 'Sacked'); return; }
       // the ball against the coverage as it stands now (before the field layer moves on)
       const coverNow = W;
-      let ballDied = false;
+      let ballDied = false; let offField = false;
       if (glider.length) {
         // caught? only the receiver it was thrown to can take it, and the ball never touches any other receiver
         const tr = recv[p.target];
@@ -152,14 +152,17 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
           glider = []; p.caught = p.target; p.carryStart = p.tick;
         } else {
           glider = inBounds(stepGlider(glider, coverNow));
-          if (glider.length < 4) { glider = []; ballDied = true; }
+          const bc = centroid(glider);
+          // a ball that has left the field, settled into a still life against the edge, or flown too long is thrown away
+          if (!bc || glider.length < 4) { glider = []; ballDied = true; }
+          else if (bc[0] > 68 || bc[1] < 9 || bc[1] > 51 || p.tick - ballFired > 110) { glider = []; ballDied = true; offField = true; }
         }
       }
       W = stepMulti(W);
       refresh();
       if (ballDied && p.caught === null) {
-        const intercepted = rng() < tune.intChance;
-        finish(intercepted ? 'int' : 'incomplete', 0, intercepted ? 'Intercepted by coverage' : 'Ball knocked down'); return;
+        const intercepted = !offField && rng() < tune.intChance;
+        finish(intercepted ? 'int' : 'incomplete', 0, intercepted ? 'Intercepted by coverage' : offField ? 'Overthrown' : 'Ball knocked down'); return;
       }
       if (p.caught !== null) {
         const r = recv[p.caught];
@@ -172,6 +175,7 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
         return;
       }
       if (!glider.length && p.tick >= tune.hold) finish('sack', -tune.sackYards, 'Held the ball too long: sacked');
+      else if (p.tick > 300) finish('incomplete', 0, 'Play dead');
     };
   } else {
     // a run: the carrier is a glider behind the line; only the coverage (linebackers, corners, safeties) can stop it

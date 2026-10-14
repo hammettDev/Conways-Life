@@ -74,4 +74,16 @@ export function teamDefence(rng, team, recentCalls) {
   return team.def[Math.floor(rng() * team.def.length)];
 }
 
+// The defence from a team's own pool that gives up the least against a kind of play (what a team audibles to).
+export function bestDefenceFor(team, kind, rng = Math.random) {
+  const key = kind === 'run' ? 'run' : 'pass';
+  const pool = team.def.slice().sort((a, b) => LIVE_DEF[a][key] - LIVE_DEF[b][key]);
+  return rng() < 0.7 ? pool[0] : pool[Math.min(1, pool.length - 1)];
+}
+// The call that hurts a defence most, for a team that audibles after seeing it.
+export function bestKindAgainst(defId) {
+  const d = LIVE_DEF[defId] || LIVE_DEF['fb-cover-3'];
+  return d.run > d.pass * 1.1 ? 'run' : 'pass';
+}
+
 export const scoreText = (you, them) => (you > them ? 'Win' : you < them ? 'Loss' : 'Tie');
