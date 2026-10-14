@@ -179,6 +179,7 @@ if (!isMainThread) {
     }
     return rows.join('\n');
   };
+  console.log('\nunits json: ' + JSON.stringify(bestU.design));
   console.log('\nbest unit design (line of scrimmage on top):\n' + show(asCells(bestU.design)));
   console.log('\nbest cell design:\n' + show(bestC.design));
 }

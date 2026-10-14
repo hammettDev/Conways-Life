@@ -131,7 +131,10 @@ export default function App() {
   const hoverRef = useRef(null);
   const arenaRef = useRef(null);
 
+  const runRef = useRef(null); // the last match's lineups and seed, so it can be watched again
+  const [replaying, setReplaying] = useState(false);
   const startEngine = (blue, red, seed) => {
+    runRef.current = { blue, red, seed };
     const e = newEngine(seed);
     e.loadTeams([...blue, ...red]);
     engineRef.current = e;
@@ -241,6 +244,7 @@ export default function App() {
     setBotName(botLabel(bot));
     setNotice('');
     setAudibleUsed(false);
+    setReplaying(false);
     setPhase('locked');
   };
 
@@ -294,8 +298,22 @@ export default function App() {
 
   const skipToEnd = () => { skipRef.current = true; };
 
+  // The engine is deterministic, so the same lineups and seed replay the same match exactly.
+  // Nothing is paid or settled again: the bet was settled when the match first ended.
+  const watchReplay = () => {
+    const run = runRef.current;
+    if (!run) return;
+    startEngine(run.blue, run.red, run.seed);
+    skipRef.current = false;
+    setResult(null);
+    setHud(null);
+    setReplaying(true);
+    setPhase('playing');
+  };
+
   const snap = () => {
     skipRef.current = false;
+    setReplaying(false);
     const pending = botPendingRef.current;
     if (pending) { setBotName(pending.name); setNotice(pending.notice); botPendingRef.current = null; }
     setResult(null);
@@ -303,6 +321,7 @@ export default function App() {
   };
 
   const newMatch = () => {
+    setReplaying(false);
     emptyBoard();
     setPhase('draft');
     setResult(null);
@@ -456,7 +475,7 @@ export default function App() {
                 )}
                 {phase === 'playing' && (
                   <>
-                    <p>Tick {live2.tick} · {live2.crashes} toppled · pit {live2.pitBlue}–{live2.pitRed}</p>
+                    <p>{replaying ? 'Replay · ' : ''}Tick {live2.tick} · {live2.crashes} toppled · pit {live2.pitBlue}–{live2.pitRed}</p>
                     {notice && <p className="note">{notice}</p>}
                     <div className="row speeds">
                       {SPEEDS.map((s) => <button key={s} className={s === speed ? 'on' : ''} onClick={() => setSpeed(s)}>{s}x</button>)}
@@ -511,7 +530,7 @@ export default function App() {
           onAudibleConfirm={confirmAudible}
           bosses={tutorial ? null : { list: unlockedBosses(save), all: BOSSES, ready: bossReady(save), toGo: winsToBoss(save), beaten: save.boss.beaten, selected: bossId }}
           onBoss={(id) => setBossId(id)}
-          onNewMatch={newMatch} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
+          onNewMatch={newMatch} onReplay={watchReplay} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(AUDIBLE_PRICE)}
           custom={tutorial ? null : {

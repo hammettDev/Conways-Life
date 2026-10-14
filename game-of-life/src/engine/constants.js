@@ -13,6 +13,10 @@ export const FIELD_Y1 = FIELD_Y0 + FIELD_ROWS;
 export const CUSTOM_PRICE = 1000000;
 export const MAX_CUSTOM = 5;     // saved custom formations
 export const MAX_CUSTOM_UNITS = 14;
+// A custom formation is rated by its win rate against the bot pool (engine/rating.js). Searches found
+// 83-94% designs, which would make every bet and boss payout free money, so the designer refuses to
+// save anything above this. The best built-in formations rate 65-67%.
+export const CUSTOM_RATING_CAP = 0.7;
 
 export const WAGER = 100;      // the default bet
 export const MIN_BET = 50;

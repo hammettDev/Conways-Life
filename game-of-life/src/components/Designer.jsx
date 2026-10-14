@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CUSTOM_SHAPES, MAX_DEPTH, checkCustom, buildCustom } from '../engine/custom.js';
 import { SHAPES, UNIT_TILES } from '../engine/shapes.js';
 import { FREE_BUILDS, TARGET_TILES } from '../engine/library.js';
-import { MAX_CUSTOM_UNITS } from '../engine/constants.js';
+import { MAX_CUSTOM_UNITS, CUSTOM_RATING_CAP } from '../engine/constants.js';
+import { designHash } from '../engine/rating.js';
 
 const LAT_MIN = -20;
 const LAT_MAX = 19;
@@ -21,9 +22,28 @@ export default function Designer({ initial, onSave, onClose }) {
   const [shape, setShape] = useState('bar');
   const [hover, setHover] = useState(null);
   const canvas = useRef(null);
+  // The rating belongs to one exact design: change a unit and it has to be measured again.
+  const [rated, setRated] = useState(initial.rating != null ? { key: designHash(initial.players, 0), rating: initial.rating } : null);
+  const [progress, setProgress] = useState(null); // { done, total } while rating
+  const worker = useRef(null);
+  useEffect(() => () => worker.current && worker.current.terminate(), []);
 
   const spec = { id: initial.id, name, players: units };
   const check = useMemo(() => checkCustom(spec), [units]); // eslint-disable-line react-hooks/exhaustive-deps
+  const key = useMemo(() => designHash(units, 0), [units]);
+  const current = rated && rated.key === key ? rated.rating : null;
+  const overCap = current != null && current > CUSTOM_RATING_CAP + 1e-9;
+  const measure = () => {
+    if (worker.current) worker.current.terminate();
+    const w = new Worker(new URL('../workers/rating.worker.js', import.meta.url), { type: 'module' });
+    worker.current = w;
+    setProgress({ done: 0, total: FREE_BUILDS.length });
+    w.onmessage = (e) => {
+      if (e.data.type === 'progress') setProgress({ done: e.data.done, total: e.data.total });
+      else { setRated({ key, rating: e.data.rating }); setProgress(null); w.terminate(); worker.current = null; }
+    };
+    w.postMessage({ players: units });
+  };
   const reserves = useMemo(() => (check.ok ? buildCustom(spec).players.filter((p) => p.role === 'RS') : []), [units, check.ok]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const at = (ev) => {
@@ -95,10 +115,21 @@ export default function Designer({ initial, onSave, onClose }) {
             <p className={check.ok ? 'hint good' : 'hint bad'} role="status">
               {units.length} of {MAX_CUSTOM_UNITS} units · {check.footprint} of {TARGET_TILES} tiles{check.ok ? ' · ready' : ` · ${check.reason}`}
             </p>
+            <div className="ratebox">
+              <button className="ghost" onClick={measure} disabled={!check.ok || Boolean(progress)}>
+                {progress ? `Rating… ${Math.round((progress.done / progress.total) * 100)}%` : current != null ? 'Rate again' : 'Rate this formation'}
+              </button>
+              {current != null && (
+                <p className={overCap ? 'hint bad' : 'hint good'} role="status">
+                  Rating {Math.round(current * 100)}% · limit {Math.round(CUSTOM_RATING_CAP * 100)}%{overCap ? ' · too strong, adjust it' : ' · allowed'}
+                </p>
+              )}
+              {current == null && !progress && <p className="hint">Rate it to save: it is measured against the bot formations (about 10 seconds). The best built-in formations rate 65-67%.</p>}
+            </div>
             <div className="row">
               <button className="ghost" onClick={() => setUnits([])}>Clear</button>
               <button className="ghost" onClick={onClose}>Cancel</button>
-              <button className="go" disabled={!check.ok || !name.trim()} onClick={() => onSave({ id: initial.id, name: name.trim(), players: units })}>Save formation</button>
+              <button className="go" disabled={!check.ok || !name.trim() || current == null || overCap} onClick={() => onSave({ id: initial.id, name: name.trim(), players: units, rating: current, hash: designHash(units, current) })}>Save formation</button>
             </div>
           </div>
         </div>

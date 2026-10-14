@@ -14,7 +14,7 @@ export default function Sidebar({
   objectId, onObject, placed, armed, onArm, onDragStart, onClearPlace,
   lockLabel, lockHint, canLock, onLockIn,
   audibleChoiceId, onAudibleConfirm, audibleLabel, canAudible,
-  onSnap, onSkip, cancelFee, custom, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
+  onSnap, onSkip, onReplay, cancelFee, custom, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
 }) {
   const [tab, setTab] = useState('formations');
   const [sport, setSport] = useState('all');
@@ -173,7 +173,10 @@ export default function Sidebar({
       ) : phase === 'playing' ? (
         <button className="lock" onClick={onSkip}>Skip to result</button>
       ) : phase === 'done' ? (
-        <button className="lock" onClick={onNewMatch}>New match</button>
+        <>
+          <button className="lock" onClick={onNewMatch}>New match</button>
+          <button className="ghost" onClick={onReplay}>Watch replay</button>
+        </>
       ) : phase === 'locked' ? (
         <>
           <button className="lock" onClick={onSnap}>Snap</button>

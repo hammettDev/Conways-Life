@@ -201,3 +201,5 @@ body {
 
 .list li.customrow { display: flex; gap: 6px; align-items: stretch; }
 .list li.customrow .item { flex: 1; }
+
+.ratebox { display: flex; flex-direction: column; gap: 6px; }

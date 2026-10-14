@@ -1,6 +1,7 @@
 import { newSave, newPlayerSave, SAVE_VERSION } from './wallet.js';
 import { checkCustom, CUSTOM_SHAPES } from '../engine/custom.js';
-import { MAX_CUSTOM, MAX_CUSTOM_UNITS } from '../engine/constants.js';
+import { designHash } from '../engine/rating.js';
+import { MAX_CUSTOM, MAX_CUSTOM_UNITS, CUSTOM_RATING_CAP } from '../engine/constants.js';
 
 const KEY = 'gcw.save';
 const PREFIX = 'GCW1';
@@ -42,7 +43,10 @@ function sanitizeCustom(c) {
     const players = f.players.slice(0, MAX_CUSTOM_UNITS)
       .filter((p) => p && CUSTOM_SHAPES.includes(p.shape) && Number.isInteger(p.depth) && Number.isInteger(p.lat))
       .map((p) => ({ shape: p.shape, depth: p.depth, lat: p.lat }));
-    const spec = { id: f.id.slice(0, 30), name: f.name.slice(0, 24), players };
+    // it must still be legal, and carry a rating under the cap that matches its design
+    const rating = f.rating;
+    if (!Number.isFinite(rating) || rating > CUSTOM_RATING_CAP + 1e-9 || f.hash !== designHash(players, rating)) continue;
+    const spec = { id: f.id.slice(0, 30), name: f.name.slice(0, 24), players, rating, hash: f.hash };
     if (checkCustom(spec).ok) list.push(spec);
   }
   return { unlocked: x.unlocked === true, list };
