@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  newSave, matchSeed, placeBet, setPending, clearPending, forfeit, noteFormation,
+  newSave, buyCustom, saveCustom, deleteCustom, matchSeed, placeBet, setPending, clearPending, forfeit, noteFormation,
 } from './wallet.js';
 import {
   exportCode, importCode, acceptImport, loadMaxRev, persistSave, loadSave,
@@ -77,5 +77,21 @@ describe('an older save code cannot roll progress back', () => {
     const fresh = fakeStorage();
     const code = importCode(exportCode({ ...newSave(), rev: 40 }));
     expect(acceptImport(code, loadSave(fresh), loadMaxRev(fresh))).toBe(true);
+  });
+});
+
+describe('the custom formation designer is a one-time purchase', () => {
+  it('costs the price once; designing, editing and deleting after that are free', () => {
+    const rich = { ...newSave(), balance: 1500000 };
+    const once = buyCustom(rich);
+    expect(once.balance).toBe(500000);
+    expect(once.custom.unlocked).toBe(true);
+    expect(buyCustom(once)).toBeNull(); // cannot be bought again
+    const spec = { id: 'c1', name: 'A', players: [] };
+    const saved = saveCustom(once, spec);
+    expect(saved.balance).toBe(500000); // saving a formation costs nothing
+    expect(deleteCustom(saved, 'c1').balance).toBe(500000);
+    expect(buyCustom({ ...newSave(), balance: 999999 })).toBeNull(); // not before you can afford it
+    expect(saveCustom(newSave(), spec)).toBeNull(); // and no saving without the unlock
   });
 });
