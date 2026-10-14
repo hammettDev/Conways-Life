@@ -11,7 +11,7 @@ import { placeFormation, pickBotSetup } from './engine/formations.js';
 import { DEFAULT_FORTUNE_RULES } from './engine/fortuneRules.js';
 import { createRng } from './engine/rng.js';
 import { createSfx } from './audio/sfx.js';
-import { BLUE, RED, COLS, ROWS, WAGER, MIN_BET, BET_STEP, AUDIBLE_PRICE, TUTORIAL_STAKE } from './engine/constants.js';
+import { BLUE, RED, COLS, ROWS, WAGER, MIN_BET, AUDIBLE_PRICE, TUTORIAL_STAKE } from './engine/constants.js';
 import { tableSize } from './render/drawBoard.js';
 import { createPitDisplay, pitLead } from './render/pitDisplay.js';
 import { loadSave, persistSave, exportCode, importCode } from './game/saveStore.js';
@@ -20,7 +20,7 @@ import {
   noteFormation, noteResult,
 } from './game/wallet.js';
 import {
-  BOSSES, getBoss, unlockedBosses, bossReady, winsToBoss, pickBossSetup, rollMultiplier,
+  BOSSES, getBoss, unlockedBosses, bossReady, winsToBoss, pickBossSetup, withItem, rollMultiplier,
 } from './game/bosses.js';
 import { STEPS, stepFor } from './game/tutorial.js';
 import BossReveal from './components/BossReveal.jsx';
@@ -38,6 +38,8 @@ const money = (n) => `$${n.toLocaleString()}`;
 const findBuild = (id) => FREE_BUILDS.find((b) => b.id === id) || null;
 
 // A formation's cells, with the bought piece swapped in for the reserves if there is one.
+// What the bot is fielding, for the scorebar: the formation, plus its piece if it brought one.
+const botLabel = (bot) => (bot.item ? `${bot.formation.name} + ${bot.item.name}` : bot.formation.name);
 const blueCells = (build, obj, drop) => (obj && drop ? cellsWithObject(build, BLUE, obj, drop) : placeFormation(build, BLUE));
 
 export default function App() {
@@ -79,21 +81,22 @@ export default function App() {
 
   const selected = findBuild(selectedId);
   const obj = objectId ? getObject(objectId) : null;
-  const tutorial = !save.tutorialDone;           // the guided first match: fixed stake, free pieces and audible
+  const [practice, setPractice] = useState(false); // replaying the tutorial: nothing is paid or won
+  const tutorial = !save.tutorialDone || practice; // the guided match: fixed stake, free pieces and audible
   const [tStep, setTStep] = useState('pick');
   const [bossId, setBossId] = useState(null);       // the boss you are challenging this match
   const [bossMult, setBossMult] = useState(null);   // the hidden payout, revealed after a win
   const [betPref, setBetPref] = useState(WAGER);
   const pieceCost = obj && !tutorial ? obj.price : 0;
   const maxBet = Math.max(MIN_BET, save.balance - pieceCost);   // up to everything left after the piece
-  const wager = tutorial ? TUTORIAL_STAKE : Math.min(Math.max(betPref, MIN_BET), maxBet);
+  const wager = tutorial ? (practice ? 0 : TUTORIAL_STAKE) : Math.min(Math.max(betPref, MIN_BET), maxBet);
   const cost = wager + pieceCost;
-  const stepBet = (d) => setBetPref(Math.min(maxBet, Math.max(MIN_BET, wager + d)));
+  const setBet = (v) => setBetPref(Math.min(maxBet, Math.max(MIN_BET, Math.round(v))));
   const audiblePrice = tutorial ? 0 : AUDIBLE_PRICE;
 
   // Everything the per-frame callbacks and window listeners need, kept current.
   const live = useRef({});
-  live.current = { tutorial, wager, phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
+  live.current = { tutorial, practice, wager, phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
   const engineRef = useRef(newEngine(1)); // an empty board, so the Hot Zones show while drafting
   const spillsRef = useRef([]);
   const lastCrashId = useRef(0);
@@ -205,12 +208,12 @@ export default function App() {
     setBossMult(null);
     skipRef.current = false;
     const bot = boss
-      ? pickBossSetup(boss, createRng(seed), save.boss.last)
+      ? withItem(boss, pickBossSetup(boss, createRng(seed), save.boss.last), createRng(seed ^ 0x51ed))
       : pickBotSetup(createRng(seed), tutorial && TUTORIAL_BUILDS.length ? TUTORIAL_BUILDS : FREE_BUILDS);
     botRef.current = bot;
     botPendingRef.current = null;
     startEngine(blueCells(selected, obj, drop), bot.cells, seed);
-    setBotName(bot.formation.name);
+    setBotName(botLabel(bot));
     setNotice('');
     setAudibleUsed(false);
     setPhase('locked');
@@ -244,7 +247,8 @@ export default function App() {
       const c = counterFor(next.id, FREE_BUILDS, rng);
       const flip = rng() < 0.5;
       bot = { formation: c, flip, cells: placeFormation(c, RED, { flip }) };
-      botPendingRef.current = { name: c.name, notice: `The bot called an audible: ${c.name}.` };
+      if (bossRef.current) bot = withItem(bossRef.current, bot, rng);
+      botPendingRef.current = { name: botLabel(bot), notice: `The bot called an audible: ${bot.formation.name}.` };
     }
     botRef.current = bot;
     seedRef.current = seed;
@@ -279,14 +283,24 @@ export default function App() {
   useEffect(() => {
     if (tutorial) setTStep((c) => stepFor(c, { phase, hasSelection: Boolean(selectedId) }));
   }, [tutorial, phase, selectedId]);
+  const leaveTutorial = () => {
+    if (practice) setPractice(false);
+    else setSave((s) => finishTutorial(s));
+  };
+  const startTutorial = () => {
+    emptyBoard();
+    setSelectedId(null); setObjectId(null); setDrop(null); setBossId(null); setNotice('');
+    setTStep('pick');
+    setPractice(true);
+  };
   const endTutorial = () => {
-    setSave((s) => finishTutorial(s));
+    leaveTutorial();
     newMatch();
     setSelectedId(null);
     setTStep('pick');
   };
   const nextStep = () => setTStep((c) => ({ hot: 'shop', shop: 'lock' }[c] || c));
-  const lesson = tutorial ? STEPS[tStep] : null;
+  const lesson = tutorial ? { ...STEPS[tStep], text: (practice && STEPS[tStep].practice) || STEPS[tStep].text } : null;
 
   const takeBail = () => {
     const r = takeBailout(save);
@@ -341,7 +355,7 @@ export default function App() {
             const mult = boss && r.outcome === 'win' ? rollMultiplier(Math.random) : 1;
             if (boss && r.outcome === 'win') setBossMult(mult);
             setSave((s) => (live.current.tutorial
-              ? settle(s, 'win', w)
+              ? (live.current.practice ? s : settle(s, 'win', w))
               : noteResult(settle(s, r.outcome, w, mult), r.outcome, boss ? boss.id : null)));
           }
         }
@@ -366,8 +380,8 @@ export default function App() {
 
   const live2 = hud || { tick: 0, blue: 0, red: 0, crashes: 0, pitBlue: 0, pitRed: 0 };
   const TABLE = tableSize(madden);
-  const verdict = result && (tutorial ? 'Insured win' : { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome]);
-  const net = result && (tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(wagerRef.current * (bossMult || 1))}` : result.outcome === 'lose' ? `−${money(wagerRef.current)}` : 'bet returned');
+  const verdict = result && (tutorial && !practice ? 'Insured win' : { win: 'You win', lose: 'You lose', push: 'Push' }[result.outcome]);
+  const net = result && (practice ? 'practice run, no money moved' : tutorial ? `insured +${money(wager)}` : result.outcome === 'win' ? `+${money(wagerRef.current * (bossMult || 1))}` : result.outcome === 'lose' ? `−${money(wagerRef.current)}` : 'bet returned');
 
   return (
     <div className={tutorial ? "app tutorial" : "app"}>
@@ -381,6 +395,7 @@ export default function App() {
               <button className="ghost small" onClick={takeBail}>Bailout +{money(bailoutAmount(save))}</button>
             )}
           </div>
+          {drafting && !tutorial && <button className="viewtoggle" onClick={startTutorial}>How to play</button>}
           <button className="viewtoggle" onClick={() => setShowSave(true)}>Save</button>
           <button className="viewtoggle" onClick={toggleLook} aria-pressed={look === 'chips'}>Look: {look === 'chips' ? 'Chips' : 'Clean'}</button>
           <button className="viewtoggle" onClick={toggleView} aria-pressed={madden}>View: {madden ? 'Madden' : 'Sideways'}</button>
@@ -396,7 +411,7 @@ export default function App() {
           <div className="coachact">
             {lesson.next && <button className="go small" onClick={tStep === 'wrap' ? endTutorial : nextStep}>{lesson.next}</button>}
             {lesson.wait && <span className="waiting">{lesson.wait}</span>}
-            {tStep !== 'wrap' && <button className="ghost small" onClick={() => { if (phase === 'locked') cancelMatch(); setSave((s) => finishTutorial(s)); }}>Skip tutorial</button>}
+            {tStep !== 'wrap' && <button className="ghost small" onClick={() => { if (phase === 'locked') cancelMatch(); leaveTutorial(); }}>{practice ? 'Leave tutorial' : 'Skip tutorial'}</button>}
           </div>
         </aside>
       )}
@@ -430,7 +445,7 @@ export default function App() {
                 {phase === 'done' && result && (
                   <>
                     <div className="line">
-                      <span className={`verdict ${tutorial ? 'win' : result.outcome}`}>{verdict}</span>
+                      <span className={`verdict ${tutorial && !practice ? 'win' : result.outcome}`}>{verdict}</span>
                     </div>
                     <p className="note">
                       {bossMult ? <><BossReveal value={bossMult} /> boss payout · </> : null}{net} · pit {result.fortune.blue}–{result.fortune.red}
@@ -450,7 +465,7 @@ export default function App() {
         </main>
 
         <Sidebar
-          builds={FREE_BUILDS} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} bet={tutorial ? null : wager} canDec={wager > MIN_BET} canInc={wager < maxBet} onBet={stepBet} betStep={BET_STEP} phase={phase}
+          builds={FREE_BUILDS} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} bet={tutorial ? null : wager} minBet={MIN_BET} maxBet={maxBet} onBet={setBet} phase={phase}
           selectedId={selectedId}
           onSelect={(id) => (phase === 'audible' ? setAudibleChoice(id) : setSelectedId(id))}
           objectId={objectId}

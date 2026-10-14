@@ -9,7 +9,6 @@ export const FIELD_Y1 = FIELD_Y0 + FIELD_ROWS;
 
 export const WAGER = 100;      // the default bet
 export const MIN_BET = 50;
-export const BET_STEP = 50;   // the bet moves in steps of this, up to the whole wallet
 export const MAX_DRAFT = 50;
 
 // Tutorial lesson 5: a forced, insured first bet. Starting from $250 and

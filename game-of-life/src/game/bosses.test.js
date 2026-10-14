@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  BOSSES, getBoss, unlockedBosses, bossReady, winsToBoss, pickBossSetup, rollMultiplier,
+  BOSSES, getBoss, unlockedBosses, bossReady, winsToBoss, pickBossSetup, withItem, rollMultiplier,
 } from './bosses.js';
 import { newSave, noteResult, noteFormation, settle, placeBet } from './wallet.js';
 import { importCode, exportCode } from './saveStore.js';
@@ -50,6 +50,26 @@ describe('boss fights', () => {
   it('the Scout always answers an audible; the others sometimes', () => {
     expect(getBoss('scout').audible).toBe(1);
     expect(getBoss('coach').audible).toBeLessThan(1);
+  });
+});
+
+describe('boss items', () => {
+  it('every boss brings a piece that fits on its half without overlapping', () => {
+    for (const b of BOSSES) {
+      for (let seed = 1; seed <= 25; seed++) {
+        const rng = createRng(seed);
+        const base = pickBossSetup(b, rng, 'fb-shotgun');
+        const setup = withItem(b, base, createRng(seed + 100));
+        expect(setup.item, `${b.id} seed ${seed}`).toBeTruthy();
+        expect(b.items).toContain(setup.item.id);
+        const keys = setup.cells.map((c) => c.y * 1000 + c.x);
+        expect(new Set(keys).size).toBe(keys.length);
+      }
+    }
+  });
+  it('the heavier bosses bring heavier pieces', () => {
+    expect(getBoss('champion').items).toContain('hwss');
+    expect(getBoss('scout').items).not.toContain('hwss');
   });
 });
 

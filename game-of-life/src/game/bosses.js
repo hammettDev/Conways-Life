@@ -1,6 +1,7 @@
 import { FREE_BUILDS, BOSS_BUILDS } from '../engine/library.js';
-import { placeFormation, pickBotSetup } from '../engine/formations.js';
-import { RED, BOSS_UNLOCK_WINS, BOSS_MULTIPLIERS, SCOUT_BOSS_AUDIBLE_CHANCE } from '../engine/constants.js';
+import { placeFormation, pickBotSetup, HALF_X } from '../engine/formations.js';
+import { getObject, cellsWithObject } from '../engine/objects.js';
+import { RED, FIELD_X1, FIELD_Y0, FIELD_Y1, BOSS_UNLOCK_WINS, BOSS_MULTIPLIERS, SCOUT_BOSS_AUDIBLE_CHANCE } from '../engine/constants.js';
 import { counterFor } from './audible.js';
 
 // Boss fights are the regular match with a tougher bot and a hidden payout:
@@ -10,15 +11,18 @@ import { counterFor } from './audible.js';
 export const BOSSES = [
   {
     id: 'scout', name: 'The Scout', audible: SCOUT_BOSS_AUDIBLE_CHANCE,
-    blurb: 'Studies your last formation and picks the counter. Answers every audible, so out-vary it instead.',
+    items: ['glider', 'rpent'],
+    blurb: 'Studies your last formation and picks the counter. Answers every audible, so out-vary it instead. Brings a cheap piece.',
   },
   {
     id: 'coach', name: 'The Coach', audible: 0.3,
-    blurb: 'Runs a strong playbook the regular bots never use.',
+    items: ['lwss', 'mwss', 'rpent'],
+    blurb: 'Runs a strong playbook the regular bots never use, and brings a spaceship.',
   },
   {
     id: 'champion', name: 'The Champion', audible: 0.5,
-    blurb: 'Counter-picks your last formation from the strong playbook too.',
+    items: ['mwss', 'hwss', 'acorn'],
+    blurb: 'Counter-picks your last formation from the strong playbook too, with the heaviest pieces.',
   },
 ];
 
@@ -46,6 +50,28 @@ export function pickBossSetup(boss, rng, lastId) {
   const pool = boss.id === 'champion' ? [...strong, ...FREE_BUILDS] : FREE_BUILDS;
   if (!lastId) return pickBotSetup(rng, pool);
   return asSetup(counterFor(lastId, pool, rng), rng);
+}
+
+// A boss brings one bought piece too (it replaces its reserves, like yours). It
+// goes where it fits on the boss's half without overlapping the formation. The
+// piece is revealed with the formation, so you can see what you are up against.
+export function withItem(boss, setup, rng) {
+  const ids = boss.items || [];
+  if (!ids.length) return setup;
+  const object = getObject(ids[Math.floor(rng() * ids.length)]);
+  for (let tries = 0; tries < 60; tries++) {
+    const drop = { depth: 8 + Math.floor(rng() * 14), lat: Math.floor(rng() * 25) - 12 };
+    const cells = cellsWithObject(setup.formation, RED, object, drop, { flip: setup.flip });
+    const seen = new Set();
+    const ok = cells.every((c) => {
+      const k = c.y * 1000 + c.x;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return c.x >= HALF_X && c.x < FIELD_X1 && c.y >= FIELD_Y0 && c.y < FIELD_Y1;
+    });
+    if (ok) return { ...setup, cells, item: object };
+  }
+  return setup; // nowhere to put it: fight without
 }
 
 // The hidden payout multiplier, from the weighted table.

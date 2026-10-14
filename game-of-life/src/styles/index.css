@@ -179,3 +179,6 @@ body {
 .bossitem .meta { white-space: normal; font-size: 0.75rem; }
 .reel { display: inline-block; min-width: 2.4em; font-weight: 800; color: var(--accent, #ffb02e); }
 .reel.landed { text-shadow: 0 0 10px var(--accent, #ffb02e); }
+
+.betbox { display: flex; flex-direction: column; gap: 6px; }
+.betslider { width: 100%; accent-color: var(--accent, #ffb02e); }

@@ -9,7 +9,7 @@ const money = (n) => `$${n.toLocaleString()}`;
 // In the shop each piece shows a looping demo of what it does, and can be dragged
 // from that card onto your half of the board (or placed with a click).
 export default function Sidebar({
-  builds, objects, balance, wager, phase, free, bet, canDec, canInc, onBet, betStep,
+  builds, objects, balance, wager, phase, free, bet, minBet, maxBet, onBet,
   selectedId, onSelect,
   objectId, onObject, placed, armed, onArm, onDragStart, onClearPlace,
   lockLabel, lockHint, canLock, onLockIn,
@@ -166,10 +166,15 @@ export default function Sidebar({
       ) : (
         <>
           {bet != null && (
-            <div className="betrow" aria-label="Bet">
-              <button className="ghost small" onClick={() => onBet(-betStep)} disabled={!drafting || !canDec} aria-label="Lower bet">−</button>
-              <span>Bet <b>{money(bet)}</b></span>
-              <button className="ghost small" onClick={() => onBet(betStep)} disabled={!drafting || !canInc} aria-label="Raise bet">+</button>
+            <div className="betbox">
+              <div className="betrow">
+                <span>Bet <b>{money(bet)}</b></span>
+                <button className="ghost small" onClick={() => onBet(maxBet)} disabled={!drafting || bet >= maxBet}>Max</button>
+              </div>
+              <input
+                type="range" className="betslider" min={minBet} max={maxBet} step={10} value={bet}
+                onChange={(e) => onBet(Number(e.target.value))} disabled={!drafting || maxBet <= minBet} aria-label="Bet amount"
+              />
             </div>
           )}
           <button className="lock" onClick={onLockIn} disabled={!canLock}>{lockLabel}</button>
