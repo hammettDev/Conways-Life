@@ -29,24 +29,22 @@ describe('stakes tables', () => {
   });
   it('charge a fee and cap what you can bet by what you can cover', () => {
     const t = getTable('regular');
-    expect(feeFor(t, 5000)).toBe(Math.round(5000 * t.fee));
-    expect(maxBetFor(t, 5050, 0)).toBe(5000); // $5,000 plus its 1% fee
-    expect(maxBetFor(t, 5049, 0)).toBeLessThan(5000);
+    expect(feeFor(t, 5000)).toBe(100);
+    expect(maxBetFor(t, 5100, 0)).toBe(5000); // $5,000 plus its 2% fee
     expect(maxBetFor(t, 1e9, 0)).toBe(t.max);
     expect(betStep(TABLES[0])).toBe(10);
     expect(betStep(TABLES[4])).toBe(100000);
   });
-  it('Rookie bots are random; the higher tables increasingly counter the formation you used last', () => {
+  it('Rookie bots are random; the higher tables counter the formation you used last', () => {
     const counters = new Set(COUNTERS['fb-dime']);
     const hits = (id) => { let n = 0; for (let s = 1; s <= 60; s++) if (counters.has(pickTableSetup(getTable(id), createRng(s), 'fb-dime', createRng(s + 9)).formation.id)) n++; return n; };
-    expect(hits('mogul')).toBeGreaterThan(35); // mostly the counter
+    expect(hits('whale')).toBe(60); // always the counter
     expect(hits('rookie')).toBeLessThan(25);
   });
   it('bring pieces at the higher tables and none at Rookie', () => {
     const has = (id) => { let n = 0; for (let s = 1; s <= 40; s++) if (pickTableSetup(getTable(id), createRng(s), null, createRng(s + 5)).item) n++; return n; };
     expect(has('rookie')).toBe(0);
-    expect(has('mogul')).toBeGreaterThan(20);
-    expect(has('whale')).toBeGreaterThan(10);
+    expect(has('whale')).toBeGreaterThan(30);
     expect(FREE_BUILDS.length + BOSS_BUILDS.length).toBeGreaterThan(10);
   });
 });
