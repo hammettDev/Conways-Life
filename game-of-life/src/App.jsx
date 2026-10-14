@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Drive from './components/Drive.jsx';
+import { DRIVE_PAYOUT } from './engine/football.js';
 import Arena from './components/Arena.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import SaveDialog from './components/SaveDialog.jsx';
@@ -604,13 +606,22 @@ export default function App() {
         </div>
       </header>
 
-      <div className="layout" data-sheet={sheet || 'none'} data-armed={armed || adjust ? '1' : undefined}>
+      <div className="layout" data-mode={mode} data-sheet={sheet || 'none'} data-armed={armed || adjust ? '1' : undefined}>
         <Tables
           save={save} tableId={table.id} drafting={drafting && !auto.on} tutorial={tutorial} scout={scoutP} repeat={repeatShare(save)}
           onPick={(id) => commit((s) => ({ ...s, table: id }))}
           mode={mode} onMode={setMode}
         />
 
+        {mode === 'drive' ? (
+          <Drive
+            balance={save.balance} table={table} minBet={table.min} maxBet={maxBet} betStep={betStep(table)} feeFor={feeFor} seed={matchSeed(save)}
+            onStart={(c) => { const held = placeBet(save, c); if (!held) return false; commit(() => held); return true; }}
+            onFinish={(win, w) => commit((cur) => noteResult(settle(cur, win ? 'win' : 'lose', w, DRIVE_PAYOUT)))}
+            onExit={() => setMode('2p')}
+          />
+        ) : (
+        <>
         <main className="stage">
           {(armed || adjust) && (
             <div className="placebar">
@@ -731,6 +742,8 @@ export default function App() {
           }}
           cancelFee={tutorial ? '' : money(audiblePrice)}
         />
+        </>
+        )}
       </div>
 
       {designer && (

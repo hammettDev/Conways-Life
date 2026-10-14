@@ -50,10 +50,14 @@ export default function Tables({ save, tableId, onPick, drafting, tutorial, scou
             <span className="name">4-player arena</span><span className="meta">A board twice the size, three bots, a bigger pit. Winner takes all: a win pays ×3.</span>
           </button>
         </li>
+        <li>
+          <button className={mode === 'drive' ? 'item on tableitem' : 'item tableitem'} aria-pressed={mode === 'drive'} disabled={!drafting || tutorial} onClick={() => onMode('drive')}>
+            <span className="name">Football drive</span><span className="meta">Call plays against a bot defence. Score a touchdown: a win pays ×2.</span>
+          </button>
+        </li>
       </ul>
       <h2>More modes</h2>
       <ul className="list soon">
-        <li><span className="item tableitem" aria-disabled="true"><span className="name">Football gauntlet</span><span className="meta">Coming soon</span></span></li>
         <li><span className="item tableitem" aria-disabled="true"><span className="name">Pinball</span><span className="meta">Coming soon</span></span></li>
       </ul>
     </aside>

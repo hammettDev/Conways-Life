@@ -427,3 +427,33 @@ body {
   .layout:has(.side.green) .stage { position: static; }
   .layout:has(.side.green) .table { width: min(100%, 300px) !important; }
 }
+
+/* ---- Football drive ---- */
+.drive { grid-column: 2 / -1; display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-areas: 'head head' 'play panel'; gap: 10px 16px; align-items: start; }
+.drivehead { grid-area: head; display: flex; align-items: center; gap: 12px; background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 8px 14px; }
+.driveinfo { display: flex; flex-direction: column; min-width: 96px; line-height: 1.25; }
+.driveinfo span { color: var(--dim); font-size: 0.8rem; }
+.drivefield { position: relative; flex: 1; height: 10px; border-radius: 6px; background: rgba(255,255,255,0.08); overflow: visible; }
+.drivefield i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: var(--accent, #45e08a); }
+.drivefield em { position: absolute; top: -4px; bottom: -4px; width: 3px; background: #ffd050; border-radius: 2px; }
+.driveleave { grid-area: play; z-index: 5; display: flex; gap: 8px; align-items: center; padding: 8px 12px; background: rgba(40,20,10,0.95); border: 1px solid #ff8a3d; border-radius: 10px; }
+.driveplay { grid-area: play; display: flex; flex-direction: column; gap: 6px; }
+.drivecanvas { width: 100%; height: auto; aspect-ratio: 60 / 48; border-radius: 12px; border: 1px solid var(--edge); background: #06110a; }
+.drivedef { text-align: center; color: var(--dim); min-height: 1.4em; }
+.drivedef b { color: #ff6f95; }
+.drivepanel { grid-area: panel; background: var(--panel); border: 1px solid var(--edge); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.drivepick { display: flex; flex-wrap: wrap; gap: 6px; }
+.driveseg { display: flex; gap: 6px; }
+.driveseg button { flex: 1; padding: 8px 4px; border-radius: 10px; border: 1px solid var(--edge); background: transparent; color: var(--text); cursor: pointer; font-weight: 600; }
+.driveseg button.on { background: var(--accent, #45e08a); color: #04100a; }
+.drivemsg { margin: 0; font-weight: 700; color: var(--text); }
+.drivepanel .betbox { display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 1099px) {
+  .drive { grid-column: 2 / -1; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'head' 'play' 'panel'; }
+}
+@media (max-width: 639px) {
+  .drive { grid-column: auto; }
+  .layout[data-mode='drive'] { display: block; }
+  .layout[data-mode='drive'] .lobby { display: none; }
+  .app:has(.layout[data-mode='drive']) { padding-bottom: 24px; }
+}
