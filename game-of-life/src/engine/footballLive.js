@@ -54,7 +54,7 @@ export const TUNE = {
   catchGap: 2,       // ball within this many cells of the receiver: caught
   carryTicks: 70,    // how long a catch is followed
   runTicks: 70, runScale: 1, runMin: -3, runMax: 25,
-  intChance: 0.5,    // chance a ball killed by coverage is an interception (else incomplete)
+  intChance: 0.25,    // chance a ball killed by coverage is an interception (else incomplete)
   sackYards: 6,
 };
 
