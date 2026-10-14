@@ -161,3 +161,15 @@ describe('game clock', () => {
     });
   });
 });
+
+describe('a missed field goal', () => {
+  const kicking = (spot) => ({ ...startPlay(newGame(7, 'rookies'), 'you'), drive: { ...startPlay(newGame(7, 'rookies'), 'you').drive, spot, down: 4 } });
+  it('gives the other team the ball where the kick was taken (their spot mirrored), at the 20 at the least', () => {
+    let g = afterPlay(kicking(70), { kind: 'kick', made: false, yards: 0 });
+    expect(g.poss).toBe('them');
+    expect(g.drive.spot).toBe(30);       // we kicked from their 30: they start at their own 30
+    expect(g.you).toBe(0);
+    g = afterPlay(kicking(90), { kind: 'kick', made: false, yards: 0 });
+    expect(g.drive.spot).toBe(20);       // a miss from close in is a touchback to the 20
+  });
+});
