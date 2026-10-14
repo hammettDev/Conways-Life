@@ -351,3 +351,8 @@ body {
   .scorebar .mid { min-height: 0; }
   .panelbody .list { min-height: 0; flex: 1 1 auto; max-height: none; }
 }
+
+/* the right panel never scrolls sideways; on small screens the idle score-bar hint is dropped so the scores have room */
+.sidebar, .panelbody, .sidebar .list, .actions { overflow-x: hidden; }
+.sidebar .item, .sidebar .list li { min-width: 0; }
+@media (max-width: 1099px) { .scorebar .idlehint { display: none; } }

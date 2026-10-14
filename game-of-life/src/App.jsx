@@ -602,7 +602,7 @@ export default function App() {
               <div className="side blue"><span className="num">{shown.blue}</span><i>you</i></div>
               {four && <div className="side red"><span className="num">{shown.red}</span><i>red</i></div>}
               <div className="mid">
-                {drafting && <p>{notice || (selected ? <>Previewing <b>{selected.name}</b>. Lock In to bet {money(cost)}.</> : 'Choose a formation from the sidebar.')}</p>}
+                {drafting && <p className={notice || selected ? undefined : 'idlehint'}>{notice || (selected ? <>Previewing <b>{selected.name}</b>. Lock In to bet {money(cost)}.</> : 'Choose a formation from the sidebar.')}</p>}
                 {phase === 'locked' && (
                   <>
                     {encounter && <p className="bossline">⚠ BOSS: {encounter.name} · hidden payout up to ×20</p>}
