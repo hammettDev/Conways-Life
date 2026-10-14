@@ -146,6 +146,8 @@ export default function App() {
   const bossRef = useRef(null);
   const tableRef = useRef(null);
   const skipRef = useRef(false);
+  const autoOnRef = useRef(false);
+  const autoPieceRef = useRef(true);
   const seedRef = useRef(1);
   const botRef = useRef(null);
   const botPendingRef = useRef(null);
@@ -352,9 +354,9 @@ export default function App() {
     setPhase('draft');
     setResult(null);
     setHud(null);
-    setObjectId(null);   // the piece was used up
+    // the piece was used up, unless auto-play is set to buy it again in the same spot
+    if (!(autoOnRef.current && autoPieceRef.current)) { setObjectId(null); setDrop(null); }
     setBossId(null);
-    setDrop(null);
     setArmed(false);
     setNotice('');
   };
@@ -458,6 +460,9 @@ export default function App() {
   const feeNote = drafting && tableFee > 0 ? `Includes a ${money(tableFee)} table fee.` : '';
   // ---- auto-play: keep firing the same bet on the same formation ------------------------
   const [auto, setAuto] = useState({ on: false, bet: 0, start: 0, n: 0 });
+  const [autoPiece, setAutoPiece] = useState(true); // auto-play re-buys the same piece, in the same spot, every match
+  autoOnRef.current = auto.on;
+  autoPieceRef.current = autoPiece;
   const stopAuto = (why) => {
     setAuto((a) => ({ ...a, on: false }));
     if (why) setNotice(why);
@@ -481,7 +486,7 @@ export default function App() {
     }
     if (phase === 'draft') {
       if (canLock && wager >= auto.bet) lockIn();
-      else stopAuto('Auto-play stopped: not enough cash to repeat the bet.');
+      else stopAuto(`Auto-play stopped: not enough cash to repeat the bet${obj ? ' and piece' : ''}.`);
     }
     return undefined;
   }, [auto.on, phase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -594,7 +599,7 @@ export default function App() {
           bosses={tutorial ? null : { list: unlockedBosses(save), all: BOSSES, ready: bossReady(save), toGo: winsToBoss(save), beaten: save.boss.beaten, selected: bossId }}
           onBoss={(id) => setBossId(id)}
           onNewMatch={newMatch} onReplay={watchReplay} onAutoStart={startAuto} onAutoStop={() => stopAuto('')}
-          auto={tutorial ? null : { on: auto.on, n: auto.n, net: save.balance - auto.start }} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
+          auto={tutorial ? null : { on: auto.on, n: auto.n, net: save.balance - auto.start, piece: autoPiece, onPiece: setAutoPiece, hasPiece: Boolean(obj && drop) }} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(audiblePrice)}
           custom={tutorial ? null : {

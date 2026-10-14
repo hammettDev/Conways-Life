@@ -264,6 +264,11 @@ export default function Sidebar({
           {lockHint && <p className="hint">{lockHint}</p>}
           {!lockHint && auto && <p className="hint">Hold Lock In to keep playing the same bet.</p>}
           {auto && <button className="ghost small" onClick={onAutoStart} disabled={!canLock}>Auto-play</button>}
+          {auto && (
+            <label className="note autopiece">
+              <input type="checkbox" checked={auto.piece} onChange={(e) => auto.onPiece(e.target.checked)} /> Buy the same piece again each match
+            </label>
+          )}
         </>
       )}
     </aside>

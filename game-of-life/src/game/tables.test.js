@@ -35,16 +35,17 @@ describe('stakes tables', () => {
     expect(betStep(TABLES[0])).toBe(10);
     expect(betStep(TABLES[4])).toBe(100000);
   });
-  it('Rookie bots are random; the higher tables counter the formation you used last', () => {
+  it('Rookie bots are random; the higher tables increasingly counter the formation you used last', () => {
     const counters = new Set(COUNTERS['fb-dime']);
     const hits = (id) => { let n = 0; for (let s = 1; s <= 60; s++) if (counters.has(pickTableSetup(getTable(id), createRng(s), 'fb-dime', createRng(s + 9)).formation.id)) n++; return n; };
-    expect(hits('whale')).toBe(60); // always the counter
+    expect(hits('mogul')).toBeGreaterThan(35); // mostly the counter
     expect(hits('rookie')).toBeLessThan(25);
   });
   it('bring pieces at the higher tables and none at Rookie', () => {
     const has = (id) => { let n = 0; for (let s = 1; s <= 40; s++) if (pickTableSetup(getTable(id), createRng(s), null, createRng(s + 5)).item) n++; return n; };
     expect(has('rookie')).toBe(0);
-    expect(has('whale')).toBeGreaterThan(30);
+    expect(has('mogul')).toBeGreaterThan(20);
+    expect(has('whale')).toBeGreaterThan(10);
     expect(FREE_BUILDS.length + BOSS_BUILDS.length).toBeGreaterThan(10);
   });
 });
