@@ -7,6 +7,13 @@ export const FIELD_Y0 = (ROWS - FIELD_ROWS) / 2;
 export const FIELD_X1 = FIELD_X0 + FIELD_COLS;
 export const FIELD_Y1 = FIELD_Y0 + FIELD_ROWS;
 
+// The custom formation designer: a late-game unlock. A custom formation obeys every rule
+// the built-in ones do (same tile budget, must be inert on its own), so what you pay for
+// is the freedom to design, not extra power.
+export const CUSTOM_PRICE = 1000000;
+export const MAX_CUSTOM = 5;     // saved custom formations
+export const MAX_CUSTOM_UNITS = 14;
+
 export const WAGER = 100;      // the default bet
 export const MIN_BET = 50;
 export const MAX_DRAFT = 50;

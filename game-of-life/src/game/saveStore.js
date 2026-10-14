@@ -1,4 +1,6 @@
 import { newSave, newPlayerSave, SAVE_VERSION } from './wallet.js';
+import { checkCustom, CUSTOM_SHAPES } from '../engine/custom.js';
+import { MAX_CUSTOM, MAX_CUSTOM_UNITS } from '../engine/constants.js';
 
 const KEY = 'gcw.save';
 const PREFIX = 'GCW1';
@@ -31,6 +33,21 @@ function sanitizePending(p) {
   return { seed: Math.floor(p.seed) & 0x7fffffff, wager: Math.floor(p.wager), boss: typeof p.boss === 'string' ? p.boss : null, blue, red };
 }
 
+// A saved custom formation only survives if it still passes the designer's own rules.
+function sanitizeCustom(c) {
+  const x = c && typeof c === 'object' ? c : {};
+  const list = [];
+  for (const f of Array.isArray(x.list) ? x.list.slice(0, MAX_CUSTOM) : []) {
+    if (!f || typeof f.id !== 'string' || typeof f.name !== 'string' || !Array.isArray(f.players)) continue;
+    const players = f.players.slice(0, MAX_CUSTOM_UNITS)
+      .filter((p) => p && CUSTOM_SHAPES.includes(p.shape) && Number.isInteger(p.depth) && Number.isInteger(p.lat))
+      .map((p) => ({ shape: p.shape, depth: p.depth, lat: p.lat }));
+    const spec = { id: f.id.slice(0, 30), name: f.name.slice(0, 24), players };
+    if (checkCustom(spec).ok) list.push(spec);
+  }
+  return { unlocked: x.unlocked === true, list };
+}
+
 function sanitizeBoss(b) {
   const x = b && typeof b === 'object' ? b : {};
   const beaten = Array.isArray(x.beaten) ? x.beaten.filter((id) => typeof id === 'string').slice(0, 20) : [];
@@ -52,6 +69,7 @@ export function sanitize(raw) {
     v: SAVE_VERSION,
     tutorialDone: raw.tutorialDone === true || played > 0, // older saves predate the tutorial
     boss: sanitizeBoss(raw.boss),
+    custom: sanitizeCustom(raw.custom),
     rev: num(raw.rev, 0),
     sid: num(raw.sid, 0),
     pending: sanitizePending(raw.pending),

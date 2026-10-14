@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Arena from './components/Arena.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import SaveDialog from './components/SaveDialog.jsx';
+import Designer from './components/Designer.jsx';
+import { buildCustom } from './engine/custom.js';
 import { createEngine } from './engine/engine.js';
 import { FREE_BUILDS, TUTORIAL_BUILDS } from './engine/library.js';
 import {
@@ -11,7 +13,7 @@ import { placeFormation, pickBotSetup } from './engine/formations.js';
 import { DEFAULT_FORTUNE_RULES } from './engine/fortuneRules.js';
 import { createRng } from './engine/rng.js';
 import { createSfx } from './audio/sfx.js';
-import { BLUE, RED, COLS, ROWS, WAGER, MIN_BET, AUDIBLE_PRICE, TUTORIAL_STAKE } from './engine/constants.js';
+import { BLUE, RED, COLS, ROWS, WAGER, MIN_BET, AUDIBLE_PRICE, CUSTOM_PRICE, MAX_CUSTOM, TUTORIAL_STAKE } from './engine/constants.js';
 import { tableSize } from './render/drawBoard.js';
 import { createPitDisplay, pitLead } from './render/pitDisplay.js';
 import {
@@ -20,7 +22,7 @@ import {
 import { packMatch, bossMultiplier, resolvePending } from './game/pending.js';
 import {
   placeBet, refund, spend, settle, canAfford, bailoutAvailable, bailoutAmount, takeBailout, finishTutorial,
-  noteFormation, noteResult, matchSeed, setPending, clearPending, forfeit,
+  noteFormation, noteResult, matchSeed, setPending, clearPending, forfeit, buyCustom, saveCustom, deleteCustom,
 } from './game/wallet.js';
 import {
   BOSSES, getBoss, unlockedBosses, bossReady, winsToBoss, pickBossSetup, withItem, rollMultiplier,
@@ -45,7 +47,6 @@ function startUp() {
   return { save: resumed ? resumed.save : save, resumed };
 }
 const money = (n) => `$${n.toLocaleString()}`;
-const findBuild = (id) => FREE_BUILDS.find((b) => b.id === id) || null;
 
 // A formation's cells, with the bought piece swapped in for the reserves if there is one.
 // What the bot is fielding, for the scorebar: the formation, plus its piece if it brought one.
@@ -94,6 +95,10 @@ export default function App() {
     return next;
   });
 
+  const customBuilds = useMemo(() => save.custom.list.map(buildCustom), [save.custom.list]);
+  const playerBuilds = useMemo(() => [...customBuilds, ...FREE_BUILDS], [customBuilds]);
+  const findBuild = (id) => playerBuilds.find((b) => b.id === id) || null;
+  const [designer, setDesigner] = useState(null); // the formation being designed, or null
   const selected = findBuild(selectedId);
   const obj = objectId ? getObject(objectId) : null;
   const [practice, setPractice] = useState(false); // replaying the tutorial: nothing is paid or won
@@ -111,7 +116,7 @@ export default function App() {
 
   // Everything the per-frame callbacks and window listeners need, kept current.
   const live = useRef({});
-  live.current = { tutorial, practice, wager, phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
+  live.current = { findBuild, tutorial, practice, wager, phase, selected, obj, drop, armed, audibleChoice, speed, look, save };
   const engineRef = useRef(newEngine(1)); // an empty board, so the Hot Zones show while drafting
   const spillsRef = useRef([]);
   const lastCrashId = useRef(0);
@@ -154,7 +159,7 @@ export default function App() {
     // Previews on your half: the formation (with the piece swapped in), and the piece under the cursor.
     let ghost = [];
     if (ph === 'draft' && sel) ghost = blueCells(sel, o, d);
-    if (ph === 'audible' && ac) { const b = findBuild(ac); if (b) ghost = placeFormation(b, BLUE); }
+    if (ph === 'audible' && ac) { const b = live.current.findBuild(ac); if (b) ghost = placeFormation(b, BLUE); }
     if (ph === 'draft' && o && arm && hoverRef.current && sel) {
       const dd = dropAt(o, hoverRef.current[0], hoverRef.current[1]);
       const ok = placementOk(sel, o, dd);
@@ -492,7 +497,7 @@ export default function App() {
         </main>
 
         <Sidebar
-          builds={FREE_BUILDS} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} bet={tutorial ? null : wager} minBet={MIN_BET} maxBet={maxBet} onBet={setBet} phase={phase}
+          builds={playerBuilds} objects={OBJECTS} balance={save.balance} wager={wager} free={tutorial} bet={tutorial ? null : wager} minBet={MIN_BET} maxBet={maxBet} onBet={setBet} phase={phase}
           selectedId={selectedId}
           onSelect={(id) => (phase === 'audible' ? setAudibleChoice(id) : setSelectedId(id))}
           objectId={objectId}
@@ -509,9 +514,32 @@ export default function App() {
           onNewMatch={newMatch} onSnap={snap} onSkip={skipToEnd} onCallAudible={callAudible} onCancel={cancelMatch} onBackAudible={cancelAudible}
           audibleDisabled={audibleUsed || !canAfford(save, audiblePrice)}
           audibleFee={tutorial ? 'free' : money(AUDIBLE_PRICE)}
+          custom={tutorial ? null : {
+            unlocked: save.custom.unlocked, price: CUSTOM_PRICE, max: MAX_CUSTOM, list: save.custom.list,
+            canBuy: save.balance >= CUSTOM_PRICE,
+            onBuy: () => { const next = buyCustom(save); if (next) commit(() => next); },
+            onNew: () => setDesigner({ id: null, name: 'My formation', players: [] }),
+            onEdit: (c) => setDesigner(c),
+            onDelete: (id) => { commit((s) => deleteCustom(s, id)); if (selectedId === id) setSelectedId(null); },
+          }}
           cancelFee={tutorial ? '' : money(AUDIBLE_PRICE)}
         />
       </div>
+
+      {designer && (
+        <Designer
+          initial={designer}
+          onClose={() => setDesigner(null)}
+          onSave={(spec) => {
+            const id = spec.id || `custom-${Date.now().toString(36)}`;
+            const next = saveCustom(save, { ...spec, id });
+            if (!next) { setNotice('Formation slots are full.'); setDesigner(null); return; }
+            commit(() => next);
+            setSelectedId(id);
+            setDesigner(null);
+          }}
+        />
+      )}
 
       {showSave && (
         <SaveDialog

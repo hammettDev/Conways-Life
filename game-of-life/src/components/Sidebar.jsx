@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { MiniPreview, Thumb } from './MiniPreview.jsx';
 import { DEMOS } from '../render/miniPreview.js';
 
-const SPORT_LABEL = { football: 'Football', soccer: 'Soccer', basketball: 'Basketball', baseball: 'Baseball', hockey: 'Hockey' };
+const SPORT_LABEL = { football: 'Football', soccer: 'Soccer', basketball: 'Basketball', baseball: 'Baseball', hockey: 'Hockey', custom: 'Custom' };
 const money = (n) => `$${n.toLocaleString()}`;
 
 // Formations and the shop. Selecting previews on the board; Lock In commits.
@@ -14,7 +14,7 @@ export default function Sidebar({
   objectId, onObject, placed, armed, onArm, onDragStart, onClearPlace,
   lockLabel, lockHint, canLock, onLockIn,
   audibleChoiceId, onAudibleConfirm, audibleLabel, canAudible,
-  onSnap, onSkip, cancelFee, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
+  onSnap, onSkip, cancelFee, custom, onNewMatch, bosses, onBoss, onCallAudible, onCancel, onBackAudible, audibleDisabled, audibleFee,
 }) {
   const [tab, setTab] = useState('formations');
   const [sport, setSport] = useState('all');
@@ -41,6 +41,7 @@ export default function Sidebar({
     <aside className="sidebar">
       <div className="tabs" role="tablist">
         <button role="tab" aria-selected={activeTab === 'formations'} onClick={() => setTab('formations')}>Formations</button>
+        {custom && <button role="tab" aria-selected={activeTab === 'custom'} onClick={() => setTab('custom')} disabled={picking}>Custom</button>}
         {bosses && <button role="tab" aria-selected={activeTab === 'boss'} onClick={() => setTab('boss')} disabled={picking}>Boss{bosses.ready ? ' !' : ''}</button>}
         <button role="tab" aria-selected={activeTab === 'shop'} onClick={() => setTab('shop')} disabled={picking}>
           Shop{chosen && placed ? ' ·1' : ''}
@@ -49,7 +50,35 @@ export default function Sidebar({
 
       {picking && <p className="banner">Audible! Pick the formation you want to switch to.</p>}
 
-      {activeTab === 'boss' && bosses ? (
+      {activeTab === 'custom' && custom ? (
+        <>
+          {!custom.unlocked ? (
+            <div className="customcard">
+              <b>Formation Designer</b>
+              <p className="note">Design your own formation, place by place. It plays by the same rules as every other one (same tile budget, must hold still on its own), so you are buying the freedom to design, not extra power. Save up to {custom.max}.</p>
+              <button className="lock" onClick={custom.onBuy} disabled={!custom.canBuy || !drafting}>Unlock · {money(custom.price)}</button>
+              {!custom.canBuy && <p className="hint">You need {money(custom.price - balance)} more.</p>}
+            </div>
+          ) : (
+            <>
+              <button className="lock" onClick={custom.onNew} disabled={!drafting || custom.list.length >= custom.max}>Design a formation</button>
+              {custom.list.length >= custom.max && <p className="hint">Formation slots full. Delete one to make room.</p>}
+              <ul className="list">
+                {custom.list.map((c) => (
+                  <li key={c.id}>
+                    <div className="row">
+                      <button className="item" style={{ flex: 1 }} onClick={() => { onSelect(c.id); setTab('formations'); }} disabled={!drafting}><span className="name">{c.name}</span><span className="meta">Use</span></button>
+                      <button className="ghost small" onClick={() => custom.onEdit(c)} disabled={!drafting}>Edit</button>
+                      <button className="ghost small" onClick={() => custom.onDelete(c.id)} disabled={!drafting} aria-label={`Delete ${c.name}`}>✕</button>
+                    </div>
+                  </li>
+                ))}
+                {!custom.list.length && <li className="empty">No custom formations yet.</li>}
+              </ul>
+            </>
+          )}
+        </>
+      ) : activeTab === 'boss' && bosses ? (
         <>
           <p className="note">
             {bosses.ready

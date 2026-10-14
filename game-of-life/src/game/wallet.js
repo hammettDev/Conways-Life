@@ -1,5 +1,5 @@
 import {
-  WAGER, MIN_BET, STARTING_WALLET, TUTORIAL_BANKROLL, BAILOUT_START, BAILOUT_STEP, BAILOUT_MIN,
+  WAGER, MIN_BET, STARTING_WALLET, CUSTOM_PRICE, MAX_CUSTOM, TUTORIAL_BANKROLL, BAILOUT_START, BAILOUT_STEP, BAILOUT_MIN,
 } from '../engine/constants.js';
 
 // The player's save: wallet, bailout count and a few stats. All functions are
@@ -14,6 +14,7 @@ export const newSave = () => ({
   sid: 0,          // per-save id that seeds the opponents, so cancelling or reloading cannot reroll them
   pending: null,   // a locked-in match that has not finished; it settles itself if the page is closed
   boss: { wins: 0, beaten: [], last: null },
+  custom: { unlocked: false, list: [] }, // the formation designer and the formations you saved with it
   bailouts: 0,
   stats: { played: 0, wins: 0, losses: 0, pushes: 0, streak: 0, bestStreak: 0 },
 });
@@ -55,6 +56,21 @@ export const clearPending = (save) => (save.pending ? { ...save, pending: null }
 
 // Pay a fee out of whatever is left (a cancelled lock-in forfeits the re-pick fee, never more than you have).
 export const forfeit = (save, amount) => ({ ...save, balance: save.balance - Math.min(amount, save.balance) });
+
+// The custom formation designer is a one-off purchase; formations you design are saved with the game.
+export function buyCustom(save) {
+  if (save.custom.unlocked || save.balance < CUSTOM_PRICE) return null;
+  return { ...save, balance: save.balance - CUSTOM_PRICE, custom: { ...save.custom, unlocked: true } };
+}
+
+export function saveCustom(save, spec) {
+  if (!save.custom.unlocked) return null;
+  const rest = save.custom.list.filter((c) => c.id !== spec.id);
+  if (rest.length >= MAX_CUSTOM) return null;
+  return { ...save, custom: { ...save.custom, list: [...rest, spec] } };
+}
+
+export const deleteCustom = (save, id) => ({ ...save, custom: { ...save.custom, list: save.custom.list.filter((c) => c.id !== id) } });
 
 export const canAfford = (save, cost) => save.balance >= cost;
 

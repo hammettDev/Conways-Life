@@ -188,3 +188,13 @@ body {
 .table.dimmed::after { content: ''; position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); border-radius: 14px; pointer-events: none; z-index: 10; }
 @keyframes coachpulse { 0%, 100% { box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 0 18px rgba(255,176,46,0.25); } 50% { box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 0 34px rgba(255,176,46,0.55); } }
 @media (prefers-reduced-motion: reduce) { .coach { animation: none; } }
+
+.dialog.designer { width: min(94vw, 900px); max-height: 94vh; overflow: auto; }
+.designrow { display: flex; gap: 16px; flex-wrap: wrap; }
+.designboard { width: 560px; max-width: 100%; height: auto; border: 1px solid var(--line, #1d3a28); border-radius: 8px; cursor: crosshair; touch-action: none; }
+.designside { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 10px; }
+.shapes { display: flex; flex-wrap: wrap; gap: 6px; }
+.hint.good { color: #4fe39a; }
+.hint.bad { color: #ff8fa8; }
+.note.small { font-size: 0.72rem; margin: 4px 0 0; }
+.customcard { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--accent, #ffb02e); border-radius: 10px; }
