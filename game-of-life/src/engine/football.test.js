@@ -42,13 +42,13 @@ describe('football drive', () => {
   });
 
   describe('the drive', () => {
-    it('starts at the 25, 1st and 10', () => {
+    it('starts at the 30, 1st and 10', () => {
       const s = newDrive();
       expect([s.down, s.toGo, s.spot]).toEqual([1, 10, DRIVE.startSpot]);
     });
     it('a first down resets the downs; a short gain moves to the next down', () => {
       const s = advance(newDrive(), { kind: 'run', yards: 3, note: '' });
-      expect([s.down, s.toGo, s.spot]).toEqual([2, 7, 28]);
+      expect([s.down, s.toGo, s.spot]).toEqual([2, 7, DRIVE.startSpot + 3]);
       const t = advance(s, { kind: 'complete', yards: 8, note: '' });
       expect([t.down, t.toGo]).toEqual([1, 10]);
     });

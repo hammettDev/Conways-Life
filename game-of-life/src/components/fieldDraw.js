@@ -37,7 +37,7 @@ export function drawField(ctx, view) {
     const px = (play.progressX - X0 + 1) * TILE;
     ctx.strokeStyle = '#4dff9a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
     ctx.fillStyle = '#4dff9a'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(`+${Math.round(play.progressX - BLUE_LOS_X)} yds`, px + 5, 6);
+    ctx.fillText(`+${Math.round((play.progressX - BLUE_LOS_X) * 1.5)} yds`, px + 5, 6);
   }
   if (play.kind === 'pass') {
     play.receivers.forEach((r, i) => {

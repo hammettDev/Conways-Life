@@ -15,11 +15,11 @@ import { BLUE, RED, COLS, ROWS } from './constants.js';
 const SIZE = COLS * ROWS;
 
 export const DRIVE = {
-  startSpot: 25,      // yards from your own goal line
+  startSpot: 30,      // yards from your own goal line
   goal: 100,
   firstDown: 10,
   downs: 4,
-  maxPlays: 10,
+  maxPlays: 12,
 };
 
 // Tunable feel (balanced by scripts/football-sim.mjs).

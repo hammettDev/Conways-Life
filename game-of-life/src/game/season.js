@@ -42,7 +42,7 @@ export const champion = (s) => seasonOver(s) && record(s).wins >= PLAYOFF_WINS;
 export const nextTeam = (s) => TEAMS[Math.min(s.week, TEAMS.length - 1)];
 
 // Points a finished drive is worth.
-export const drivePoints = (d) => (d.over === 'td' ? 7 : (d.over === 'downs' || d.over === 'clock') && d.spot >= 60 ? 3 : 0);
+export const drivePoints = (d) => (d.over === 'td' ? 7 : (d.over === 'downs' || d.over === 'clock') && d.spot >= 55 ? 3 : 0);
 export const driveNote = (d) => (d.over === 'td' ? 'Touchdown' : drivePoints(d) === 3 ? 'Field goal' : d.over === 'int' ? 'Intercepted' : 'Turned it over on downs');
 
 // The opponent's drive against the defence you called. Each team has a favourite kind of play (its style); a defence

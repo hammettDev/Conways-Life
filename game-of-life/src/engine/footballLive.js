@@ -56,6 +56,7 @@ export const TUNE = {
   runTicks: 70, runScale: 1, runMin: -3, runMax: 25,
   intChance: 0.25,    // chance a ball killed by coverage is an interception (else incomplete)
   sackYards: 6,
+  yardsPerCell: 1.5, // the field is 60 cells for 100 yards
 };
 
 // The ball and a run's carrier are gliders that touch only the coverage players (and, for the ball, the receiver it is
@@ -165,7 +166,7 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
         if (r.alive) maxCatch = Math.max(maxCatch, maxX(W, (t) => t === r.id));
         p.progressX = maxCatch;
         if (!r.alive || p.tick - p.carryStart >= tune.carryTicks || maxCatch >= 68) {
-          const yards = Math.max(0, Math.min(40, maxCatch - BLUE_LOS_X));
+          const yards = Math.round(Math.max(0, Math.min(40, maxCatch - BLUE_LOS_X)) * tune.yardsPerCell);
           finish('complete', yards, `Complete for ${yards}`);
         }
         return;
@@ -184,9 +185,9 @@ export function createLivePlay({ off, def, kind, lane = 0, rng = Math.random, tu
       W = stepMulti(W);
       if (glider.length >= 3) best = Math.max(best, ...glider.map(([x]) => x));
       p.progressX = best;
-      p.live = Math.max(0, Math.min(tune.runMax, best - BLUE_LOS_X));
+      p.live = Math.round(Math.max(0, Math.min(tune.runMax, best - BLUE_LOS_X)) * tune.yardsPerCell);
       if (glider.length < 3 || p.tick >= tune.runTicks || best >= 68) {
-        const yards = Math.round(Math.max(tune.runMin, Math.min(tune.runMax, (best - BLUE_LOS_X) * tune.runScale)));
+        const yards = Math.round(Math.max(tune.runMin, Math.min(tune.runMax, (best - BLUE_LOS_X) * tune.runScale)) * tune.yardsPerCell);
         glider = [];
         finish('run', yards, yards <= 0 ? 'Stuffed at the line' : `Run for ${yards}`);
       }
