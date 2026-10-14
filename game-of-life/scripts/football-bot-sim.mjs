@@ -3,7 +3,8 @@
 import { createLivePlay } from '../src/engine/footballLive.js';
 import { DEFENCES, defenceById, newDrive, advance } from '../src/engine/football.js';
 import { botCall, botDriver } from '../src/game/botOffence.js';
-import { TEAMS, WEAK, drivePoints } from '../src/game/season.js';
+import { TEAMS, LIVE_DEF, yardsAgainst, drivePoints } from '../src/game/season.js';
+import { inFgRange, fgChance } from '../src/engine/football.js';
 import { createRng } from '../src/engine/rng.js';
 
 const N = Number(process.argv[2] || 20);
@@ -16,7 +17,7 @@ for (const team of [TEAMS[0], TEAMS[2], TEAMS[5]]) {
       while (!s.over) {
         const call = botCall(rng, team);
         const def = mode === 'random' ? DEFENCES[Math.floor(rng() * DEFENCES.length)]
-          : defenceById(Object.keys(WEAK).find((id) => WEAK[id][WEAK[id].length - 1] === team.style) || 'fb-prevent');
+          : defenceById(Object.keys(LIVE_DEF).sort((a, b) => yardsAgainst(a, team.style) - yardsAgainst(b, team.style))[0]);
         const play = createLivePlay({ off: call.off, def, kind: call.kind, lane: call.lane, rng });
         const drive = botDriver(play, team, rng);
         play.start();
@@ -24,6 +25,7 @@ for (const team of [TEAMS[0], TEAMS[2], TEAMS[5]]) {
         const r = play.result || { kind: 'incomplete', yards: 0 };
         kinds[r.kind] = (kinds[r.kind] || 0) + 1; plays++;
         s = advance(s, r);
+        if (!s.over && s.down === 4 && inFgRange(s.spot)) s = advance(s, { kind: 'kick', made: rng() < fgChance(s.spot), yards: 0 });
       }
       pts += drivePoints(s);
     }
